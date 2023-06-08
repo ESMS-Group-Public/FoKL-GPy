@@ -5,4 +5,4 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 
 [project]
-description = "blah blah"
+long_description="foo bar baz"
