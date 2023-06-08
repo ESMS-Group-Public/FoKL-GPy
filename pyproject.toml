@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 
 [project]
-name = "my_package"
+name = "FokLMethod"
 authors = [
     {name = "ESMS Group", email = "derek.slack.001@gmail.com"},
 ]
