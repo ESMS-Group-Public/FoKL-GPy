@@ -6,12 +6,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "my_package"
 authors = [
-    {name = "Josiah Carberry", email = "josiah_carberry@brown.edu"},
+    {name = "ESMS Group", email = "derek.slack.001@gmail.com"},
 ]
 description = "My package description"
+long_description = "hm"
 requires-python = ">=3.7"
-keywords = ["one", "two"]
-license = {text = "BSD-3-Clause"}
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
