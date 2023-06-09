@@ -8,7 +8,7 @@ name = "FoKL"
 authors = [
     {name = "ESMS Group", email = "derek.slack.001@gmail.com"},
 ]
-description = "My package description"
+description = "Karhunen Loève decomposed Gaussian processes with forward variable selection"
 readme = "ReadMe.md"
 requires-python = ">=3.7"
 classifiers = [
