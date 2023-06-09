@@ -1,20 +1,10 @@
-"""
-Script for running the python implementation of the emulator_Xin routine
 
-Using 'toy' data imported from X.csv, Y.csv, and DATA_nois.csv
-
----Requirements to run---
-
-Packages needed:
-numpy
-matplotlib
-
-Need the emulator_python folder in the same directory as this script.
-
-Need X, Y, and DATA_nois.csv files in the same directory as this script
-"""
 import numpy as np
-import FokL
+import FoKL
+from FoKL import FoKLRoutines
+
+
+fkl = FoKLRoutines.FoKL()
 
 
 #%% Setting input parameters
@@ -44,7 +34,7 @@ data = np.reshape(data_load, (m*n,1), order='F')
 # generating phis from the spline coefficients text file in emulator_python
 # combined with the splineconvert script
 
-phis = splineconvert500('spline_coefficient_500.txt')
+phis = fkl.splineconvert500('spline_coefficient_500.txt')
 
 # a
 a = 9
@@ -73,7 +63,7 @@ aic = True
 
 
 #%% Running emulator_Xin routine and visualization
-betas, mtx, evs = FokL.emulator(inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
+betas, mtx, evs = fkl.emulator(inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
 
-meen, bounds, rmse = FokL.coverage3(betas, inputs, data, phis, mtx, 1000,1)
+meen, bounds, rmse = fkl.coverage3(betas, inputs, data, phis, mtx, 1000,1)
 
