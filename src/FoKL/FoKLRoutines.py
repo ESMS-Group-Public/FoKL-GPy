@@ -6,7 +6,7 @@ from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 
 class FoKL:
-    def splineconvert500(A):
+    def splineconvert500(self,A):
         """
         Same as splineconvert, but for a larger basis of 500
         """
@@ -24,7 +24,7 @@ class FoKL:
 
         return phi
 
-    def coverage3(betas, normputs, data, phis, mtx, draws, plots):
+    def coverage3(self,betas, normputs, data, phis, mtx, draws, plots):
         """
             Inputs:
                 Interprets outputs of emulator
@@ -115,7 +115,7 @@ class FoKL:
         rmse = np.sqrt(np.mean(meen - data) ** 2)
         return meen, bounds, rmse
 
-    def gibbs(inputs, data, phis, Xin, discmtx, a, b, atau, btau,
+    def gibbs(self, inputs, data, phis, Xin, discmtx, a, b, atau, btau,
               draws):
         """
         'sigsqd0' is the initial guess for the obs error variance
@@ -280,7 +280,7 @@ class FoKL:
 
         return betas, sigs, taus, betahat, X, ev
 
-    def emulator(inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
+    def emulator(self, inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
         """
         this version uses 3 way interactions use routines.emulator_Xin for two way interactions
 
@@ -560,7 +560,7 @@ class FoKL:
 
 
 
-    def GP_Integrate(betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs):
+    def GP_Integrate(self, betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs):
         """""
           betas is a list of arrays in which each entry to the list contains a specific row of the betas matrix,
           or the mean of the the betas matrix for each model being integrated
