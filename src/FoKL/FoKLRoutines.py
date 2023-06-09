@@ -115,7 +115,90 @@ class FoKL:
         rmse = np.sqrt(np.mean(meen - data) ** 2)
         return meen, bounds, rmse
 
-    def gibbs(self, inputs, data, phis, Xin, discmtx, a, b, atau, btau,
+    def emulator(self, inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
+        """
+        this version uses 3 way interactions use routines.emulator_Xin for two way interactions
+
+        this version uses the 'Xin' mode of the gibbs sampler
+
+        builds a single-output bss-anova emulator for a stationary dataset in an
+        automated fashion
+
+        function inputs:
+        'sigsqd0' is the initial guess for the obs error variance
+
+        'inputs' is the set of inputs normalized on [0,1]: matrix or numpy array
+        with columns corresponding to inputs and rows the different experimental designs
+
+        'data' are the output dataset used to build the function: column vector,
+        with entries corresponding to rows of 'inputs'
+
+        'relats' is a boolean matrix indicating which terms should be excluded
+        from the model building; for instance if a certain main effect should be
+        excluded relats will include a row with a 1 in the column for that input
+        and zeros elsewhere; if a certain two way interaction should be excluded
+        there should be a row with ones in those columns and zeros elsewhere
+        to exclude no terms 'relats = np.array([[0]])'. An example of excluding
+        the first input main effect and its interaction with the third input for
+        a case with three total inputs is:'relats = np.array([[1,0,0],[1,0,1]])'
+
+        'phis' are a data structure with the spline coefficients for the basis
+        functions, built with 'spline_coefficient.txt' and 'splineconvert' or
+        'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
+        25 basis functions: enough for most things -- while the latter provides
+        500: definitely enough for anything)
+
+        'a' and 'b' are the shape and scale parameters of the ig distribution for
+        the observation error variance of the data. the observation error model is
+        white noise choose the mode of the ig distribution to match the noise in
+        the output dataset and the mean to broaden it some
+
+        'atau' and 'btau' are the parameters of the ig distribution for the 'tau
+        squared' parameter: the variance of the beta priors is iid normal mean
+        zero with variance equal to sigma squared times tau squared. tau squared
+        must be scaled in the prior such that the product of tau squared and sigma
+        squared scales with the output dataset
+
+        'tolerance' controls how hard the function builder tries to find a better
+        model once adding terms starts to show diminishing returns. a good
+        default is 3 -- large datasets could benefit from higher values
+
+        'draws' is the total number of draws from the posterior for each tested
+        model
+
+        'draws' is the total number of draws from the posterior for each tested
+
+        'gimmie' is a boolean causing the routine to return the most complex
+        model tried instead of the model with the optimum bic
+
+        'aic' is a boolean specifying the use of the aikaike information
+        criterion
+
+        function outputs:
+
+        'betas' are a draw from the posterior distribution of coefficients: matrix,
+        with rows corresponding to draws and columns corresponding to terms in the
+        GP
+
+        'mtx' is the basis function interaction matrix from the best model:
+        matrix, with rows corresponding to terms in the GP (and thus to the
+        columns of 'betas' and columns corresponding to inputs). A given entry in
+        the matrix gives the order of the basis function appearing in a given term
+        in the GP.
+        All basis functions indicated on a given row are multiplied together.
+        a zero indicates no basis function from a given input is present in a
+        given term.
+
+        'ev' is a vector of BIC values from all of the models evaluated
+        """
+
+        def perms(x):
+            """Python equivalent of MATLAB perms."""
+            # from https://stackoverflow.com/questions/38130008/python-equivalent-for-matlabs-perms
+            a = np.vstack(list(itertools.permutations(x)))[::-1]
+
+            return a
+        def gibbs(self, inputs, data, phis, Xin, discmtx, a, b, atau, btau,
               draws):
         """
         'sigsqd0' is the initial guess for the obs error variance
@@ -279,91 +362,7 @@ class FoKL:
         X = X[:, 0:mmtx + 1]
 
         return betas, sigs, taus, betahat, X, ev
-
-    def emulator(self, inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
-        """
-        this version uses 3 way interactions use routines.emulator_Xin for two way interactions
-
-        this version uses the 'Xin' mode of the gibbs sampler
-
-        builds a single-output bss-anova emulator for a stationary dataset in an
-        automated fashion
-
-        function inputs:
-        'sigsqd0' is the initial guess for the obs error variance
-
-        'inputs' is the set of inputs normalized on [0,1]: matrix or numpy array
-        with columns corresponding to inputs and rows the different experimental designs
-
-        'data' are the output dataset used to build the function: column vector,
-        with entries corresponding to rows of 'inputs'
-
-        'relats' is a boolean matrix indicating which terms should be excluded
-        from the model building; for instance if a certain main effect should be
-        excluded relats will include a row with a 1 in the column for that input
-        and zeros elsewhere; if a certain two way interaction should be excluded
-        there should be a row with ones in those columns and zeros elsewhere
-        to exclude no terms 'relats = np.array([[0]])'. An example of excluding
-        the first input main effect and its interaction with the third input for
-        a case with three total inputs is:'relats = np.array([[1,0,0],[1,0,1]])'
-
-        'phis' are a data structure with the spline coefficients for the basis
-        functions, built with 'spline_coefficient.txt' and 'splineconvert' or
-        'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
-        25 basis functions: enough for most things -- while the latter provides
-        500: definitely enough for anything)
-
-        'a' and 'b' are the shape and scale parameters of the ig distribution for
-        the observation error variance of the data. the observation error model is
-        white noise choose the mode of the ig distribution to match the noise in
-        the output dataset and the mean to broaden it some
-
-        'atau' and 'btau' are the parameters of the ig distribution for the 'tau
-        squared' parameter: the variance of the beta priors is iid normal mean
-        zero with variance equal to sigma squared times tau squared. tau squared
-        must be scaled in the prior such that the product of tau squared and sigma
-        squared scales with the output dataset
-
-        'tolerance' controls how hard the function builder tries to find a better
-        model once adding terms starts to show diminishing returns. a good
-        default is 3 -- large datasets could benefit from higher values
-
-        'draws' is the total number of draws from the posterior for each tested
-        model
-
-        'draws' is the total number of draws from the posterior for each tested
-
-        'gimmie' is a boolean causing the routine to return the most complex
-        model tried instead of the model with the optimum bic
-
-        'aic' is a boolean specifying the use of the aikaike information
-        criterion
-
-        function outputs:
-
-        'betas' are a draw from the posterior distribution of coefficients: matrix,
-        with rows corresponding to draws and columns corresponding to terms in the
-        GP
-
-        'mtx' is the basis function interaction matrix from the best model:
-        matrix, with rows corresponding to terms in the GP (and thus to the
-        columns of 'betas' and columns corresponding to inputs). A given entry in
-        the matrix gives the order of the basis function appearing in a given term
-        in the GP.
-        All basis functions indicated on a given row are multiplied together.
-        a zero indicates no basis function from a given input is present in a
-        given term.
-
-        'ev' is a vector of BIC values from all of the models evaluated
-        """
-
-        def perms(x):
-            """Python equivalent of MATLAB perms."""
-            # from https://stackoverflow.com/questions/38130008/python-equivalent-for-matlabs-perms
-            a = np.vstack(list(itertools.permutations(x)))[::-1]
-
-            return a
-
+    
         # 'n' is the number of datapoints whereas 'm' is the number of inputs
         n, m = np.shape(inputs)
         mrel = n
@@ -454,7 +453,7 @@ class FoKL:
                     damtx = np.append(damtx, vecs, axis=0)
                 [dam,null] = np.shape(damtx)
 
-                [beters, null, null, null, xers, ev] = FoKL.gibbs(inputs, data, phis, X, damtx, a, b, atau, btau, draws)
+                [beters, null, null, null, xers, ev] = gibbs(inputs, data, phis, X, damtx, a, b, atau, btau, draws)
 
                 if aic:
                     ev = ev + (2 - np.log(n)) * (dam + 1)
@@ -485,7 +484,7 @@ class FoKL:
                             count = count + 1
                         damtest, null = np.shape(damtx_test)
 
-                        [betertest, null, null, null, Xtest, evtest] = FoKL.gibbs(inputs, data, phis, X, damtx_test, a, b, atau, btau, draws)
+                        [betertest, null, null, null, Xtest, evtest] = gibbs(inputs, data, phis, X, damtx_test, a, b, atau, btau, draws)
                         if aic:
                             evtest = evtest + (2 - np.log(n))*(damtest+1)
                         if evtest < evmin:
