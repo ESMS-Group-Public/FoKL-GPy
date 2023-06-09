@@ -454,7 +454,7 @@ class FoKL:
                     damtx = np.append(damtx, vecs, axis=0)
                 [dam,null] = np.shape(damtx)
 
-                [beters, null, null, null, xers, ev] = FokL.gibbs(inputs, data, phis, X, damtx, a, b, atau, btau, draws)
+                [beters, null, null, null, xers, ev] = FoKL.gibbs(inputs, data, phis, X, damtx, a, b, atau, btau, draws)
 
                 if aic:
                     ev = ev + (2 - np.log(n)) * (dam + 1)
@@ -485,7 +485,7 @@ class FoKL:
                             count = count + 1
                         damtest, null = np.shape(damtx_test)
 
-                        [betertest, null, null, null, Xtest, evtest] = FokL.gibbs(inputs, data, phis, X, damtx_test, a, b, atau, btau, draws)
+                        [betertest, null, null, null, Xtest, evtest] = FoKL.gibbs(inputs, data, phis, X, damtx_test, a, b, atau, btau, draws)
                         if aic:
                             evtest = evtest + (2 - np.log(n))*(damtest+1)
                         if evtest < evmin:
@@ -611,9 +611,9 @@ class FoKL:
             f = []
             for kk in range(len(inputs)):
                 if len(f) == 0:
-                    f = [FokL.bss_eval(inputs[kk], betas[kk], phis, matrix[kk]) + betas[kk][len(betas[kk]) - 1]]
+                    f = [bss_eval(inputs[kk], betas[kk], phis, matrix[kk]) + betas[kk][len(betas[kk]) - 1]]
                 else:
-                    f = np.append(f, FokL.bss_eval(inputs[kk], betas[kk], phis, matrix[kk]) + betas[kk][len(betas[kk]) - 1])
+                    f = np.append(f, bss_eval(inputs[kk], betas[kk], phis, matrix[kk]) + betas[kk][len(betas[kk]) - 1])
             return f
 
         def reorder(used, inputs):
