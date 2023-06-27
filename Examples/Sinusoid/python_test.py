@@ -1,4 +1,3 @@
-
 import numpy as np
 import FoKL
 from FoKL import FoKLRoutines
@@ -8,8 +7,6 @@ fkl = FoKLRoutines.FoKL()
 
 
 #%% Setting input parameters
-# sigsqd0
-sigsqd0 = 0.009
 
 #inputs
 X = np.loadtxt('X.csv',dtype=float,delimiter=',')
@@ -50,7 +47,7 @@ btau = 4000
 
 # tolerance
 tolerance = 3
-relats_in  = []
+relats_in = []
 # draws
 draws = 1000
 
