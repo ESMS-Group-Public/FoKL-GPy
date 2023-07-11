@@ -519,6 +519,8 @@ class FoKL:
                         break
                 else:
                     greater = greater + 1
+                    betas = beters
+                    mtx = damtx
                     evs = np.append(evs, ev)
                 if m == 1:
                     break
