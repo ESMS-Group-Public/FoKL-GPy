@@ -3,9 +3,6 @@ import itertools
 
 def emulator(inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
     """
-    this version uses 3 way interactions use routines.emulator_Xin for two way interactions
-
-    this version uses the 'Xin' mode of the gibbs sampler
 
     builds a single-output bss-anova emulator for a stationary dataset in an
     automated fashion
@@ -49,10 +46,23 @@ def emulator(inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, 
     'draws' is the total number of draws from the posterior for each tested
     model
 
-    'draws' is the total number of draws from the posterior for each tested
-
     'gimmie' is a boolean causing the routine to return the most complex
     model tried instead of the model with the optimum bic
+
+    'way3' is a boolean indicating whether the model should include 3-way interactions
+
+    'threshav' is a threshold for down-selection based on the absolute value of the average 
+    of the term's coefficient, expressed as a fraction of the mean. 0.01 is a good default.
+    Coefficients that fall below this and which meet the standard deviation criterion specified
+    by 'threshstda' will be proposed for elimination from the model
+
+    'threshstda' is a threshold for down-selection based on the standard deviation (normalized to the mean).
+    Coefficients with standard deviations that exceed 'threshstda' and whose means fall below
+    'threshav' will be proposed for elimination. A good default is 0.5
+
+    'threshstdb' is a standalone relative standard deviation threshold. Coefficients with 
+    standard deviations (relative to the mean) that exceed this value will be proposed for
+    elimination. A good default is 2.0
 
     'aic' is a boolean specifying the use of the aikaike information
     criterion
@@ -67,12 +77,11 @@ def emulator(inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, 
     matrix, with rows corresponding to terms in the GP (and thus to the
     columns of 'betas' and columns corresponding to inputs). A given entry in
     the matrix gives the order of the basis function appearing in a given term
-    in the GP.
-    All basis functions indicated on a given row are multiplied together.
+    in the GP. All basis functions indicated on a given row are multiplied together.
     a zero indicates no basis function from a given input is present in a
     given term.
 
-    'ev' is a vector of BIC values from all of the models evaluated
+    'evs' is a vector of BIC values from all of the models evaluated
     """
 
     def perms(x):
