@@ -12302,5 +12302,4 @@ def getPhis():
         7.32718e-08,  5.37066e-08,  2.92890e-08]]]
     return phis
 
-getPhis()
     
