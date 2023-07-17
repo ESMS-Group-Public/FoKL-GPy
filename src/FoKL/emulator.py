@@ -10,9 +10,6 @@ def emulator(inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, 
     builds a single-output bss-anova emulator for a stationary dataset in an
     automated fashion
 
-    function inputs:
-    'sigsqd0' is the initial guess for the obs error variance
-
     'inputs' is the set of inputs normalized on [0,1]: matrix or numpy array
     with columns corresponding to inputs and rows the different experimental designs
 
