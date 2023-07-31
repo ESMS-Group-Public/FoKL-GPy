@@ -25,20 +25,20 @@ phis = getKernel()
 ```
 Once the kernel is defined, you can initialize your model the required hyper paramters.
 ```
-'model = fkl(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)'
+model = fkl(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
 ```
 - The definition of each of these hypers can be found within the function documentation.
 
 With the model defined the training can begin by calling the fit function:
 ```
-'model.fit( Normalized Training Inputs, Training Data)'
+model.fit( Normalized Training Inputs, Training Data)
 ```
 - documentation of fit() inputs and outputs can be found in the function documentation.
 
 The console will display the index and bic of the model being built in real time.
 Once completed the model can be validated with the coverage3 function:
 ```
-'model.converage3(Normalized Test Inputs, Test Data, draws, plots)'
+model.converage3(Normalized Test Inputs, Test Data, draws, plots)
 ```
 - documentation of coverage inputs and outputs can be found in function documentation.
 
