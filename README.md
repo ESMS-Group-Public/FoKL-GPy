@@ -8,11 +8,11 @@ To install: 'pip install FoKL', or clone this repo
 
 Once installed, import the package into your environment with:
 ```
-'import FoKL'
+import FoKL
 ```
- and then the proper routines with:
+and then the proper routines with:
  ```
- from FoKL import FoKLRoutines
+from FoKL import FoKLRoutines
 ```
 for ease of use it is recommended to call the class with an abreviation 'fkl' s:
 ```
