@@ -7,17 +7,18 @@ inference on static and dynamic datasets.
 To install: 'pip install FoKL', or clone this repo
 
 Once installed, import the package into your environment with:
+```
 'import FoKL'
  and then the proper routines with:
  'from FoKL import FoKLRoutines'
 for ease of use it is recommended to call the class with an abreviation 'fkl' so
 fkl = FoKLRoutines.FoKL()
-
+```
 Now you are ready to beginning creating your model. FoKL depends on a kernel to do its linear regression, these kernels can be called with the 'getKernel()' function. 
 The getKernel() function calls a collection of splines that is good for general use, but future updates can add more kernels.
-
+```
 phis = getKernel()
-
+```
 Once the kernel is defined, you can initialize your model the required hyper paramters.
 'model = fkl(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)'
 - The definition of each of these hypers can be found within the function documentation.
