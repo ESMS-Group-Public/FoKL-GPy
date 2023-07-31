@@ -1,5 +1,6 @@
 import numpy as np
 import FoKL
+from FoKL import getKernels
 from FoKLRoutines import FoKL
 
 
@@ -25,8 +26,6 @@ data_load = np.loadtxt('DATA_nois.csv',dtype=float,delimiter=',')
 
 data = np.reshape(data_load, (m*n,1), order='F')
 
-# generating phis from the spline coefficients text file in emulator_python
-# combined with the splineconvert script
 
 phis = getKernel()
 
@@ -54,10 +53,10 @@ threshav = 0.05
 threshstda = 0.5
 threshstdb = 2
 aic = True
-
+# define model
 model = FoKL(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
 
-#%% Running emulator_Xin routine and visualization
+#%% Running emulator_Xin routine and visualization, fit model to data
 betas, mtx, evs = model.fit(inputs, data)
 
 meen, bounds, rmse = model.coverage3(inputs, data, 1000, 1)
