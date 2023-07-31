@@ -1,6 +1,6 @@
 import numpy as np
+import FoKL
 from FoKLRoutines import FoKL
-from getKernels import getKernel
 
 
 #%% Setting input parameters
