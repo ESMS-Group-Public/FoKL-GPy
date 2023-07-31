@@ -3,7 +3,7 @@ Karhunen Loève decomposed Gaussian processes with forward variable
 selection. Use this package for scalable GP regression and fast
 inference on static and dynamic datasets.
 
-# How to Use
+## How to Use
 To install: 'pip install FoKL', or clone this repo
 
 Once installed, import the package into your environment with:
@@ -44,7 +44,7 @@ model.converage3(Normalized Test Inputs, Test Data, draws, plots)
 
 
 Cover
-
+## Citations
 Please cite: K. Hayes, M.W. Fouts, A. Baheri and
 D.S. Mebane, "Forward variable selection enables fast and accurate
 dynamic system identification with Karhunen-Loève decomposed Gaussian
