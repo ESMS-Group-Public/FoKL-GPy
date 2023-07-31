@@ -1,1 +1,1 @@
-Sinusoid Example Run Script
+Sigmoid Example Run Script
