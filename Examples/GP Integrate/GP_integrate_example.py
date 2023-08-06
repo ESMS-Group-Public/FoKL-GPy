@@ -1,6 +1,4 @@
 import csv
-
-import fkl as fkl
 import numpy as np
 import FoKL
 from FoKL import FoKLRoutines
