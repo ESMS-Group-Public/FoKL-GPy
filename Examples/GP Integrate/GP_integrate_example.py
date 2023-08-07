@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 fkl = FoKLRoutines.FoKL()
 
 #inputs
-traininputs = np.loadtxt('traininputs.csv.txt',dtype=float,delimiter=',')
+traininputs = np.loadtxt('traininputs.txt',dtype=float,delimiter=',')
 traindata1 = np.loadtxt('traindata1.txt',dtype=float,delimiter=',')
 traindata2 = np.loadtxt('traindata2.txt',dtype=float,delimiter=',')
 y = np.loadtxt('y.txt',dtype=float,delimiter=',')
