@@ -15,10 +15,7 @@ and then the proper routines with:
 from FoKL import FoKLRoutines
 from FoKL import getKernels
 ```
-for ease of use it is recommended to call the class with an abreviation 'fkl' s:
-```
-fkl = FoKLRoutines.FoKL()
-```
+
 Now you are ready to beginning creating your model. FoKL depends on a kernel to do its linear regression, these kernels can be called with the 'getKernel()' function. 
 The getKernel() function calls a collection of splines that is good for general use, but future updates can add more kernels.
 ```
@@ -26,7 +23,7 @@ phis = getKernels()
 ```
 Once the kernel is defined, you can initialize your model the required hyper paramters.
 ```
-model = fkl(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
+model = FoKLRoutines.FoKL(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
 ```
 - The definition of each of these hypers can be found within the function documentation.
 
@@ -34,17 +31,23 @@ With the model defined the training can begin by calling the fit function:
 ```
 model.fit( Normalized Training Inputs, Training Data)
 ```
-- documentation of fit() inputs and outputs can be found in the function documentation.
 
 The console will display the index and bic of the model being built in real time.
 Once completed the model can be validated with the coverage3 function:
 ```
 model.converage3(Normalized Test Inputs, Test Data, draws, plots)
 ```
-- documentation of coverage inputs and outputs can be found in function documentation.
-
-
 Cover
+
+## Integration
+FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently the same functionality cannot be used. The model.fits outputs should be returned to your workspace via:
+
+```
+betas, mtx, evs = model.fit(inputs, data)
+```
+
+An example of the integration functionality can be seen in GP_intergrate_example.py
+
 ## Citations
 Please cite: K. Hayes, M.W. Fouts, A. Baheri and
 D.S. Mebane, "Forward variable selection enables fast and accurate
