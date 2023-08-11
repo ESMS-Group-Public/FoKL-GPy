@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 
 [project]
-name = "FoKL-beta"
+name = "FoKL"
 authors = [
     {name = "ESMS Group", email = "derek.slack.001@gmail.com"},
 ]
 description = "Karhunen Loève decomposed Gaussian processes with forward variable selection"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
