@@ -7,6 +7,64 @@ import matplotlib.pyplot as plt
 
 class FoKL:
     def __init__(self, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
+        """
+                initialization inputs:
+
+                'relats' is a boolean matrix indicating which terms should be excluded
+                from the model building; for instance if a certain main effect should be
+                excluded relats will include a row with a 1 in the column for that input
+                and zeros elsewhere; if a certain two way interaction should be excluded
+                there should be a row with ones in those columns and zeros elsewhere
+                to exclude no terms 'relats = np.array([[0]])'. An example of excluding
+                the first input main effect and its interaction with the third input for
+                a case with three total inputs is:'relats = np.array([[1,0,0],[1,0,1]])'
+
+                'phis' are a data structure with the spline coefficients for the basis
+                functions, built with 'spline_coefficient.txt' and 'splineconvert' or
+                'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
+                25 basis functions: enough for most things -- while the latter provides
+                500: definitely enough for anything)
+
+                'a' and 'b' are the shape and scale parameters of the ig distribution for
+                the observation error variance of the data. the observation error model is
+                white noise choose the mode of the ig distribution to match the noise in
+                the output dataset and the mean to broaden it some
+
+                'atau' and 'btau' are the parameters of the ig distribution for the 'tau
+                squared' parameter: the variance of the beta priors is iid normal mean
+                zero with variance equal to sigma squared times tau squared. tau squared
+                must be scaled in the prior such that the product of tau squared and sigma
+                squared scales with the output dataset
+
+                'tolerance' controls how hard the function builder tries to find a better
+                model once adding terms starts to show diminishing returns. a good
+                default is 3 -- large datasets could benefit from higher values
+
+                'draws' is the total number of draws from the posterior for each tested
+                model
+
+                'draws' is the total number of draws from the posterior for each tested
+
+                 'threshav' is a threshold for proposing terms for elimination based on
+                 their mean values (larger thresholds lead to more elimination)
+
+                 'threshstda' is a threshold standard deviation -- expressed as a fraction 
+                 relative to the mean -- that pairs with 'threshav'.
+                 terms with coefficients that are lower than 'threshav' and higher than
+                 'threshstda' will be proposed for elimination (elimination will happen or not 
+                 based on relative BIC values)
+
+                 'threshstdb' is a threshold standard deviation that is independent of the
+                 mean value of the coefficient -- all with a standard deviation (fraction 
+                 relative to mean) exceeding
+                 this value will be proposed for elimination
+
+                'gimmie' is a boolean causing the routine to return the most complex
+                model tried instead of the model with the optimum bic
+
+                'aic' is a boolean specifying the use of the aikaike information
+                criterion 
+            """
         self.phis = phis
         self.relats_in = relats_in
         self.a = a
@@ -43,15 +101,11 @@ class FoKL:
     def coverage3(self, normputs, data, draws, plots):
         """
             Inputs:
-                Interprets outputs of emulator
+                Interprets outputs of FoKL.fit()
 
                 betas - betas emulator output
 
                 normputs - normalized inputs
-
-                phis - from spline convert
-
-                mtx - interaction matrix from emulator
 
                 draws - number of beta terms used
 
@@ -137,80 +191,26 @@ class FoKL:
 
     def fit(self, inputs, data):
         """
-        this version uses 3 way interactions use routines.emulator_Xin for two way interactions
+            inputs: 
+                'inputs' - normalzied inputs
 
-        this version uses the 'Xin' mode of the gibbs sampler
+                'data' - results
 
-        builds a single-output bss-anova emulator for a stationary dataset in an
-        automated fashion
+            outputs:
+                 'betas' are a draw from the posterior distribution of coefficients: matrix, with
+                 rows corresponding to draws and columns corresponding to terms in the GP
 
-        function inputs:
-        'sigsqd0' is the initial guess for the obs error variance
+                 'mtx' is the basis function interaction matrix from the
+                 best model: matrix, with rows corresponding to terms in the GP (and thus to the 
+                 columns of 'betas' and columns corresponding to inputs. a given entry in the 
+                 matrix gives the order of the basis function appearing in a given term in the GP.
+                 all basis functions indicated on a given row are multiplied together.
+                 a zero indicates no basis function from a given input is present in a given term
 
-        'inputs' is the set of inputs normalized on [0,1]: matrix or numpy array
-        with columns corresponding to inputs and rows the different experimental designs
-
-        'data' are the output dataset used to build the function: column vector,
-        with entries corresponding to rows of 'inputs'
-
-        'relats' is a boolean matrix indicating which terms should be excluded
-        from the model building; for instance if a certain main effect should be
-        excluded relats will include a row with a 1 in the column for that input
-        and zeros elsewhere; if a certain two way interaction should be excluded
-        there should be a row with ones in those columns and zeros elsewhere
-        to exclude no terms 'relats = np.array([[0]])'. An example of excluding
-        the first input main effect and its interaction with the third input for
-        a case with three total inputs is:'relats = np.array([[1,0,0],[1,0,1]])'
-
-        'phis' are a data structure with the spline coefficients for the basis
-        functions, built with 'spline_coefficient.txt' and 'splineconvert' or
-        'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
-        25 basis functions: enough for most things -- while the latter provides
-        500: definitely enough for anything)
-
-        'a' and 'b' are the shape and scale parameters of the ig distribution for
-        the observation error variance of the data. the observation error model is
-        white noise choose the mode of the ig distribution to match the noise in
-        the output dataset and the mean to broaden it some
-
-        'atau' and 'btau' are the parameters of the ig distribution for the 'tau
-        squared' parameter: the variance of the beta priors is iid normal mean
-        zero with variance equal to sigma squared times tau squared. tau squared
-        must be scaled in the prior such that the product of tau squared and sigma
-        squared scales with the output dataset
-
-        'tolerance' controls how hard the function builder tries to find a better
-        model once adding terms starts to show diminishing returns. a good
-        default is 3 -- large datasets could benefit from higher values
-
-        'draws' is the total number of draws from the posterior for each tested
-        model
-
-        'draws' is the total number of draws from the posterior for each tested
-
-        'gimmie' is a boolean causing the routine to return the most complex
-        model tried instead of the model with the optimum bic
-
-        'aic' is a boolean specifying the use of the aikaike information
-        criterion
-
-        function outputs:
-
-        'betas' are a draw from the posterior distribution of coefficients: matrix,
-        with rows corresponding to draws and columns corresponding to terms in the
-        GP
-
-        'mtx' is the basis function interaction matrix from the best model:
-        matrix, with rows corresponding to terms in the GP (and thus to the
-        columns of 'betas' and columns corresponding to inputs). A given entry in
-        the matrix gives the order of the basis function appearing in a given term
-        in the GP.
-        All basis functions indicated on a given row are multiplied together.
-        a zero indicates no basis function from a given input is present in a
-        given term.
-
-        'ev' is a vector of BIC values from all of the models evaluated
+                 'ev' is a vector of BIC values from all of the models
+                 evaluated
         """
+        
         # Initializations
         phis = self.phis
         relats_in = self.relats_in
@@ -235,7 +235,6 @@ class FoKL:
             return a
         def gibbs(inputs, data, phis, Xin, discmtx, a, b, atau, btau, draws):
             """
-            'sigsqd0' is the initial guess for the obs error variance
 
             'inputs' is the set of normalized inputs -- both parameters and model
             inputs -- with columns corresponding to inputs and rows the different
