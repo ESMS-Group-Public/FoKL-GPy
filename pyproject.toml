@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Karhunen Loève decomposed Gaussian processes with forward variable selection"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
 ]

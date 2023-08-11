@@ -6,6 +6,22 @@ from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 
 class FoKL:
+    def __init__(self, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
+        self.phis = phis
+        self.relats_in = relats_in
+        self.a = a
+        self.b = b
+        self.atau = atau
+        self.btau = btau
+        self.tolerance = tolerance
+        self.draws = draws
+        self.gimmie = gimmie
+        self.way3 = way3
+        self.threshav = threshav
+        self.threshstda = threshstda
+        self.threshstdb = threshstdb
+        self.aic = aic
+
     def splineconvert500(self,A):
         """
         Same as splineconvert, but for a larger basis of 500
@@ -24,7 +40,7 @@ class FoKL:
 
         return phi
 
-    def coverage3(self,betas, normputs, data, phis, mtx, draws, plots):
+    def coverage3(self, normputs, data, draws, plots):
         """
             Inputs:
                 Interprets outputs of emulator
@@ -50,6 +66,10 @@ class FoKL:
 
 
            """
+        betas = self.betas
+        mtx = self.mtx
+        phis = self.phis
+
         m, mbets = np.shape(betas)  # Size of betas
         n, mputs = np.shape(normputs)  # Size of normalized inputs
 
@@ -115,7 +135,7 @@ class FoKL:
         rmse = np.sqrt(np.mean(meen - data) ** 2)
         return meen, bounds, rmse
 
-    def emulator(self, inputs, data, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
+    def fit(self, inputs, data):
         """
         this version uses 3 way interactions use routines.emulator_Xin for two way interactions
 
@@ -191,6 +211,21 @@ class FoKL:
 
         'ev' is a vector of BIC values from all of the models evaluated
         """
+        # Initializations
+        phis = self.phis
+        relats_in = self.relats_in
+        a = self.a
+        b = self.b
+        atau = self.atau
+        btau = self.btau
+        tolerance = self.tolerance
+        draws = self.draws
+        gimmie = self.gimmie
+        way3 = self.way3
+        threshav = self.threshav
+        threshstda = self.threshstda
+        threshstdb = self.threshstdb
+        aic = self.aic
 
         def perms(x):
             """Python equivalent of MATLAB perms."""
@@ -234,7 +269,7 @@ class FoKL:
             else:
                 mmtx, null = np.shape(discmtx)
 
-            if Xin == []:
+            if np.size(Xin) == 0:
                 Xin = np.ones((minp, 1))
                 mxin, nxin = np.shape(Xin)
             else:
@@ -557,9 +592,11 @@ class FoKL:
             betas = beters
             mtx = damtx
 
+        self.betas = betas
+        self.mtx = mtx
+        self.evs = evs
+
         return betas, mtx, evs
-
-
 
     def GP_Integrate(self, betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs):
         """""
@@ -608,13 +645,14 @@ class FoKL:
           Y is an array of the models that have been integrated, at the time steps
           contained in T.
           """
+
         def prediction(inputs):
             f = []
             for kk in range(len(inputs)):
                 if len(f) == 0:
-                    f = [bss_eval(inputs[kk], betas[kk], phis, matrix[kk]) + betas[kk][len(betas[kk]) - 1]]
+                    f = [bss_eval(inputs[kk], betas[kk], phis, matrix[kk])]
                 else:
-                    f = np.append(f, bss_eval(inputs[kk], betas[kk], phis, matrix[kk]) + betas[kk][len(betas[kk]) - 1])
+                    f = np.append(f, bss_eval(inputs[kk], betas[kk], phis, matrix[kk]))
             return f
 
         def reorder(used, inputs):
@@ -652,40 +690,47 @@ class FoKL:
             if Xin == []:
                 m, n = np.shape(mtx)  # getting dimensions of the matrix 'mtx'
 
-                delta = 0
+                mx = 1
+
+                mbet = 1
+
+                delta = np.zeros([mx, mbet])
 
                 phind = []
+
                 for j in range(len(x)):
-                    phind.append(math.floor(x[j] * 499))
+                    phind.append(math.floor(x[j] * 498))
 
                 phind_logic = []
                 for k in range(len(phind)):
-                    if phind[k] == 499:
+                    if phind[k] == 498:
                         phind_logic.append(1)
                     else:
                         phind_logic.append(0)
 
                 phind = np.subtract(phind, phind_logic)
 
-                r = 1 / 499
+                r = 1 / 498
                 xmin = r * np.array(phind)
                 X = (x - xmin) / r
+                for ii in range(mx):
+                    for i in range(m):
+                        phi = 1
 
-                for i in range(m):
-                    phi = 1
+                        for j in range(n):
 
-                    for j in range(n):
+                            num = mtx[i][j]
 
-                        num = mtx[i][j]
+                            if num != 0:
+                                phi = phi * (phis[int(num) - 1][0][phind[j]] + phis[int(num) - 1][1][phind[j]] * X[j] \
+                                             + phis[int(num) - 1][2][phind[j]] * X[j] ** 2 + phis[int(num) - 1][3][
+                                                 phind[j]] *
+                                             X[j] ** 3)
 
-                        if num != 0:
-                            phi = phi * (phis[int(num) - 1][0][phind[j]] + phis[int(num) - 1][1][phind[j]] * X[j] \
-                                         + phis[int(num) - 1][2][phind[j]] * X[j] ** 2 + phis[int(num) - 1][3][phind[j]] *
-                                         X[j] ** 3)
-
-                    delta = delta + betas[i] * phi
+                        delta[ii, :] = delta[ii, :] + betas[i + 1] * phi
+                        mmm = 1
+                delta[ii, :] = delta[ii, :] + betas[0]
             else:
-
                 if np.ndim(betas) == 1:
                     betas = np.array([betas])
                 elif np.ndim(betas) > 2:
@@ -701,11 +746,11 @@ class FoKL:
                         print("Success! New shape is", np.shape(betas))
 
                 delta = Xin.dot(betas.T)
-
+            dc = 1
             return delta
 
         T = np.arange(start, stop + h, h)
-        y = (y0.astype(float)).reshape(5, 1)
+        y = y0
         Y = np.array([y0])
         Y = Y.reshape(len(y0), 1)
 
@@ -729,22 +774,31 @@ class FoKL:
                             inputs1[i] = normalize(y[j], norms[0, j], norms[1, j])
                         else:
                             inputs1[i] = np.append(inputs1[i], normalize(y[j], norms[0, j], norms[1, j]), 1)
-            # if b.shape[0] > 0:
-            #     for ii in range(len(y0)):
-            #         for jj in range(len(y),b.shape[1]+len(y)):
-            #             print(range(len(y),b.shape[1]+len(y)))
-            #             if used_inputs[ii][jj] != 0:
-            #                 if len(othinputs[ii])==0:
-            #                     othinputs[ii] = b[ind-1,jj-len(y0)]
-            #                 else:
-            #                     othinputs[ii] = np.append(othinputs[ii],b[ind-1,jj-len(y0)],1)
-            #     for k in range(len(y)):
-            #         inputs1[k] = np.append(inputs1[k], othinputs[k])
+
+            nnn = int(b.size / b.shape[0])
+            if b.size > 0:
+                for ii in range(len(y0)):
+                    for jj in range(len(y), nnn + len(y)):
+
+                        if used_inputs[ii][jj] != 0:
+                            if len(othinputs[ii]) == 0:
+                                if ind - 1 == 0:
+                                    othinputs[ii] = b[ind - 1]
+                                else:
+
+                                    othinputs[ii] = b[ind - 1]
+
+                                    ttt = 1
+                            else:
+                                othinputs[ii] = np.append(othinputs[ii], b[ind - 1, jj - len(y0)], 1)
+                for k in range(len(y)):
+                    inputs1[k] = np.append(inputs1[k], othinputs[k])
             for ii in range(len(y0)):
                 if np.amax(used_inputs[ii]) > 1:
                     inputs1[ii] = reorder(used_inputs[ii], inputs1[ii])
 
             dy1 = prediction(inputs1) * h
+
             for p in range(len(y)):
                 if y[p] >= norms[1, p] and dy1[p] > 0:
                     dy1[p] = 0
@@ -760,9 +814,9 @@ class FoKL:
                         else:
                             inputs2[i] = np.append(inputs2[i], normalize(y[j] + dy1[j] / 2, norms[0, j], norms[1, j]),
                                                    1)
-            # if b.shape[1] > 0:
-            #     for k in range(len(y)):
-            #         inputs2[k] = np.append(inputs2[k], othinputs[k])
+
+            for k in range(len(y)):
+                inputs2[k] = np.append(inputs2[k], othinputs[k])
             for ii in range(len(y0)):
                 if np.amax(used_inputs[ii]) > 1:
                     inputs2[ii] = reorder(used_inputs[ii], inputs2[ii])
@@ -781,9 +835,9 @@ class FoKL:
                         else:
                             inputs3[i] = np.append(inputs3[i], normalize(y[j] + dy2[j] / 2, norms[0, j], norms[1, j]),
                                                    1)
-            # if b.shape[1] > 0:
-            #     for k in range(len(y)):
-            #         inputs3[k] = np.append(inputs3[k], othinputs[k])
+            if b.size > 0:
+                for k in range(len(y)):
+                    inputs3[k] = np.append(inputs3[k], othinputs[k])
             for ii in range(len(y0)):
                 if np.amax(used_inputs[ii]) > 1:
                     inputs3[ii] = reorder(used_inputs[ii], inputs3[ii])
@@ -801,9 +855,9 @@ class FoKL:
                             inputs4[i] = normalize(y[j] + dy3[j], norms[0, j], norms[1, j])
                         else:
                             inputs4[i] = np.append(inputs4[i], normalize(y[j] + dy3[j], norms[0, j], norms[1, j]), 1)
-            # if b.shape[1] > 0:
-            #     for k in range(len(y)):
-            #         inputs4[k] = np.append(inputs4[k], othinputs[k])
+            if b.size > 0:
+                for k in range(len(y)):
+                    inputs4[k] = np.append(inputs4[k], othinputs[k])
             for ii in range(len(y0)):
                 if np.amax(used_inputs[ii]) > 1:
                     inputs4[ii] = reorder(used_inputs[ii], inputs4[ii])
@@ -814,12 +868,9 @@ class FoKL:
                 if (y[p] + dy3[p]) <= norms[0, p] and dy4[p] < 0:
                     dy4[p] = 0
 
-            rdy1 = dy1.reshape(5, 1)
-            rdy2 = dy2.reshape(5, 1)
-            rdy3 = dy3.reshape(5, 1)
-            rdy4 = dy4.reshape(5, 1)
-            y += (rdy1 + 2 * rdy2 + 2 * rdy3 + rdy4) / 6
-            Y = np.append(Y, y, 1)
+            y += (dy1 + 2 * dy2 + 2 * dy3 + dy4) / 6
+            yt = np.reshape(y, [2, 1])
+            Y = np.append(Y, yt, 1)
             ind += 1
 
         return T, Y
