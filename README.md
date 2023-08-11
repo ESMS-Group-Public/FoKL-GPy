@@ -45,6 +45,11 @@ FoKL can be used to model state derivatives and thus contains an integration met
 ```
 betas, mtx, evs = model.fit(inputs, data)
 ```
+and then used as 
+
+```
+T,Y = FoKLRoutines.FoKL.GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
+```
 
 An example of the integration functionality can be seen in GP_intergrate_example.py
 
