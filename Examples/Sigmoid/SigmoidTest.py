@@ -1,8 +1,7 @@
 import numpy as np
 import FoKL
 from FoKL import getKernels
-from FoKLRoutines import FoKL
-
+from FoKL import FoKLRoutines
 
 #%% Setting input parameters
 
@@ -26,8 +25,8 @@ data_load = np.loadtxt('DATA_nois.csv',dtype=float,delimiter=',')
 
 data = np.reshape(data_load, (m*n,1), order='F')
 
-
-phis = getKernel()
+# load basis functions
+phis = getKernels.sp500()
 
 # a
 a = 9
@@ -54,7 +53,7 @@ threshstda = 0.5
 threshstdb = 2
 aic = True
 # define model
-model = FoKL(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
+model = FoKLRoutines.FoKL(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
 
 #%% Running emulator_Xin routine and visualization, fit model to data
 betas, mtx, evs = model.fit(inputs, data)
