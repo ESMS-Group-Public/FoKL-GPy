@@ -5,8 +5,12 @@ from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 
+# Update:       2023/09/14, Jacob P. Krell;
+# Description:  inputs were (self, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic);
+#               inputs changed to (self, **kwargs)
+
 class FoKL:
-    def __init__(self, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
+    def __init__(self, **kwargs):
         """
                 initialization inputs:
 
@@ -65,20 +69,33 @@ class FoKL:
                 'aic' is a boolean specifying the use of the aikaike information
                 criterion 
             """
-        self.phis = phis
-        self.relats_in = relats_in
-        self.a = a
-        self.b = b
-        self.atau = atau
-        self.btau = btau
-        self.tolerance = tolerance
-        self.draws = draws
-        self.gimmie = gimmie
-        self.way3 = way3
-        self.threshav = threshav
-        self.threshstda = threshstda
-        self.threshstdb = threshstdb
-        self.aic = aic
+    # To-Do:
+    #    - update above description with each kwarg
+    #    - add compatibilty for Pandas input data
+    #    - test and record examples
+    
+    # Calculate some default hypers based on data unless user-defined:
+    if 'atau' not in kwargs:
+        atau = stdev(self) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914)
+    else:
+        atau = kwargs.get('atau')
+    if 'btau' not in kwargs:
+        btau = stdev(self) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914)
+    else:
+        btau = kwargs.get('btau')
+
+    # Define default hypers:
+    hypers = {'phis': 1,'relats_in': 1,'a': 4,'b': 1,'atau': atau,'btau': btau,'tolerance': 1,'draws': 1,'gimmie': 1,'way3': 1,'threshav': 1,'threshstda': 1,'threshstdb': 1,'aic': 1}
+    
+    # Update hypers based on user-input:
+    kwargs_expected = hypers.keys()
+    for kwarg in kwargs.keys():
+        if kwarg not in kwargs_expected:
+            raise ValueError(f"Unexpected keyword argument: {kwarg}")
+        else:
+            hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
+    for hyperKey, hyperValue in hypers.items():
+        setattr(self, hyperKey, hyperValue)
 
     def splineconvert500(self,A):
         """
