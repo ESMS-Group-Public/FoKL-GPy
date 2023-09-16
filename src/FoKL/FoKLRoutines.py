@@ -1,3 +1,5 @@
+import pandas as pd
+import warnings
 import itertools
 import math
 import numpy as np
@@ -5,29 +7,25 @@ from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 
-# Update:       2023/09/14, Jacob P. Krell;
-# Description:  inputs were (self, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic);
-#               inputs changed to (self, **kwargs)
-
 class FoKL:
     def __init__(self, **kwargs):
         """
                 initialization inputs:
-
-                'relats' is a boolean matrix indicating which terms should be excluded
-                from the model building; for instance if a certain main effect should be
-                excluded relats will include a row with a 1 in the column for that input
-                and zeros elsewhere; if a certain two way interaction should be excluded
-                there should be a row with ones in those columns and zeros elsewhere
-                to exclude no terms 'relats = np.array([[0]])'. An example of excluding
-                the first input main effect and its interaction with the third input for
-                a case with three total inputs is:'relats = np.array([[1,0,0],[1,0,1]])'
 
                 'phis' are a data structure with the spline coefficients for the basis
                 functions, built with 'spline_coefficient.txt' and 'splineconvert' or
                 'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
                 25 basis functions: enough for most things -- while the latter provides
                 500: definitely enough for anything)
+                
+                'relats_in' is a boolean matrix indicating which terms should be excluded
+                from the model building; for instance if a certain main effect should be
+                excluded relats will include a row with a 1 in the column for that input
+                and zeros elsewhere; if a certain two way interaction should be excluded
+                there should be a row with ones in those columns and zeros elsewhere
+                to exclude no terms 'relats = np.array([[0]])'. An example of excluding
+                the first input main effect and its interaction with the third input for
+                a case with three total inputs is:'relats_in = np.array([[1,0,0],[1,0,1]])'
 
                 'a' and 'b' are the shape and scale parameters of the ig distribution for
                 the observation error variance of the data. the observation error model is
@@ -46,33 +44,37 @@ class FoKL:
 
                 'draws' is the total number of draws from the posterior for each tested
                 model
-
-                'draws' is the total number of draws from the posterior for each tested
-
-                 'threshav' is a threshold for proposing terms for elimination based on
-                 their mean values (larger thresholds lead to more elimination)
-
-                 'threshstda' is a threshold standard deviation -- expressed as a fraction 
-                 relative to the mean -- that pairs with 'threshav'.
-                 terms with coefficients that are lower than 'threshav' and higher than
-                 'threshstda' will be proposed for elimination (elimination will happen or not 
-                 based on relative BIC values)
-
-                 'threshstdb' is a threshold standard deviation that is independent of the
-                 mean value of the coefficient -- all with a standard deviation (fraction 
-                 relative to mean) exceeding
-                 this value will be proposed for elimination
-
+                
                 'gimmie' is a boolean causing the routine to return the most complex
                 model tried instead of the model with the optimum bic
+
+                'way3' is a boolean specifying the calculation of three-way interactions
+
+                'threshav' is a threshold for proposing terms for elimination based on
+                their mean values (larger thresholds lead to more elimination)
+
+                'threshstda' is a threshold standard deviation -- expressed as a fraction 
+                relative to the mean -- that pairs with 'threshav'.
+                terms with coefficients that are lower than 'threshav' and higher than
+                'threshstda' will be proposed for elimination (elimination will happen or not 
+                based on relative BIC values)
+
+                'threshstdb' is a threshold standard deviation that is independent of the
+                mean value of the coefficient -- all with a standard deviation (fraction 
+                relative to mean) exceeding this value will be proposed for elimination
 
                 'aic' is a boolean specifying the use of the aikaike information
                 criterion 
             """
     # To-Do:
-    #    - update above description with each kwarg
-    #    - add compatibilty for Pandas input data
+    #    - equation for atau and btau
+    #    - equation or pre-set for others
     #    - test and record examples
+
+    # Convert input data to numpy if pandas:
+    if isinstance(self, pd.DataFrame):
+        self = self.to_numpy()
+        warnings.warn("Warning: Input 'self' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
     
     # Calculate some default hypers based on data unless user-defined:
     if 'atau' not in kwargs:
@@ -96,7 +98,7 @@ class FoKL:
             hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
     for hyperKey, hyperValue in hypers.items():
         setattr(self, hyperKey, hyperValue)
-
+    
     def splineconvert500(self,A):
         """
         Same as splineconvert, but for a larger basis of 500
