@@ -77,6 +77,7 @@ class FoKL:
         warnings.warn("Warning: Input 'self' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
     
     # Calculate some default hypers based on data unless user-defined:
+    if phis !!!!!!!!!!!!!!!!!!!!!!
     if 'atau' not in kwargs:
         atau = stdev(self) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914)
     else:
@@ -87,7 +88,7 @@ class FoKL:
         btau = kwargs.get('btau')
 
     # Define default hypers:
-    hypers = {'phis': 1,'relats_in': 1,'a': 4,'b': 1,'atau': atau,'btau': btau,'tolerance': 1,'draws': 1,'gimmie': 1,'way3': 1,'threshav': 1,'threshstda': 1,'threshstdb': 1,'aic': 1}
+    hypers = {'phis': 1,'relats_in': 1,'a': 4,'b': 0.01,'atau': atau,'btau': btau,'tolerance': 1,'draws': 1,'gimmie': 1,'way3': 1,'threshav': 1,'threshstda': 1,'threshstdb': 1,'aic': 1}
     
     # Update hypers based on user-input:
     kwargs_expected = hypers.keys()
