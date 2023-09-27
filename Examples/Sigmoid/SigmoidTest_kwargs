@@ -25,24 +25,25 @@ data_load = np.loadtxt('DATA_nois.csv',dtype=float,delimiter=',')
 
 data = np.reshape(data_load, (m*n,1), order='F')
 
-# specify and define hypers that user wants to override (all are listed here for example)
-phis = getKernels.sp500()
-a = 9
-b = 0.01
-atau = 3
-btau = 4000
-tolerance = 3
-relats_in = []
-draws = 1000
-gimmie = False
-way3 = False
-threshav = 0.05
-threshstda = 0.5
-threshstdb = 2
-aic = True
+# specify and define hypers that user wants to override from default
+# phis = getKernels.sp500() # default: phis = getKernels.sp500()
+a = 9                       # default: a = 4 ???
+b = 0.01                    # default: b = 
+atau = 3                    # default: atau = std dev of ???
+btau = 4000                 # default: btau = std dev of ???
+tolerance = 3               # default: tolerance = 
+# relats_in = []            # default: relats_in = [] ????
+draws = 1000                # default: draws = 
+# gimmie = False              # default: gimmie = False
+# way3 = False                # default: way3 = False
+threshav = 0.05             # default: threshav = 
+threshstda = 0.5            # default: threshstda = 0.5 ???
+threshstdb = 2              # default: threshstdb = 2 ???
+aic = True                  # default: aic = False
 
-# define model with user-defined hypers as inputs (if hyper not specified above then exclude from function argument)
-model = FoKLRoutines.FoKL(phis=phis, relats_in=relats_in, a=a, b=b, atau=atau, btau=btau, tolerance=tolerance, draws=draws, gimmie=gimmie, way3=way3, threshav=threshav, threshstda=threshstda, threshstdb=threshstdb, aic=aic)
+# define model using only user-defined hypers as inputs
+# ALL HYPERS EXAMPLE: model = FoKLRoutines.FoKL(phis=phis, relats_in=relats_in, a=a, b=b, atau=atau, btau=btau, tolerance=tolerance, draws=draws, gimmie=gimmie, way3=way3, threshav=threshav, threshstda=threshstda, threshstdb=threshstdb, aic=aic)
+model = FoKLRoutines.FoKL(a=a, b=b, atau=atau, btau=btau, tolerance=tolerance, draws=draws, gimmie=gimmie, way3=way3, threshav=threshav, threshstda=threshstda, threshstdb=threshstdb, aic=aic)
 """
         initialization inputs:
 
