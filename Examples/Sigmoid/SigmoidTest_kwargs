@@ -27,18 +27,18 @@ data = np.reshape(data_load, (m*n,1), order='F')
 
 # specify and define hypers that user wants to override from default
 # phis = getKernels.sp500() # default: phis = getKernels.sp500()
-a = 9                       # default: a = 4 ???
-b = 0.01                    # default: b = 
-atau = 3                    # default: atau = std dev of ???
-btau = 4000                 # default: btau = std dev of ???
-tolerance = 3               # default: tolerance = 
-# relats_in = []            # default: relats_in = [] ????
-draws = 1000                # default: draws = 
+a = 9                       # default: a = 4 ??? 9, 1000
+b = 0.01                    # default: b = 0.01, 1
+atau = 3                    # default: atau = std dev of ??? 3, 4
+btau = 4000                 # default: btau = std dev of ??? 4000, 0.6091
+tolerance = 3               # default: tolerance = ??? 3, 3
+# relats_in = []            # default: relats_in = ??? = [], [1,1,1,1,1,1]
+draws = 1000                # default: draws = ??? 1000, 2000
 # gimmie = False              # default: gimmie = False
 # way3 = False                # default: way3 = False
-threshav = 0.05             # default: threshav = 
-threshstda = 0.5            # default: threshstda = 0.5 ???
-threshstdb = 2              # default: threshstdb = 2 ???
+threshav = 0.05             # default: threshav = ??? 0.05, 0
+threshstda = 0.5            # default: threshstda = ??? 0.5, 0
+threshstdb = 2              # default: threshstdb = ??? 2, 100
 aic = True                  # default: aic = False
 
 # define model using only user-defined hypers as inputs
