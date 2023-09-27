@@ -25,26 +25,15 @@ data_load = np.loadtxt('DATA_nois.csv',dtype=float,delimiter=',')
 
 data = np.reshape(data_load, (m*n,1), order='F')
 
+# specify and define hypers that user wants to override (all are listed here for example)
 phis = getKernels.sp500()
-
-# a
 a = 9
-
-# b
 b = 0.01
-
-# atau
 atau = 3
-
-# btau
 btau = 4000
-
-# tolerance
 tolerance = 3
 relats_in = []
-# draws
 draws = 1000
-
 gimmie = False
 way3 = False
 threshav = 0.05
@@ -52,8 +41,8 @@ threshstda = 0.5
 threshstdb = 2
 aic = True
 
-# define model
-model = FoKLRoutines.FoKL(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
+# define model with user-defined hypers as inputs (if hyper not specified above then exclude from function argument)
+model = FoKLRoutines.FoKL(phis=phis, relats_in=relats_in, a=a, b=b, atau=atau, btau=btau, tolerance=tolerance, draws=draws, gimmie=gimmie, way3=way3, threshav=threshav, threshstda=threshstda, threshstdb=threshstdb, aic=aic)
 """
         initialization inputs:
 
