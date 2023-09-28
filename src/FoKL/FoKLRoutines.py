@@ -83,11 +83,6 @@ class FoKL:
                 - threshstdb = 2 ??? 2, 100
                 - aic = False
         """
-
-    # Convert input data to numpy if pandas:
-    if isinstance(self, pd.DataFrame):
-        self = self.to_numpy()
-        warnings.warn("Warning: Input 'self' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
     
     # Calculate some default hypers based on data unless user-defined:
     if 'phis' not in kwargs:
@@ -95,11 +90,11 @@ class FoKL:
     else:
         phis = kwargs.get('phis')
     if 'atau' not in kwargs:
-        atau = stdev(self) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914)
+        atau = stdev(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928)
     else:
         atau = kwargs.get('atau')
     if 'btau' not in kwargs:
-        btau = stdev(self) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914)
+        btau = stdev(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928)
     else:
         btau = kwargs.get('btau')
 
@@ -247,7 +242,18 @@ class FoKL:
                  'ev' is a vector of BIC values from all of the models
                  evaluated
         """
+
+        # Convert 'inputs' to numpy if pandas
+        if isinstance(inputs, pd.DataFrame):
+            inputs = inputs.to_numpy()
+            warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
         
+        # Normalize 'inputs' if not already normalized
+        inputs_max = np.max(inputs)
+        if inputs_max != 1:
+            inputs_min = np.min(inputs)
+            inputs = (inputs - inputs_min) / (inputs_max - inputs_min)
+
         # Initializations
         phis = self.phis
         relats_in = self.relats_in
