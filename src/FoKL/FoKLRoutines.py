@@ -8,6 +8,7 @@ from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 
 class FoKL:
+    kwargs = {}
     def __init__(self, **kwargs):
         """
             initialization inputs:
