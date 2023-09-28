@@ -2,5 +2,11 @@
 
 data = # find pandas dataset online
 
-model = FoKLRoutines()
+model = FoKLRoutines.FoKL()
+
+inputs = # ????
+
+# Running emulator routine and visualization, fit model to data
+betas, mtx, evs = model.fit(inputs, data)
+
 
