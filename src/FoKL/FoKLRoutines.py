@@ -11,60 +11,77 @@ class FoKL:
     def __init__(self, **kwargs):
         """
                 initialization inputs:
-
-                'phis' are a data structure with the spline coefficients for the basis
-                functions, built with 'spline_coefficient.txt' and 'splineconvert' or
-                'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
-                25 basis functions: enough for most things -- while the latter provides
-                500: definitely enough for anything)
+        
+                    - 'phis' is a data structure with the spline coefficients for the basis
+                    functions, built with 'spline_coefficient.txt' and 'splineconvert' or
+                    'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
+                    25 basis functions: enough for most things -- while the latter provides
+                    500: definitely enough for anything)
+        
+                    - 'relats_in' is a boolean matrix indicating which terms should be excluded
+                    from the model building; for instance if a certain main effect should be
+                    excluded relats will include a row with a 1 in the column for that input
+                    and zeros elsewhere; if a certain two way interaction should be excluded
+                    there should be a row with ones in those columns and zeros elsewhere.
+                    to exclude no terms 'relats = np.array([[0]])'. an example of excluding
+                    the first input main effect and its interaction with the third input for
+                    a case with three total inputs is: 'relats = np.array([[1,0,0],[1,0,1]])'
+        
+                    - 'a' and 'b' are the shape and scale parameters of the ig distribution for
+                    the observation error variance of the data. the observation error model is
+                    white noise. choose the mode of the ig distribution to match the noise in
+                    the output dataset and the mean to broaden it some
+        
+                    - 'atau' and 'btau' are the parameters of the ig distribution for the 'tau
+                    squared' parameter: the variance of the beta priors is iid normal mean
+                    zero with variance equal to sigma squared times tau squared. tau squared
+                    must be scaled in the prior such that the product of tau squared and sigma
+                    squared scales with the output dataset       
+        
+                    - 'tolerance' controls how hard the function builder tries to find a better
+                    model once adding terms starts to show diminishing returns. a good
+                    default is 3 -- large datasets could benefit from higher values
+        
+                    - 'draws' is the total number of draws from the posterior for each tested
+                    model
+        
+                    - 'gimmie' is a boolean causing the routine to return the most complex
+                    model tried instead of the model with the optimum bic
+        
+                    - 'way3' is a boolean specifying the calculation of three-way interactions
                 
-                'relats_in' is a boolean matrix indicating which terms should be excluded
-                from the model building; for instance if a certain main effect should be
-                excluded relats will include a row with a 1 in the column for that input
-                and zeros elsewhere; if a certain two way interaction should be excluded
-                there should be a row with ones in those columns and zeros elsewhere
-                to exclude no terms 'relats = np.array([[0]])'. An example of excluding
-                the first input main effect and its interaction with the third input for
-                a case with three total inputs is:'relats_in = np.array([[1,0,0],[1,0,1]])'
-
-                'a' and 'b' are the shape and scale parameters of the ig distribution for
-                the observation error variance of the data. the observation error model is
-                white noise choose the mode of the ig distribution to match the noise in
-                the output dataset and the mean to broaden it some
-
-                'atau' and 'btau' are the parameters of the ig distribution for the 'tau
-                squared' parameter: the variance of the beta priors is iid normal mean
-                zero with variance equal to sigma squared times tau squared. tau squared
-                must be scaled in the prior such that the product of tau squared and sigma
-                squared scales with the output dataset
-
-                'tolerance' controls how hard the function builder tries to find a better
-                model once adding terms starts to show diminishing returns. a good
-                default is 3 -- large datasets could benefit from higher values
-
-                'draws' is the total number of draws from the posterior for each tested
-                model
-                
-                'gimmie' is a boolean causing the routine to return the most complex
-                model tried instead of the model with the optimum bic
-
-                'way3' is a boolean specifying the calculation of three-way interactions
-
-                'threshav' is a threshold for proposing terms for elimination based on
-                their mean values (larger thresholds lead to more elimination)
-
-                'threshstda' is a threshold standard deviation -- expressed as a fraction 
-                relative to the mean -- that pairs with 'threshav'.
-                terms with coefficients that are lower than 'threshav' and higher than
-                'threshstda' will be proposed for elimination (elimination will happen or not 
-                based on relative BIC values)
-
-                'threshstdb' is a threshold standard deviation that is independent of the
-                mean value of the coefficient -- all with a standard deviation (fraction 
-                relative to mean) exceeding this value will be proposed for elimination
-
-                'aic' is a boolean specifying the use of the aikaike information
-                criterion 
+                    - 'threshav' and 'threshstda' form a threshold for the elimination of terms
+                        - 'threshav' is a threshold for proposing terms for elimination based on
+                        their mean values (larger thresholds lead to more elimination)
+                        - 'threshstda' is a threshold standard deviation -- expressed as a fraction 
+                        relative to the mean
+                        - terms with coefficients that are lower than 'threshav' and higher than
+                        'threshstda' will be proposed for elimination (elimination will happen or not 
+                        based on relative BIC values)
+        
+                    - 'threshstdb' is a threshold standard deviation that is independent of the
+                    mean value of the coefficient -- all with a standard deviation (fraction 
+                    relative to mean) exceeding this value will be proposed for elimination
+        
+                    - 'aic' is a boolean specifying the use of the aikaike information
+                    criterion
+        
+                default values:
+        
+                    - phis = getKernels.sp500()
+                    - relats_in = [] or np.array([[0]]) ??? = [], [1,1,1,1,1,1]
+                    - a = 4 ??? 9, 1000
+                    - b = 0.1 ??? 0.01, 1
+                    - atau = std dev of ??? 3, 4
+                    - btau = std dev of ??? 4000, 0.6091
+                    - tolerance = 3
+                    - draws = 1000 ??? 1000, 2000
+                    - gimmie = False
+                    - way3 = False
+                    - threshav = 0.05 ??? 0.05, 0
+                    - threshstda = 0.5 ??? 0.5, 0
+                    - threshstdb = 2 ??? 2, 100
+                    - aic = False
             """
     # To-Do:
     #    - equation for atau and btau
@@ -77,7 +94,10 @@ class FoKL:
         warnings.warn("Warning: Input 'self' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
     
     # Calculate some default hypers based on data unless user-defined:
-    if phis !!!!!!!!!!!!!!!!!!!!!!
+    if 'phis' not in kwargs:
+        phis = getKernels.sp500() # DELETE THIS IF/ELSE IF {getKernels.sp500()} IS NOT NOT NOT A CALCULATION BUT IS INDEXING, AND PUT {getKernels.sp500()} IN {hypers} DIRECTLY
+    else:
+        phis = kwargs.get('phis')
     if 'atau' not in kwargs:
         atau = stdev(self) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914)
     else:
@@ -88,7 +108,7 @@ class FoKL:
         btau = kwargs.get('btau')
 
     # Define default hypers:
-    hypers = {'phis': 1,'relats_in': 1,'a': 4,'b': 0.01,'atau': atau,'btau': btau,'tolerance': 1,'draws': 1,'gimmie': 1,'way3': 1,'threshav': 1,'threshstda': 1,'threshstdb': 1,'aic': 1}
+    hypers = {'phis': phis,'relats_in': [],'a': 4,'b': 0.01,'atau': atau,'btau': btau,'tolerance': 3,'draws': 1000,'gimmie': False,'way3': False,'threshav': 0.05,'threshstda': 0.5,'threshstdb': 2,'aic': False}
     
     # Update hypers based on user-input:
     kwargs_expected = hypers.keys()
