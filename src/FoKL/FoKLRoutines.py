@@ -85,10 +85,6 @@ class FoKL:
         """
     
     # Calculate some default hypers based on data unless user-defined:
-    if 'phis' not in kwargs:
-        phis = getKernels.sp500() # DELETE THIS IF/ELSE IF {getKernels.sp500()} IS NOT NOT NOT A CALCULATION BUT IS INDEXING, AND PUT {getKernels.sp500()} IN {hypers} DIRECTLY
-    else:
-        phis = kwargs.get('phis')
     if 'atau' not in kwargs:
         atau = stdev(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928)
     else:
@@ -99,7 +95,7 @@ class FoKL:
         btau = kwargs.get('btau')
 
     # Define default hypers:
-    hypers = {'phis': phis,'relats_in': [],'a': 4,'b': 0.01,'atau': atau,'btau': btau,'tolerance': 3,'draws': 1000,'gimmie': False,'way3': False,'threshav': 0.05,'threshstda': 0.5,'threshstdb': 2,'aic': False}
+    hypers = {'phis': getKernels.sp500(),'relats_in': [],'a': 4,'b': 0.01,'atau': atau,'btau': btau,'tolerance': 3,'draws': 1000,'gimmie': False,'way3': False,'threshav': 0.05,'threshstda': 0.5,'threshstdb': 2,'aic': False}
     
     # Update hypers based on user-input:
     kwargs_expected = hypers.keys()
