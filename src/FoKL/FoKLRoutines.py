@@ -83,10 +83,6 @@ class FoKL:
                     - threshstdb = 2 ??? 2, 100
                     - aic = False
             """
-    # To-Do:
-    #    - equation for atau and btau
-    #    - equation or pre-set for others
-    #    - test and record examples
 
     # Convert input data to numpy if pandas:
     if isinstance(self, pd.DataFrame):
