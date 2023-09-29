@@ -7,9 +7,9 @@ from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 inputs = []
+phis = getKernels.sp500() 
 class FoKL:
     kwargs = {}
-    phis = getKernels.sp500() 
     def __init__(self, **kwargs):
         """
             initialization inputs:
