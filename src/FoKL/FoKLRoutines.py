@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from FoKL import getKernels
 
 class FoKL:
-    kwargs = {}
+
     def __init__(self, **kwargs):
         """
             initialization inputs:
