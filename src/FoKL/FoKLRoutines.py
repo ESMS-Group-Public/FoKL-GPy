@@ -244,10 +244,19 @@ class FoKL:
         if isinstance(inputs, pd.DataFrame):
             inputs = inputs.to_numpy()
             warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+        elif isinstance(inputs, pd.Series):
+            inputs = inputs.to_numpy()
+            warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+        else:
+
         if isinstance(data, pd.DataFrame):
             data = data.to_numpy()
             warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-        
+        elif isinstance(data, pd.Series):
+            data = data.to_numpy()
+            warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+        else:
+            
         # Normalize 'inputs' if not already normalized
         inputs_max = np.max(inputs)
         if inputs_max != 1:
