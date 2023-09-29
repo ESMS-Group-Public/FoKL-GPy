@@ -86,29 +86,29 @@ class FoKL:
                 - aic = False
         """
     
-    # Calculate some default hypers based on data unless user-defined:
-    if 'atau' not in kwargs:
-        atau = np.std(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928), may have correct equation via np.std command but will troubleshoot (20230928)
-    else:
-        atau = kwargs.get('atau')
-    if 'btau' not in kwargs:
-        btau = np.std(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928), may have correct equation via np.std command but will troubleshoot (20230928)
-    else:
-        btau = kwargs.get('btau')
-
-    # Define default hypers:
-    hypers = {'phis': getKernels.sp500(),'relats_in': [],'a': 4,'b': 0.01,'atau': atau,'btau': btau,'tolerance': 3,'draws': 1000,'gimmie': False,'way3': False,'threshav': 0.05,'threshstda': 0.5,'threshstdb': 2,'aic': False}
-    
-    # Update hypers based on user-input:
-    kwargs_expected = hypers.keys()
-    for kwarg in kwargs.keys():
-        if kwarg not in kwargs_expected:
-            raise ValueError(f"Unexpected keyword argument: {kwarg}")
+        # Calculate some default hypers based on data unless user-defined:
+        if 'atau' not in kwargs:
+            atau = 3 # np.std(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928), may have correct equation via np.std command but will troubleshoot (20230928)
         else:
-            hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
-    for hyperKey, hyperValue in hypers.items():
-        setattr(self, hyperKey, hyperValue) # defines each hyper as an attribute of 'self'
-        locals()[hyperKey] = hyperValue # defines each hyper as a local variable
+            atau = kwargs.get('atau')
+        if 'btau' not in kwargs:
+            btau = 4000 # np.std(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928), may have correct equation via np.std command but will troubleshoot (20230928)
+        else:
+            btau = kwargs.get('btau')
+    
+        # Define default hypers:
+        hypers = {'phis': getKernels.sp500(),'relats_in': [],'a': 4,'b': 0.01,'atau': atau,'btau': btau,'tolerance': 3,'draws': 1000,'gimmie': False,'way3': False,'threshav': 0.05,'threshstda': 0.5,'threshstdb': 2,'aic': False}
+        
+        # Update hypers based on user-input:
+        kwargs_expected = hypers.keys()
+        for kwarg in kwargs.keys():
+            if kwarg not in kwargs_expected:
+                raise ValueError(f"Unexpected keyword argument: {kwarg}")
+            else:
+                hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
+        for hyperKey, hyperValue in hypers.items():
+            setattr(self, hyperKey, hyperValue) # defines each hyper as an attribute of 'self'
+            locals()[hyperKey] = hyperValue # defines each hyper as a local variable
     
     def splineconvert500(self,A):
         """
