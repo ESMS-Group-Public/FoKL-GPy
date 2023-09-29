@@ -49,7 +49,7 @@ betas, mtx, evs = model.fit(inputs, data)
          evaluated
 """
 
-meen, bounds, rmse = model.coverage3(inputs, data, draws, 1)
+meen, bounds, rmse = model.coverage3(inputs, data, model.draws, 1)
 """
     inputs:
         'inputs' - normalized test inputs
