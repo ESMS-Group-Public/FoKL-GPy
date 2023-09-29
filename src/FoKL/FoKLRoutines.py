@@ -6,8 +6,8 @@ import numpy as np
 from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
-inputs = []
-phis = getKernels.sp500() 
+from FoKL import getKernels
+
 class FoKL:
     kwargs = {}
     def __init__(self, **kwargs):
