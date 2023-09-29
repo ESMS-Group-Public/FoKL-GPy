@@ -87,11 +87,11 @@ class FoKL:
     
     # Calculate some default hypers based on data unless user-defined:
     if 'atau' not in kwargs:
-        atau = stdev(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928)
+        atau = np.std(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928)
     else:
         atau = kwargs.get('atau')
     if 'btau' not in kwargs:
-        btau = stdev(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928)
+        btau = np.std(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928)
     else:
         btau = kwargs.get('btau')
 
