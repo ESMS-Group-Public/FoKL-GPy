@@ -6,7 +6,7 @@ import numpy as np
 from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
-
+inputs = []
 class FoKL:
     kwargs = {}
     def __init__(self, **kwargs):
