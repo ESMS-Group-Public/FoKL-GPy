@@ -108,7 +108,6 @@ class FoKL:
                 hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
         for hyperKey, hyperValue in hypers.items():
             setattr(self, hyperKey, hyperValue) # defines each hyper as an attribute of 'self'
-            locals()[hyperKey] = hyperValue # defines each hyper as a local variable
     
     def splineconvert500(self,A):
         """
