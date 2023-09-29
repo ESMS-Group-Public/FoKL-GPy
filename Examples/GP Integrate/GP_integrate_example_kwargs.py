@@ -1,7 +1,6 @@
 import numpy as np
 import FoKL
 from FoKL import FoKLRoutines
-from FoKL import getKernels
 import matplotlib.pyplot as plt
 
 
@@ -45,6 +44,7 @@ stepsize = 4
 used_inputs = [[1,1,1],[1,1,1]]
 ic = y[:,int(m/2)-1]
 
+phis = model1.phis # = model2.phis
 T,Y = FoKLRoutines.FoKL.GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
 
 plt.plot(T,Y[0],T,y[0][3750:7500])
