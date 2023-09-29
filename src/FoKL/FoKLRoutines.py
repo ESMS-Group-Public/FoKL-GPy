@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 inputs = []
 class FoKL:
     kwargs = {}
+    phis = getKernels.sp500() 
     def __init__(self, **kwargs):
         """
             initialization inputs:
