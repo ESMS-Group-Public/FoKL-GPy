@@ -243,8 +243,8 @@ class FoKL:
         # Convert 'inputs' and 'datas' to numpy if pandas
         if isinstance(inputs, pd.DataFrame) or isinstance(inputs, pd.Series):
             inputs = inputs.to_numpy()
-            print("Warning")
             warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+            print("TestForFunction")
         elif isinstance(inputs, np.ndarray):
             print("inputs already auto-converted to numpy")
         
