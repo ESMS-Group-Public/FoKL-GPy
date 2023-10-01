@@ -241,18 +241,20 @@ class FoKL:
         """
 
         # Convert 'inputs' and 'datas' to numpy if pandas
-        if isinstance(inputs, pd.DataFrame) or isinstance(inputs, pd.Series): 
+        if isinstance(inputs, pd.DataFrame) or isinstance(inputs, pd.Series):
             inputs = inputs.to_numpy()
             print("Warning")
             warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
         elif isinstance(inputs, np.ndarray):
-            print("inputs already auto converted to numpy")
+            print("inputs already auto-converted to numpy")
+        
         if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
             data = data.to_numpy()
             warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
             print("Warning")
         elif isinstance(data, np.ndarray):
-            print("data already auto converted to numpy")
+            print("data already auto-converted to numpy")
+
         # Normalize 'inputs' if not already normalized
         inputs_max = np.max(inputs)
         if inputs_max != 1:
