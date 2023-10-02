@@ -1,3 +1,4 @@
+from src.FoKL import getKernels # from FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools
@@ -6,7 +7,6 @@ import numpy as np
 from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
-from FoKL import getKernels
 
 class FoKL:
 
