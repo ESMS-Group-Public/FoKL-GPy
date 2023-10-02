@@ -1,6 +1,5 @@
 import numpy as np
-import FoKL
-from FoKL import FoKLRoutines
+from src.FoKL import FoKLRoutines # from FoKL import FoKLRoutines
 
 # Setting input parameters
 
