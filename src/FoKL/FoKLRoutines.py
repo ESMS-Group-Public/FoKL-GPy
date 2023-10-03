@@ -1,4 +1,4 @@
-from FoKL import getKernels
+from src.FoKL import getKernels # from FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools
