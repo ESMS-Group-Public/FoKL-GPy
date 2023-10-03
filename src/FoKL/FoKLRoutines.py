@@ -1,4 +1,4 @@
-from src.FoKL import getKernels # from FoKL import getKernels
+from FoKL import getKernels # from src.FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools
@@ -233,7 +233,8 @@ class FoKL:
             print("Warning")
         elif isinstance(data, np.ndarray):
             print("data already auto-converted to numpy")
-    
+        return inputs, data
+        
     def fit(self, inputs, data):
         """
             inputs: 
