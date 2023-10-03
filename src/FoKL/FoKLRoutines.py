@@ -1,4 +1,4 @@
-from FoKL import getKernels # from src.FoKL import getKernels
+from FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools
@@ -217,24 +217,7 @@ class FoKL:
 
         rmse = np.sqrt(np.mean(meen - data) ** 2)
         return meen, bounds, rmse
-
-    def pandaC(self, inputs, data):
-            # Convert 'inputs' and 'datas' to numpy if pandas
-        if isinstance(inputs, pd.DataFrame) or isinstance(inputs, pd.Series):
-            inputs = inputs.to_numpy()
-            warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            print("TestForFunction")
-        elif isinstance(inputs, np.ndarray):
-            print("inputs already auto-converted to numpy")
-        
-        if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-            data = data.to_numpy()
-            warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            print("Warning")
-        elif isinstance(data, np.ndarray):
-            print("data already auto-converted to numpy")
-        return inputs, data
-        
+    
     def fit(self, inputs, data):
         """
             inputs: 
@@ -256,6 +239,32 @@ class FoKL:
                  'ev' is a vector of BIC values from all of the models
                  evaluated
         """
+        # Adding method to auto convert to numpy 
+
+        if isinstance(inputs, pd.DataFrame) or isinstance(inputs, pd.Series):
+            inputs = inputs.to_numpy()
+            warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+            print("Warning")
+        elif isinstance(inputs, list):
+            inputs = np.array(inputs)
+            warnings.warn("Warning: 'inputs' was auto-converted to numpy from a list. Convert manually for assured accuracy.", UserWarning)
+            print("Warning")
+        elif isinstance(inputs, np.ndarray):
+            print("inputs already auto-converted to numpy")
+        
+        if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
+            data = data.to_numpy()
+            warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+            print("Warning")
+        elif isinstance(data, list):
+            data = np.array(data)
+            warnings.warn("Warning: 'data' was auto-converted to numpy from a list. Convert manually for assured accuracy.", UserWarning)
+            print("Warning")
+        elif isinstance(data, np.ndarray):
+            print("data already auto-converted to numpy")
+
+        # Adding method to convert column to a proper size (10000, None) -> (10000,1)
+
 
         # Normalize 'inputs' if not already normalized
         inputs_max = np.max(inputs)
