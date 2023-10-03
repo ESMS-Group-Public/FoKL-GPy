@@ -218,7 +218,7 @@ class FoKL:
         rmse = np.sqrt(np.mean(meen - data) ** 2)
         return meen, bounds, rmse
 
-    def PandaConvert(inputs, data):
+    def pandaC(self, inputs, data):
             # Convert 'inputs' and 'datas' to numpy if pandas
         if isinstance(inputs, pd.DataFrame) or isinstance(inputs, pd.Series):
             inputs = inputs.to_numpy()
