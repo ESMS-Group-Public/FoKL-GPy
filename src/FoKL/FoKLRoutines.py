@@ -1,4 +1,4 @@
-from src.FoKL import getKernels
+from FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools
@@ -244,27 +244,39 @@ class FoKL:
         if isinstance(inputs, pd.DataFrame) or isinstance(inputs, pd.Series):
             inputs = inputs.to_numpy()
             warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            print("Warning")
+            
         elif isinstance(inputs, list):
             inputs = np.array(inputs)
             warnings.warn("Warning: 'inputs' was auto-converted to numpy from a list. Convert manually for assured accuracy.", UserWarning)
-            print("Warning")
+           
         elif isinstance(inputs, np.ndarray):
             print("inputs already auto-converted to numpy")
         
         if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
             data = data.to_numpy()
             warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            print("Warning")
+          
         elif isinstance(data, list):
             data = np.array(data)
             warnings.warn("Warning: 'data' was auto-converted to numpy from a list. Convert manually for assured accuracy.", UserWarning)
-            print("Warning")
+
         elif isinstance(data, np.ndarray):
             print("data already auto-converted to numpy")
 
         # Adding method to convert column to a proper size (10000, None) -> (10000,1)
-
+        rowamt = len(data)
+        try:
+        # Check if the data has the desired shape
+            if len(data.shape) == 1:
+                print("data is currently not formatted correctly, reformatting")
+                data = data[:, np.newaxis]
+            elif data.shape != (rowamt,1):
+                raise ValueError("Data shape is not in a single column, readjusting.")
+            data = data.reshape(rowamt,1)
+            if len(data.shape) == 1:
+                data = data[:, np.newaxis]
+        except ValueError as e:
+            print(f"Error: {e}")
 
         # Normalize 'inputs' if not already normalized
         inputs_max = np.max(inputs)
@@ -934,5 +946,3 @@ class FoKL:
             ind += 1
 
         return T, Y
-
-
