@@ -1,4 +1,4 @@
-from FoKL import getKernels
+from src.FoKL import getKernels # from FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools
@@ -9,7 +9,6 @@ from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 
 class FoKL:
-
     def __init__(self, **kwargs):
         """
             initialization inputs:
@@ -67,7 +66,7 @@ class FoKL:
     
                 - 'aic' is a boolean specifying the use of the aikaike information
                 criterion
-    
+
             default values:
     
                 - phis = getKernels.sp500()
@@ -87,18 +86,16 @@ class FoKL:
         """
     
         # Calculate some default hypers based on data unless user-defined:
-        if 'atau' not in kwargs:
-            atau = 3 # np.std(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928), may have correct equation via np.std command but will troubleshoot (20230928)
-        else:
-            atau = kwargs.get('atau')
         if 'btau' not in kwargs:
-            btau = 4000 # np.std(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION (20230914), make sure inputs normalized if called before model.fit (20230928), may have correct equation via np.std command but will troubleshoot (20230928)
+            btau = 1000 # stdev(inputs) # NEEDS TO BE UPDATED WITH CORRECT EQUATION
+            # . . . (or updated in model.fit since data not provided here)
+            # . . . (or create function for user to call before initializing FoKLRoutines so as to provide btau)
         else:
             btau = kwargs.get('btau')
-    
+
         # Define default hypers:
-        hypers = {'phis': getKernels.sp500(),'relats_in': [],'a': 4,'b': 0.01,'atau': atau,'btau': btau,'tolerance': 3,'draws': 1000,'gimmie': False,'way3': False,'threshav': 0.05,'threshstda': 0.5,'threshstdb': 2,'aic': False}
-        
+        hypers = {'phis': getKernels.sp500(),'relats_in': [],'a': 4,'b': 0.01,'atau': 4,'btau': btau,'tolerance': 3,'draws': 1000,'gimmie': False,'way3': False,'threshav': 0.05,'threshstda': 0.5,'threshstdb': 2,'aic': False}
+
         # Update hypers based on user-input:
         kwargs_expected = hypers.keys()
         for kwarg in kwargs.keys():
@@ -108,7 +105,8 @@ class FoKL:
                 hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
         for hyperKey, hyperValue in hypers.items():
             setattr(self, hyperKey, hyperValue) # defines each hyper as an attribute of 'self'
-    
+            locals()[hyperKey] = hyperValue # defines each hyper as a local variable
+
     def splineconvert500(self,A):
         """
         Same as splineconvert, but for a larger basis of 500
@@ -217,13 +215,16 @@ class FoKL:
 
         rmse = np.sqrt(np.mean(meen - data) ** 2)
         return meen, bounds, rmse
-    
-    def fit(self, inputs, data):
+
+    def fit(self, inputs, data, **kwargs):
         """
             inputs: 
                 'inputs' - normalzied inputs
 
                 'data' - results
+
+                'p_true' - (optional) percentage 0 to 1 of datapoints to use for training the model.
+                set equal to 1 (default) or leave blank to disable the auto split and fit the model to all data.
 
             outputs:
                  'betas' are a draw from the posterior distribution of coefficients: matrix, with
@@ -238,53 +239,104 @@ class FoKL:
 
                  'ev' is a vector of BIC values from all of the models
                  evaluated
+
+             attributes:
+                'inputs_train', 'data_train', 'inputs_test', and 'data_test' get stored as attributes of 'self'.
+                if 'p_true' = 1, then all datapoints fall under the train set and the test set will be an empty list [].
         """
-        # Adding method to auto convert to numpy 
 
-        if isinstance(inputs, pd.DataFrame) or isinstance(inputs, pd.Series):
-            inputs = inputs.to_numpy()
-            warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            
-        elif isinstance(inputs, list):
-            inputs = np.array(inputs)
-            warnings.warn("Warning: 'inputs' was auto-converted to numpy from a list. Convert manually for assured accuracy.", UserWarning)
-           
-        elif isinstance(inputs, np.ndarray):
-            print("inputs already auto-converted to numpy")
-        
-        if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
-            data = data.to_numpy()
-            warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-          
-        elif isinstance(data, list):
-            data = np.array(data)
-            warnings.warn("Warning: 'data' was auto-converted to numpy from a list. Convert manually for assured accuracy.", UserWarning)
+        if 'p_true' in kwargs:
+            p_true = kwargs.get('p_true')
+        else:
+            p_true = 1
 
-        elif isinstance(data, np.ndarray):
-            print("data already auto-converted to numpy")
+        # Automatically handle some data formatting exceptions:
+        def auto_cleanData(inputs, data, p_true):
 
-        # Adding method to convert column to a proper size (10000, None) -> (10000,1)
-        rowamt = len(data)
-        try:
-        # Check if the data has the desired shape
-            if len(data.shape) == 1:
-                print("data is currently not formatted correctly, reformatting")
+            # Convert 'inputs' and 'datas' to numpy if pandas:
+            if isinstance(inputs, pd.DataFrame):
+                inputs = inputs.to_numpy()
+                warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+            if isinstance(data, pd.DataFrame):
+                data = data.to_numpy()
+                warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+
+            # Normalize 'inputs' and convert to proper format for FoKL:
+            inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
+            # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
+            # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
+            N = inputs.shape[0]
+            M = inputs.shape[1]
+            if M > N: # if more "input variables" than "datapoints", assume user is using transpose of proper format above
+                inputs = inputs.transpose()
+                warnings.warn("Warning: 'inputs' was transposed. Ignore if more datapoints than input variables.", category=UserWarning)
+            inputs_max = np.max(inputs, axis=0) # max of each input variable
+            inputs_scale = []
+            for ii in range(len(inputs_max)):
+                inputs_min = np.min(inputs[:, ii])
+                if inputs_max[ii] != 1 or inputs_min != 0:
+                    if inputs_min == inputs_max[ii]:
+                        inputs[:,ii] = np.ones(len(inputs[:,ii]))
+                        warnings.warn("Warning: 'inputs' contains a column of constants which will not improve the model's fit.", category=UserWarning)
+                    else: # normalize
+                        inputs[:,ii] = (inputs[:,ii] - inputs_min) / (inputs_max[ii] - inputs_min)
+                inputs_scale.append(np.array([inputs_min, inputs_max[ii]]))  # store for post-processing convenience
+            inputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
+            # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
+
+            # Transpose 'data' if needed:
+            data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
+            if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
                 data = data[:, np.newaxis]
-            elif data.shape != (rowamt,1):
-                raise ValueError("Data shape is not in a single column, readjusting.")
-            data = data.reshape(rowamt,1)
-            if len(data.shape) == 1:
-                data = data[:, np.newaxis]
-        except ValueError as e:
-            print(f"Error: {e}")
+                warnings.warn("Warning: 'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting.",category=UserWarning)
+            else: # check user provided only one output column/row, then transpose if needed
+                N = data.shape[0]
+                M = data.shape[1]
+                if (M != 1 and N != 1) or (M == 1 and N == 1):
+                    raise ValueError("Error: 'data' must be a vector.")
+                elif M != 1 and N == 1:
+                    data = data.transpose()
+                    warnings.warn("Warning: 'data' was transposed to match FoKL formatting.",category=UserWarning)
 
-        # Normalize 'inputs' if not already normalized
-        inputs_max = np.max(inputs)
-        if inputs_max != 1:
-            inputs_min = np.min(inputs)
-            inputs = (inputs - inputs_min) / (inputs_max - inputs_min)
+            if p_true < 1:
+                def random_train(p_true, inputs, data):  # split data for training and testing (i.e., validating)
+                    Ldata = len(data)
+                    train_log = np.random.rand(Ldata) < p_true # indices to use as training data
+                    test_log = ~train_log
 
-        # Initializations
+                    inputs_train = [inputs[ii] for ii, ele in enumerate(train_log) if ele] # because list
+                    data_train = data[train_log] # because numpy
+                    inputs_test = [inputs[ii] for ii, ele in enumerate(test_log) if ele]
+                    data_test = data[test_log]
+
+                    return inputs_train, data_train, inputs_test, data_test
+                inputs_train, data_train, inputs_test, data_test = random_train(p_true, inputs, data)
+            else:
+                inputs_train = inputs
+                data_train = data
+                inputs_test = []
+                data_test = []
+
+            return inputs_train, data_train, inputs_test, data_test, inputs_scale
+
+
+        inputs, data, inputs_validn, data_validn, inputs_scale = auto_cleanData(inputs, data, p_true)
+
+        self.inputs = inputs
+        self.data = data
+        self.inputs_validn = inputs_validn
+        self.data_validn = data_validn
+        self.inputs_scale = inputs_scale # [min,max] of each input before normalization
+
+        def inputs_to_numpy(inputs_list):
+            inputs_np = np.array(inputs_list) # should be N datapoints x M inputs
+            NM = np.shape(inputs_np)
+            if NM[0] < NM[1]:
+                inputs_np = np.transpose(inputs_np)
+            return inputs_np
+        self.inputs_np = inputs_to_numpy(self.inputs)
+
+        # Initializations:
         phis = self.phis
         relats_in = self.relats_in
         a = self.a
@@ -336,6 +388,7 @@ class FoKL:
             # outputs for each set of inputs
             minp, ninp = np.shape(inputs)
             phi_vec = []
+            # CHECK BELOW !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             if np.shape(discmtx) == ():  # part of fix for single input model
                 mmtx = 1
             else:
@@ -351,6 +404,7 @@ class FoKL:
                 X = Xin
             else:
                 X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
+            # CHECK ABOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             for i in range(minp):
 
@@ -387,7 +441,6 @@ class FoKL:
                             phi = phi * (phis[int(num) - 1][0][phind[k]] + phis[int(num) - 1][1][phind[k]] * xsm +
                                          phis[int(num) - 1][2][phind[k]] * xsm ** 2 + phis[int(num) - 1][3][phind[k]] *
                                          xsm ** 3)
-                            ppp = 1
 
                     X[i][j] = phi
 
@@ -429,6 +482,9 @@ class FoKL:
                 Lamb_tausqd_inv = np.diag(1 / np.diag(Lamb_tausqd))
 
                 mun = Q.dot(Lamb_tausqd_inv).dot(np.transpose(Q)).dot(Xty)
+                if mun.ndim == 1: # if mun.shape == (number,) != (number,1), then add new axis
+                    mun = mun[:, np.newaxis]
+                    warnings.warn("Warning: 'mun' was made into (n,1) column vector from single list (n,). It is unclear why this was not already the case.",category=UserWarning)
                 S = Q.dot(np.diag(np.diag(Lamb_tausqd_inv) ** (1 / 2)))
 
                 vec = np.random.normal(loc=0, scale=1, size=(mmtx + 1, 1))  # drawing from normal distribution
@@ -946,3 +1002,5 @@ class FoKL:
             ind += 1
 
         return T, Y
+
+
