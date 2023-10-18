@@ -268,7 +268,7 @@ class FoKL:
             if isinstance(data, pd.DataFrame):
                 data = data.to_numpy()
                 warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            pdb.set_trace()  
+                
             # Normalize 'inputs' and convert to proper format for FoKL:
             inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
             inputs = np.atleast_2d(inputs)
