@@ -4,6 +4,7 @@ import warnings
 import itertools
 import math
 import numpy as np
+import pdb
 from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
@@ -264,7 +265,7 @@ class FoKL:
             if 'OutliersMethod' in kwargs:
                 OutliersMethod = kwargs.get('OutliersMethod')
             CatchOutliers = kwargs.get('CatchOutliers')
-            if isinstance(CatchOutliers, str): # convert user input to logical for auto_cleanData to interpret
+            if (CatchOutliers, str): # convert user input to logical for auto_cleanData to interpret
                 if CatchOutliers.lower() in ('all', 'both', 'yes'):
                     CatchOutliers = 1
                 elif CatchOutliers.lower() in ('none','no'):
@@ -273,7 +274,7 @@ class FoKL:
                     CatchOutliers = [1, 0] # note 1 will need to be replicated later to match number of input variables
                 elif CatchOutliers.lower() in ('data', 'dataonly', 'outputs', 'outputsonly', 'output', 'outputonly'):
                     CatchOutliers = [0, 1] # note 0 will need to be replicated later to match number of input variables
-            elif isinstance(CatchOutliers, np.ndarray): # assume 1D list if not, which is the goal
+            elif (CatchOutliers, np.ndarray): # assume 1D list if not, which is the goal
                 if CatchOutliers.ndim == 1:
                     CatchOutliers = CatchOutliers.to_list() # should return 1D list
                 else:
@@ -282,7 +283,7 @@ class FoKL:
                         raise ValueError("CatchOutliers, if being applied to a user-selected inputs+data combo, must be a logical 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
                     else:
                         CatchOutliers = CatchOutliers.to_list()  # should return 1D list
-            elif not isinstance(CatchOutliers, list):
+            elif not (CatchOutliers, list):
                 raise ValueError("CatchOutliers must be defined as 'Inputs', 'Data', 'All', or a logical 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
         # note at this point CatchOutliers might be 0, 1, [1, 0], [0, 1, 0, 0], etc.
 
@@ -290,10 +291,10 @@ class FoKL:
         def auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod):
 
             # Convert 'inputs' and 'datas' to numpy if pandas:
-            if isinstance(inputs, pd.DataFrame):
+            if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
                 inputs = inputs.to_numpy()
                 warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            if isinstance(data, pd.DataFrame):
+            if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
                 data = data.to_numpy()
                 warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
 
