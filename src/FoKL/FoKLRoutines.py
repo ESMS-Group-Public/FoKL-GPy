@@ -301,10 +301,7 @@ class FoKL:
         def auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod):
 
             # Convert 'inputs' and 'datas' to numpy if pandas:
-            if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):              
-                # if isinstance(inputs, pd.DataFrame): # then convert dataframe to list
-                #     for ii in range(len(inputs)):
-                #         inputs.append(inputs.iloc[ii])
+            if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
                 inputs = inputs.to_numpy()
                 warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
             if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
