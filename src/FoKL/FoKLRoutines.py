@@ -1,10 +1,9 @@
-from FoKL import getKernels # from FoKL import getKernels
+from src.FoKL import getKernels # from FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools
 import math
 import numpy as np
-import pdb
 from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
@@ -118,14 +117,14 @@ class FoKL:
 
         return phi
 
-    def coverage3(self, inputs, data, draws, plots):
+    def coverage3(self, normputs, data, draws, plots):
         """
             Inputs:
                 Interprets outputs of FoKL.fit()
 
                 betas - betas emulator output
 
-                inputs - normalized inputs
+                normputs - normalized inputs
 
                 draws - number of beta terms used
 
@@ -145,7 +144,7 @@ class FoKL:
         phis = self.phis
 
         m, mbets = np.shape(betas)  # Size of betas
-        n, mputs = np.shape(inputs)  # Size of normalized inputs
+        n, mputs = np.shape(normputs)  # Size of normalized inputs
 
         setnos_p = np.random.randint(m, size=(1, draws))  # Random draws  from integer distribution
         i = 1
@@ -158,11 +157,11 @@ class FoKL:
                 setnos_p = np.append(setnos, np.random.randint(m, size=(1, draws - np.shape(setnos)[0])))
 
         X = np.zeros((n, mbets))
-        inputs = np.asarray(inputs)
+        normputs = np.asarray(normputs)
         for i in range(n):
             phind = []  # Rounded down point of input from 0-499
-            for j in range(len(inputs[i])):
-                phind.append(math.floor(inputs[i, j] * 498))
+            for j in range(len(normputs[i])):
+                phind.append(math.floor(normputs[i, j] * 498))
                 # 499 changed to 498 for python indexing
 
             phind_logic = []
@@ -179,7 +178,7 @@ class FoKL:
                 for k in range(mputs):
                     num = mtx[j - 1, k]
                     if num > 0:
-                        xsm = 498 * inputs[i][k] - phind[k]
+                        xsm = 498 * normputs[i][k] - phind[k]
                         phi = phi * (phis[int(num) - 1][0][phind[k]] + phis[int(num) - 1][1][phind[k]] * xsm +
                                      phis[int(num) - 1][2][phind[k]] * xsm ** 2 + phis[int(num) - 1][3][
                                          phind[k]] * xsm ** 3)
@@ -210,7 +209,7 @@ class FoKL:
         rmse = np.sqrt(np.mean(meen - data) ** 2)
         return meen, bounds, rmse
 
-    def fit(self, inputs, data, p_true, **kwargs):
+    def fit(self, inputs, data, **kwargs):
         """
             inputs: 
                 'inputs' - normalzied inputs
@@ -289,15 +288,15 @@ class FoKL:
 
         # Automatically handle some data formatting exceptions:
         def auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod):
-            
+
             # Convert 'inputs' and 'datas' to numpy if pandas:
-            if isinstance(inputs, pd.DataFrame) or isinstance(data, pd.Series):
+            if isinstance(inputs, pd.DataFrame):
                 inputs = inputs.to_numpy()
                 warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
+            if isinstance(data, pd.DataFrame):
                 data = data.to_numpy()
                 warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-                
+
             # Normalize 'inputs' and convert to proper format for FoKL:
             inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
             # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
@@ -323,9 +322,9 @@ class FoKL:
                 inputs_scale.append(np.array([inputs_min, inputs_max[ii]]))  # store for post-processing convenience
             inputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
             # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
-            
+
             # Transpose 'data' if needed:
-            data = np.array([data])  # attempts to handle lists or any other format (i.e., not pandas)
+            data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
             if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
                 data = data[:, np.newaxis]
                 warnings.warn("Warning: 'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting.",category=UserWarning)
@@ -341,7 +340,7 @@ class FoKL:
             # Store properly formatted data and normalized inputs BEFORE removing outliers and BEFORE splitting train
             rawinputs = inputs
             rawdata = data
-            
+
             # Catch and remove outliers:
             if CatchOutliers == [1,0]: # i.e., inputs only
                 CatchOutliers = list(np.ones(M))+[0] # [1,1,...,1,0] as a list
@@ -420,7 +419,7 @@ class FoKL:
             else:
                 inputslist_np = np.array([])
             return inputslist_np, was_auto_transposed
-            
+
         # Define/update attributes with cleaned data and other relevant variables:
         setattr(self, 'inputs', inputs)
         setattr(self, 'data', data)
@@ -437,7 +436,7 @@ class FoKL:
         setattr(self, 'rawinputs_np', inputslist_to_np(self.rawinputs, do_transpose)[0])
         setattr(self, 'traininputs_np', inputslist_to_np(self.traininputs, do_transpose)[0])
         setattr(self, 'testinputs_np', inputslist_to_np(self.testinputs, do_transpose)[0])
-        
+
         # Initializations:
         phis = self.phis
         relats_in = self.relats_in
