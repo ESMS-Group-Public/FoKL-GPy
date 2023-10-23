@@ -4,7 +4,7 @@ import warnings
 import itertools
 import math
 import numpy as np
-import pdb
+# import pdb
 from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
@@ -118,7 +118,7 @@ class FoKL:
 
         return phi
 
-    def coverage3(self, normputs, data, draws, **kwargs):
+    def coverage3(self, **kwargs):
         """
             Inputs:
                 Interprets outputs of FoKL.fit()
@@ -140,16 +140,102 @@ class FoKL:
 
 
            """
-        # Default keywords:
-        plot_controls = {'plot': 0, 'bounds': 0}
-        # Update keywords based on user-input:
-        kwargs_expected = plot_controls.keys()
-        for kwarg in kwargs.keys():
-            if kwarg not in kwargs_expected:
-                raise ValueError(f"Unexpected keyword argument: {kwarg}")
-            else:
-                plot_controls[kwarg] = kwargs.get(kwarg, plot_controls.get(kwarg))
-        plots = plot_controls.get('plot')
+
+        def process_kwargs(kwargs):
+            # Default keywords:
+            kwargs_upd = {'inputs': 'default', 'data': 'default', 'draws': self.draws, 'plot': 0, 'bounds': 0, 'xaxis': 0, 'labels': 1, 'xlabel': 'Index', 'ylabel': 'Data', 'title': 'FoKL', 'legend': 0, 'PlotTypeFoKL': 'b', 'PlotSizeFoKL': 2, 'PlotTypeBounds': 'k--', 'PlotSizeBounds': 2, 'PlotTypeData': 'ro', 'PlotSizeData': 2, 'LegendLabelFoKL': 'FoKL', 'LegendLabelData': 'Data', 'LegendLabelBounds': 'Bounds'}
+
+            # Update keywords based on user-input:
+            kwargs_expected = kwargs_upd.keys()
+            for kwarg in kwargs.keys():
+                if kwarg not in kwargs_expected:
+                    raise ValueError(f"Unexpected keyword argument: {kwarg}")
+                else:
+                    kwargs_upd[kwarg] = kwargs.get(kwarg, kwargs_upd.get(kwarg))
+
+            # Define default values if no user-input, or if only 'inputs' is user-defined:
+            if isinstance(kwargs_upd.get('data'), str): # if 'data' is default
+                if not isinstance(kwargs_upd.get('inputs'), str): # if 'inputs' is NOT default
+                    kwargs_upd['data'] = 'ignore' # do not plot 'data'
+                    warnings.warn("Keyword argument 'data' must be defined for user-defined 'inputs' if intending to plot 'data'.")
+                elif kwargs_upd.get('data').lower() == 'default': # confirm 'data' is default
+                    kwargs_upd['data'] = self.data # default ... train+test data, i.e., validation
+                    if not isinstance(kwargs_upd.get('inputs'), str): # if 'inputs' is not default
+                        warnings.warn("Keyword argument 'data' should be defined for user-defined 'inputs'. Assuming default value for 'data' which may error if 'inputs' is not also default.")
+                else:
+                    raise ValueError("Keyword argument 'data' was improperly defined.")
+            else: # if 'data' is user-defined
+                if isinstance(kwargs_upd.get('inputs'), str): # if 'inputs' is default
+                    if kwargs_upd.get('inputs').lower() == 'default': # confirm 'inputs' is default
+                        raise ValueError("Keyword argument 'inputs' must be defined for user-defined 'data'.")
+            if isinstance(kwargs_upd.get('inputs'), str): # if 'inputs' is default
+                if kwargs_upd.get('inputs').lower() == 'default': # confirm 'inputs' is default
+                    kwargs_upd['inputs'] = self.inputs # default ... train+test inputs, i.e., validation
+
+            plots = kwargs_upd.get('plot') # 0 by default
+            raise_error = 0
+            if isinstance(plots, str):
+                plots = plots.lower()
+                if plots in ['yes', 'on', 'y']:
+                    kwargs_upd['plot'] = 1
+                elif plots in ['sort', 'sorted']:
+                    kwargs_upd['plot'] = 'sorted'
+                    if kwargs_upd['xlabel'] == 'Index': # if default value, i.e., no user-defined xlabel
+                        kwargs_upd['xlabel'] = 'Index (Sorted)'
+                elif plots in ['no', 'none', 'off', 'n']:
+                    kwargs_upd['plot'] = 0
+                else:
+                    raise_error = 1
+            elif plots not in (0, 1):
+                raise_error = 1
+            if raise_error:
+                raise ValueError(f"Optional keyword argument 'plot' is limited to 0, 1, or 'sorted'.")
+
+            xaxis = kwargs_upd['xaxis']
+            if xaxis != 0: # if not default, i.e., user-defined
+                if isinstance(xaxis, str):
+                    xaxis = xaxis.lower()
+                    if xaxis in ['true', 'actual', 'denorm', 'denormed', 'denormalized']:
+                        kwargs_upd['xaxis'] = 1 # assume first input variable is xaxis (e.g., time)
+                    elif xaxis in ['indices', 'none', 'norm', 'normed', 'normalized']:
+                        kwargs_upd['xaxis'] = 0
+                elif not isinstance(xaxis, int):
+                    xaxis = np.squeeze(np.array(xaxis))
+                    if xaxis.ndim == 1: # then not a vector
+                        raise ValueError("Keyword argument 'xaxis' is limited to an integer corresponding to the input variable to plot along the xaxis (e.g., 1, 2, 3, etc.) or to a vector corresponding to the user-provided data. Leave blank or =0 to plot indices along the xaxis.")
+                    else:
+                        kwargs_upd['xaxis'] = xaxis # update as a numpy vector
+
+            plt_labels = kwargs_upd['labels']
+            if plt_labels != 1: # if not default, i.e., user-defined
+                if isinstance(plt_labels, str):
+                    plt_labels = plt_labels.lower()
+                    if plt_labels in ['no', 'off', 'hide', 'none', 'false']:
+                        kwargs_upd['labels'] = 0
+                    elif plt_labels in ['yes', 'on', 'show', 'all', 'plot', 'true' 'y']:
+                        kwargs_upd['labels'] = 1
+                elif plt_labels != 0:
+                    raise ValueError("Keyword argument 'labels' is limited to 0 or 1.")
+
+            plt_legend = kwargs_upd['legend']
+            if plt_legend != 0:  # if not default, i.e., user-defined
+                if isinstance(plt_legend, str):
+                    plt_legend = plt_legend.lower()
+                    if plt_legend in ['y', 'yes', 'on', 'show', 'all', 'plot', 'true']:
+                        kwargs_upd['legend'] = 1
+                    elif plt_legend in ['n', 'no', 'off', 'hide', 'none', 'false']:
+                        kwargs_upd['legend'] = 0
+                elif plt_legend != 1:
+                    raise ValueError("Keyword argument 'legend' is limited to 0 or 1.")
+
+            if not all(isinstance(kwargs_upd[key], str) for key in ['LegendLabelFoKL', 'LegendLabelData', 'LegendLabelBounds']):
+                raise ValueError("Keyword arguments 'LegendLabelFoKL', 'LegendLabelData',and 'LegendLabelBounds' are limited to strings.")
+
+            return kwargs_upd
+        kwargs_upd = process_kwargs(kwargs)
+        normputs = kwargs_upd.get('inputs')
+        data = kwargs_upd.get('data')
+        draws = kwargs_upd.get('draws')
 
         betas = self.betas
         mtx = self.mtx
@@ -197,27 +283,78 @@ class FoKL:
                 X[i, j] = phi
 
         X[:, 0] = np.ones((n,))
-        modells = np.zeros((np.shape(data)[0], draws))
+        modells = np.zeros((n, draws)) # note n == np.shape(data)[0] if data != 'ignore'
         for i in range(draws):
             modells[:, i] = np.matmul(X, betas[setnos[i], :])
         meen = np.mean(modells, 1)
-        bounds = np.zeros((np.shape(data)[0], 2))
+        bounds = np.zeros((n, 2)) # note n == np.shape(data)[0] if data != 'ignore'
         cut = int(np.floor(draws * .025))
-        for i in range(np.shape(data)[0]):
+        for i in range(n): # note n == np.shape(data)[0] if data != 'ignore'
             drawset = np.sort(modells[i, :])
             bounds[i, 0] = drawset[cut]
             bounds[i, 1] = drawset[draws - cut]
+# xaxis, sorted .... xaxis, default xlabel
+        if kwargs_upd.get('plot') != 0: # if user requested a plot
+            plt_x = kwargs_upd.get('xaxis') # 0, integer indexing input variable to plot, or user-defined vector
+            linspace_needed_if_sorted = 1
+            if plt_x != 0: # if user specified x-axis
+                if isinstance(plt_x, int): # if user-specified an input variable (i.e., not a vector)
+                    warnings.warn("Using default inputs for defining x-axis. Set keyword argument 'xaxis' equal to a vector if using custom inputs.", category=UserWarning)
+                    minmax = self.normalize
+                    min = minmax[plt_x - 1][0]
+                    max = minmax[plt_x - 1][1]
+                    inputs_np = self.inputs_np
+                    plt_x = inputs_np[:, plt_x-1] * (max - min) + min # vector to plot on x-axis
+            else: # if plt_x == 0
+                # plt_x = np.linspace(0, len(data) - 1, len(data))
+                plt_x = np.linspace(0, n - 1, n)
+                linspace_needed_if_sorted = 0
 
-        if plots:
+            if kwargs_upd.get('plot') == 'sorted': # if user requested a sorted plot
+                if isinstance(kwargs_upd.get('data'), str):
+                    if kwargs_upd.get('data').lower() == 'ignore':
+                        raise ValueError("Keyword argument 'data' must be defined if using a sorted plot with user-defined 'inputs'.")
+                sort_id = np.squeeze(np.argsort(data, axis=0))
+                plt_meen = meen[sort_id]
+                plt_bounds = bounds[sort_id]
+                plt_data = data[sort_id]
+                if linspace_needed_if_sorted:
+                    plt_x = np.linspace(0, len(data) - 1, len(data))
+                    warnings.warn("Keyword argument 'xaxis' was overwritten. For a sorted plot, the x-axis is of arbitrary indices.", category=UserWarning)
+            else:
+                plt_meen = meen
+                plt_data = data
+                plt_bounds = bounds
+
             plt.figure()
-            plt.plot(meen, 'b', linewidth=2)
-            if plot_controls.get('bounds'):
-                plt.plot(bounds[:, 0], 'k--')
-                plt.plot(bounds[:, 1], 'k--')
-            plt.plot(data, 'ro')
+            plt.plot(plt_x, plt_meen, kwargs_upd.get('PlotTypeFoKL'), linewidth=kwargs_upd.get('PlotSizeFoKL'), label=kwargs_upd.get('LegendLabelFoKL'))
+            if not isinstance(kwargs_upd.get('data'), str): # then kwargs_upd.get('data').lower() == 'ignore':
+                plt.plot(plt_x, plt_data, kwargs_upd.get('PlotTypeData'), markersize=kwargs_upd.get('PlotSizeData'), label=kwargs_upd.get('LegendLabelData'))
+            if kwargs_upd.get('bounds'):
+                plt.plot(plt_x, plt_bounds[:, 0], kwargs_upd.get('PlotTypeBounds'), linewidth=kwargs_upd.get('PlotSizeBounds'), label=kwargs_upd.get('LegendLabelBounds'))
+                plt.plot(plt_x, plt_bounds[:, 1], kwargs_upd.get('PlotTypeBounds'), linewidth=kwargs_upd.get('PlotSizeBounds'))
+            if kwargs_upd.get('labels'):
+                if not all(isinstance(kwargs_upd.get(key), str) for key in ['xlabel', 'ylabel', 'title']):
+                    if any(kwargs_upd.get(key) != 0 for key in ['xlabel', 'ylabel', 'title']):
+                        raise ValueError("Keyword arguments 'xlabel', 'ylabel', and 'title' are limited to strings.")
+                if kwargs_upd.get('xlabel') != 0:
+                    plt.xlabel(kwargs_upd.get('xlabel'))
+                if kwargs_upd.get('ylabel') != 0:
+                    plt.ylabel(kwargs_upd.get('ylabel'))
+                if kwargs_upd.get('title') != 0:
+                    plt.title(kwargs_upd.get('title'))
+
+            if kwargs_upd.get('legend'):
+                plt.legend()
+
             plt.show()
 
-        rmse = np.sqrt(np.mean(meen - data) ** 2)
+        if isinstance(kwargs_upd.get('data'), str): # then assume kwargs_upd.get('data').lower() == 'ignore':
+            warnings.warn("Keyword argument 'data' must be defined for user-defined 'inputs' in order to calculate RMSE.")
+            rmse = []
+        else:
+            rmse = np.sqrt(np.mean(meen - data) ** 2)
+
         return meen, bounds, rmse
 
     def fit(self, inputs, data, **kwargs):
@@ -227,7 +364,12 @@ class FoKL:
 
                 'data' - results
 
-                'p_true' - (optional) percentage 0 to 1 of datapoints to use as a training set.
+                keywords (optional):
+                    'train' - percentage 0 to 1 of datapoints to use as a training set
+
+                    'CatchOutliers' - blah
+
+                    'OutliersMethod' - blah
 
             outputs:
                  'betas' are a draw from the posterior distribution of coefficients: matrix, with
@@ -265,20 +407,37 @@ class FoKL:
                      > model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
         """
 
-        # Process user-defined optional keywords:
-        p_train = 1  # default
+        # Check all keywords and update hypers if re-defined by user:
+        kwargs_hypers = ['phis', 'relats_in', 'a', 'b', 'atau', 'btau', 'tolerance', 'draws', 'gimmie', 'way3',
+                         'threshav', 'threshstda', 'threshstdb', 'aic']
+        kwargs_for_fit = ['train', 'TrainMethod', 'CatchOutliers', 'OutliersMethod', 'OutliersMethodParams']
+        kwargs_expected = kwargs_hypers + kwargs_for_fit
+        for kwarg in kwargs.keys():
+            if kwarg not in kwargs_expected:
+                raise ValueError(f"Unexpected keyword argument: {kwarg}")
+            elif kwarg in kwargs_hypers: # then update hyper as attribute
+                setattr(self, kwarg, kwargs.get(kwarg))
+
+        # Process keywords specific to fit():
+        p_train = 1 # default
+        p_train_method = 'random' # default
+        if 'train' in kwargs:
+            p_train = kwargs.get('train')
+            if 'TrainMethod' in kwargs:
+                p_train_method = kwargs.get('TrainMethod')
         CatchOutliers = 0  # default
         OutliersMethod = []  # default
-        if 'p_train' in kwargs:
-            p_train = kwargs.get('p_train')
+        OutliersMethodParams = [] # default
         if 'CatchOutliers' in kwargs:
+            CatchOutliers = kwargs.get('CatchOutliers')
             if 'OutliersMethod' in kwargs:
                 OutliersMethod = kwargs.get('OutliersMethod')
-            CatchOutliers = kwargs.get('CatchOutliers')
+                if 'OutliersMethodParams' in kwargs:
+                    OutliersMethodParams = kwargs.get('OutliersMethodParams')
             if isinstance(CatchOutliers, str): # convert user input to logical for auto_cleanData to interpret
-                if CatchOutliers.lower() in ('all', 'both', 'yes'):
+                if CatchOutliers.lower() in ('all', 'both', 'yes', 'y'):
                     CatchOutliers = 1
-                elif CatchOutliers.lower() in ('none','no'):
+                elif CatchOutliers.lower() in ('none','no', 'n'):
                     CatchOutliers = 0
                 elif CatchOutliers.lower() in ('inputs', 'inputsonly', 'input', 'inputonly'):
                     CatchOutliers = [1, 0] # note 1 will need to be replicated later to match number of input variables
@@ -298,15 +457,15 @@ class FoKL:
         # note at this point CatchOutliers might be 0, 1, [1, 0], [0, 1, 0, 0], etc.
 
         # Automatically handle some data formatting exceptions:
-        def auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod):
+        def auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod, OutliersMethodParams):
 
             # Convert 'inputs' and 'datas' to numpy if pandas:
             if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
                 inputs = inputs.to_numpy()
-                warnings.warn("Warning: 'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+                warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
             if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
                 data = data.to_numpy()
-                warnings.warn("Warning: 'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+                warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
 
             # Normalize 'inputs' and convert to proper format for FoKL:
             inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
@@ -319,7 +478,7 @@ class FoKL:
             M = inputs.shape[1]
             if M > N: # if more "input variables" than "datapoints", assume user is using transpose of proper format above
                 inputs = inputs.transpose()
-                warnings.warn("Warning: 'inputs' was transposed. Ignore if more datapoints than input variables.", category=UserWarning)
+                warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables.", category=UserWarning)
                 N_old = N
                 N = M # number of datapoints (i.e., timestamps)
                 M = N_old # number of input variables
@@ -330,7 +489,7 @@ class FoKL:
                 if inputs_max[ii] != 1 or inputs_min != 0:
                     if inputs_min == inputs_max[ii]:
                         inputs[:,ii] = np.ones(len(inputs[:,ii]))
-                        warnings.warn("Warning: 'inputs' contains a column of constants which will not improve the model's fit.", category=UserWarning)
+                        warnings.warn("'inputs' contains a column of constants which will not improve the model's fit.", category=UserWarning)
                     else: # normalize
                         inputs[:,ii] = (inputs[:,ii] - inputs_min) / (inputs_max[ii] - inputs_min)
                 inputs_scale.append(np.array([inputs_min, inputs_max[ii]]))  # store for post-processing convenience
@@ -341,15 +500,15 @@ class FoKL:
             data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
             if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
                 data = data[:, np.newaxis]
-                warnings.warn("Warning: 'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting.",category=UserWarning)
+                warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting.",category=UserWarning)
             else: # check user provided only one output column/row, then transpose if needed
-                N = data.shape[0]
-                M = data.shape[1]
-                if (M != 1 and N != 1) or (M == 1 and N == 1):
+                N_data = data.shape[0]
+                M_data = data.shape[1]
+                if (M_data != 1 and N_data != 1) or (M_data == 1 and N_data == 1):
                     raise ValueError("Error: 'data' must be a vector.")
-                elif M != 1 and N == 1:
+                elif M_data != 1 and N_data == 1:
                     data = data.transpose()
-                    warnings.warn("Warning: 'data' was transposed to match FoKL formatting.",category=UserWarning)
+                    warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
 
             # Store properly formatted data and normalized inputs BEFORE removing outliers and BEFORE splitting train
             rawinputs = inputs
@@ -366,37 +525,51 @@ class FoKL:
                 CatchOutliers = list(np.zeros(M+1)) # [0,0,...,0,0] as a list
             elif len(CatchOutliers) != M+1:
                 raise ValueError(r"CatchOutliers must be defined as 'Inputs', 'Data', 'All', or a logical 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
-            def catch_outliers(inputs, data, CatchOutliers, OutliersMethod):
+            def catch_outliers(inputs, data, CatchOutliers, OutliersMethod, OutliersMethodParams):
                 inputs_wo_outliers = inputs
                 data_wo_outliers = data
                 outliers_indices = [] # if logical true/false, then use np.zeros(len(data))
                 if OutliersMethod != []:
-                    if OutliersMethod == 'Method 1': # Normal Std Dev
-                        test=1
+                    CatchOutliers_np = np.array(CatchOutliers)
+                    CatchOutliers_id = np.where(CatchOutliers_np == 1)[0]
+                    inputs_data = np.hstack((inputs, data))
+                    inputs_data_rel = inputs_data[:, CatchOutliers_id]
 
-                    elif OutliersMethod == 'Method 2': # Z-Score
-                        test = 1
+                    from scipy import stats
 
-                    elif OutliersMethod == 'Method 3': # Interquartile Range
-                        test = 1
+                    if OutliersMethod == 'Z-Score':
+                        z_scores = np.abs(stats.zscore(inputs_data_rel))
+                        if OutliersMethodParams != []: # if user-defined
+                            threshold = OutliersMethodParams
+                        else:
+                            threshold = 3 # default value if threshold of z-score is not user-specified
+                        outliers_indices = np.any(np.where(z_scores > threshold, True, False), axis=1)
 
-                    elif OutliersMethod == 'Method N': # Kernel Density Estimation (KDE) ... can be multivariate
-                        test = 1
+                    elif OutliersMethod == 'other': # maybe ... Interquartile Range
+                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
 
-                    elif OutliersMethod == 'Method N': # Mahalanobis Distance ... can be multivariate
-                        test = 1
+                    elif OutliersMethod == 'other': # maybe ... Kernel Density Estimation (KDE) ... can be multivariate
+                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
 
-                    elif OutliersMethod == 'Method N': # Local Outlier Factor (LOF)
-                        test = 1
+                    elif OutliersMethod == 'other': # maybe ... Mahalanobis Distance ... can be multivariate
+                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
+
+                    elif OutliersMethod == 'other': # maybe ... Local Outlier Factor (LOF)
+                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
 
                     elif OutliersMethod != []:
-                        raise ValueError(r"OutliersMethod must be defined as 'Method 1', 'Method 2', 'Method 3', 'Method N', or left blank.")
-                return inputs_wo_outliers, data_wo_outliers, outliers_indices
-            inputs, data, outliers_indices = catch_outliers(inputs, data, CatchOutliers, OutliersMethod)
+                        raise ValueError(r"Keyword argument 'OutliersMethod' is limited to 'Z-Score'. Other methods are in development.")
 
-            # Spit [inputs,data] randomly into train and test sets:
-            if p_train < 1:
-                def random_train(p_train, inputs, data):  # split data for training and testing (i.e., validating)
+                    inputs_data_wo_outliers = inputs_data[~outliers_indices, :]
+                    inputs_wo_outliers = inputs_data_wo_outliers[:, :-1]
+                    data_wo_outliers = inputs_data_wo_outliers[:, -1]
+
+                return inputs_wo_outliers, data_wo_outliers, outliers_indices
+            inputs, data, outliers_indices = catch_outliers(inputs, data, CatchOutliers, OutliersMethod, OutliersMethodParams)
+
+            # Spit [inputs,data] into train and test sets (depending on TrainMethod):
+            if p_train < 1: # split inputs+data into training and testing sets for validation of model
+                def random_train(p_train, inputs, data): # random split, if TrainMethod = 'random'
                     Ldata = len(data)
                     train_log = np.random.rand(Ldata) < p_train # indices to use as training data
                     test_log = ~train_log
@@ -407,7 +580,35 @@ class FoKL:
                     data_test = data[test_log]
 
                     return inputs_train, data_train, inputs_test, data_test, train_log, test_log
-                inputs_train, data_train, inputs_test, data_test, train_log, test_log = random_train(p_train, inputs, data)
+
+                def other_train(p_train, inputs, data): # IN DEVELOPMENT ... other split, if TrainMethod = 'other'
+                    # WRITE CODE HERE FOR NEW METHOD OF SPLITTING TEST/TRAIN SETS
+                    inputs_train = inputs
+                    data_train = data
+                    inputs_test = []
+                    data_test = []
+                    train_log = np.linspace(0, len(inputs[:, 0]) - 1, len(inputs[:, 0]))
+                    test_log = []
+
+                    return inputs_train, data_train, inputs_test, data_test, train_log, test_log
+
+                def otherN_train(p_train, inputs, data): # IN DEVELOPMENT ... otherN split, if TrainMethod = 'otherN'
+                    # WRITE CODE HERE FOR NEW METHOD OF SPLITTING TEST/TRAIN SETS
+                    inputs_train = inputs
+                    data_train = data
+                    inputs_test = []
+                    data_test = []
+                    train_log = np.linspace(0, len(inputs[:,0]) - 1, len(inputs[:,0]))
+                    test_log = []
+
+                    return inputs_train, data_train, inputs_test, data_test, train_log, test_log
+
+                function_mapping = {'random': random_train,'other': other_train,'otherN': otherN_train}
+                if p_train_method in function_mapping:
+                    inputs_train, data_train, inputs_test, data_test, train_log, test_log = function_mapping[p_train_method](p_train, inputs, data)
+                else:
+                    raise ValueError("Keyword argument 'TrainMethod' is limited to 'random' as of now. Additional methods of splitting are in development.")
+
             else:
                 inputs_train = inputs
                 data_train = data
@@ -418,11 +619,11 @@ class FoKL:
 
             return inputs, data, rawinputs, rawdata, inputs_train, data_train, inputs_test, data_test, inputs_scale, outliers_indices, train_log, test_log
 
-        inputs, data, rawinputs, rawdata, traininputs, traindata, testinputs, testdata, inputs_scale, outliers_indices, train_log, test_log = auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod)
+        inputs, data, rawinputs, rawdata, traininputs, traindata, testinputs, testdata, inputs_scale, outliers_indices, train_log, test_log = auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod, OutliersMethodParams)
 
         def inputslist_to_np(inputslist, do_transpose):
             was_auto_transposed = 0
-            if inputslist != []:
+            if np.any(inputslist): # if inputslist is not empty (i.e., != [] )
                 inputslist_np = np.array(inputslist) # should be N datapoints x M inputs
                 NM = np.shape(inputslist_np)
                 if NM[0] < NM[1] and do_transpose == 'auto':
@@ -441,6 +642,7 @@ class FoKL:
         setattr(self, 'traininputs', traininputs)
         setattr(self, 'traindata', traindata)
         setattr(self, 'testinputs', testinputs)
+        setattr(self, 'testdata', testdata)
         setattr(self, 'normalize', inputs_scale) # [min,max] of each input before normalization
         setattr(self, 'outliers', outliers_indices) # indices removed from raw
         setattr(self, 'trainlog', train_log) # indices AFTER OUTLIERS WERE REMOVED FROM RAW of datapoints used for training
@@ -610,7 +812,7 @@ class FoKL:
                 mun = Q.dot(Lamb_tausqd_inv).dot(np.transpose(Q)).dot(Xty)
                 if mun.ndim == 1: # if mun.shape == (number,) != (number,1), then add new axis
                     mun = mun[:, np.newaxis]
-                    warnings.warn("Warning: 'mun' was made into (n,1) column vector from single list (n,). It is unclear why this was not already the case.",category=UserWarning)
+                    warnings.warn("'mun' was made into (n,1) column vector from single list (n,). It is unclear why this was not already the case.",category=UserWarning)
                 S = Q.dot(np.diag(np.diag(Lamb_tausqd_inv) ** (1 / 2)))
 
                 vec = np.random.normal(loc=0, scale=1, size=(mmtx + 1, 1))  # drawing from normal distribution
