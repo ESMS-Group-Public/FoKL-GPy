@@ -11,7 +11,7 @@ from scipy.interpolate import griddata
 from scipy.signal import argrelextrema
 
 import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
+# warnings.filterwarnings("ignore", category=UserWarning)
 
 
 # ======================================================================================================================
@@ -21,8 +21,8 @@ warnings.filterwarnings("ignore", category=UserWarning)
 dataset = [0,1,'max',3] # dataset to model . . .
 # . . . = [acceleration location (0,1,2), logical if modeling amplitude, 'min' or 'max' amplitude if applicable, . . .
 # . . . . . . number of sweeps to perform (i.e., ~number of neighbors to eliminate per max/min point)]
-res = 'full' # 1e10 # number of datapoints to look at (decrease for sake of example to decrease computation time)
-cbar_lim = [0, 4.8, 100] # limits of color bar in plots [min, max, number of discretizations]
+res = 1e2 # 1e10 # number of datapoints to look at (decrease for sake of example to decrease computation time)
+cbar_lim = [0, 4.8, 64] # limits of color bar in plots [min, max, number of discretizations]
 
 
 # ======================================================================================================================
@@ -167,53 +167,34 @@ if res != 'full':
 # initialize a FoKL class for the dataset being modeled
 model = FoKLRoutines.FoKL() # leave argument blank to use default hypers
 
-# customize how model.fit() treats user inputs and data by defining keywords
-p_train = 0.75 # use 75% of data for training and the rest for validation testing
-CatchOutliers = 'Data' # only look at 'data' for outliers to remove
-OutliersMethod = 'Method 1' # apply 'Method 1' for defining what constitutes an outlier
+# build model using all inputs and data (i.e., train and test both included)
+betas, mtx, evs = model.fit(userinputs, userdata, train=0.8, CatchOutliers='Data')
 
-# test all inputs and data (i.e., train and test both included)
-betas, mtx, evs = model.fit(userinputs, userdata, p_train=p_train, CatchOutliers=CatchOutliers, OutliersMethod=OutliersMethod)
+# this example models frequency resonances so no outliers were removed, but if removing z-scores > 2 from 'data' then:
+# betas, mtx, evs = model.fit(userinputs, userdata, train=0.8, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=2)
 
 
 # ======================================================================================================================
 # Standard post-processing of FoKL model:
 
 
-meen, bounds, rmse = model.coverage3(model.inputs, model.data, model.draws)
-# meen, bounds, rmse = model.coverage3(model.inputs, model.data, model.draws, plot=1, bounds=1)
+# return estimated values of default inputs (i.e., 'userinputs' minus outliers if any were removed during model.fit())
+meen, bounds, rmse = model.coverage3(draws=500, plot='sorted', bounds=1, legend=1, title='F16 Vibration Testing', ylabel='Induced Acceleration', PlotTypeFoKL='k', PlotTypeData='ko', PlotSizeData=3, PlotTypeBounds='k--', PlotSizeBounds=1)
 
 
 # ======================================================================================================================
-# Additional user post-processing of FoKL model:
+# Additional user post-processing of FoKL model (to make contour plots in this example):
 
-
-# # SORTED:
-
-# plt.figure()
-# sort_id = np.squeeze(np.argsort(model.data, axis=0))
-# meen_sort = meen[sort_id]
-# bounds_sort = bounds[sort_id]
-# data_sort = model.data[sort_id]
-# plt.plot(meen_sort, 'b', linewidth=2)
-# plt.plot(bounds_sort[:, 0], 'k--')
-# plt.plot(bounds_sort[:, 1], 'k--')
-# plt.plot(data_sort, 'ro')
-# plt.title('model sorted by increasing data values')
-# plt.show()
-
-
-# PLOT CONTOURS:
 
 # de-normalize inputs
-inputs_scale = model.normalize # [min,max] used to normalize each input
+minmax = model.normalize # [[min,max],...,[min,max]], used to normalize each input
 inputs_np = model.inputs_np
 M = np.shape(inputs_np)[1] # number of inputs
 inputs_denorm = []
 for ii in range(M):
-    inp_min = inputs_scale[ii][0]
-    inp_max = inputs_scale[ii][1]
-    inputs_denorm.append(np.array(inputs_np[:,ii] * (inp_max-inp_min) + inp_min))
+    inp_min = minmax[ii][0]
+    inp_max = minmax[ii][1]
+    inputs_denorm.append(inputs_np[:, ii] * (inp_max - inp_min) + inp_min)
 
 # data for color map
 x = inputs_denorm[0] # frequency
@@ -231,29 +212,26 @@ zi = np.squeeze(zi)
 zi_model = griddata((x, y), meen, (xi, yi), method='linear')
 zi_model = np.squeeze(zi_model)
 
+# create figure
 plt.figure()
-plt.subplot(1,2,1) # EXPERIMENTAL RESULTS:
-cbar_title = 'Acceleration (m/s^2)'
+plt.subplot(1,3,1) # EXPERIMENTAL RESULTS:
 plt.contourf(xi, yi, zi, cmap='viridis', levels=np.linspace(cbar_lim[0], cbar_lim[1], cbar_lim[2]))
 cbar = plt.colorbar()
-cbar.set_label(cbar_title)
 plt.xlabel('Frequency (Hz)')
 plt.ylabel('Force Amplitude (N)')
-plt.title('Induced Acceleration at Location 1, Measured Experimentally')
-plt.subplot(1,2,2) # FOKL MODEL OF RESULTS:
-cbar_title = 'Acceleration (m/s^2)'
+plt.title('Acceleration (Actual)')
+plt.subplot(1,3,2) # FOKL MODEL OF RESULTS:
 plt.contourf(xi, yi, zi_model, cmap='viridis', levels=np.linspace(cbar_lim[0], cbar_lim[1], cbar_lim[2]))
 cbar = plt.colorbar()
-cbar.set_label(cbar_title)
 plt.xlabel('Frequency (Hz)')
-plt.ylabel('Force Amplitude (N)')
-plt.title('Induced Acceleration at Location 1, Predicted with FoKL')
+plt.title('Acceleration (FoKL)')
+plt.subplot(1,3,3) # PERCENT ERROR:
+zi_percDiff = abs(zi_model - zi) / zi
+plt.contourf(xi, yi, zi_percDiff, cmap='hot_r', levels=np.linspace(0, 5, 11))
+cbar = plt.colorbar()
+plt.xlabel('Frequency (Hz)')
+plt.title('Acceleration (% Error)')
 plt.show()
 
 
-
-
 b=1
-
-
-
