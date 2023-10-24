@@ -1,7 +1,7 @@
-# the following dataset was obtained from:
-#   https://www.nonlinearbenchmark.org/
-#       https://www.nonlinearbenchmark.org/benchmarks/f-16-gvt
-#           https://data.4tu.nl/articles/_/12954911
+# The datasets for the F16 vibration testing were obtained from:
+# . . . > https://www.nonlinearbenchmark.org/
+# . . . . . . > https://www.nonlinearbenchmark.org/benchmarks/f-16-gvt
+# . . . . . . . . . > https://data.4tu.nl/articles/_/12954911
 
 import pandas as pd
 import numpy as np
@@ -11,7 +11,7 @@ from scipy.interpolate import griddata
 from scipy.signal import argrelextrema
 
 import warnings
-# warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 # ======================================================================================================================
@@ -21,8 +21,11 @@ import warnings
 dataset = [0,1,'max',3] # dataset to model . . .
 # . . . = [acceleration location (0,1,2), logical if modeling amplitude, 'min' or 'max' amplitude if applicable, . . .
 # . . . . . . number of sweeps to perform (i.e., ~number of neighbors to eliminate per max/min point)]
-res = 1e2 # 1e10 # number of datapoints to look at (decrease for sake of example to decrease computation time)
+res = 'full' # 1e4 # number of datapoints to look at (decrease for sake of example to decrease computation time)
+p_train = 1 # percentage of datapoints to train model on
+plt_res_2d = int(1e3) # number of datapoints to plot in coverage3
 cbar_lim = [0, 4.8, 64] # limits of color bar in plots [min, max, number of discretizations]
+plt_res = int(1e3) # resolution of contour plot grid
 
 
 # ======================================================================================================================
@@ -37,6 +40,7 @@ for n in [1,3,5,7]:
 def clean_data_for_F16_example(dfs):
 
     # clean up raw data:
+    freq_all = np.linspace(15,2,108477) # based on 400 Hz sample rate and 108477 samples per dataset
     forceAmp = [4.8,28.8,67.0,95.6] # N, amplitude of force for Levels 1,3,5,7
     inputs = []
     data = []
@@ -66,8 +70,7 @@ def clean_data_for_F16_example(dfs):
 
         accel = accel[:, mask] # apply masking to 'data'
         force = force[mask] # apply masking to 'inputs'
-        L = len(force)
-        freq = np.linspace(15, 2, L)  # assuming 15Hz at first peak and 2Hz at vibration turned off
+        freq = freq_all[mask] # based on sample rate and samples per dataset, 0.04793642892041631 Hz/s = ~0.05 Hz/s
 
         # calculate phase of vibrational force to provide as an input
         force_for_phase = force
@@ -92,7 +95,7 @@ def clean_data_for_F16_example(dfs):
             return phase_true
         phase = true_phase_adjustment(phase) # adjust phase values to all quadrants (assumes continuous changes)
 
-        forceAmpVec = np.array([forceAmp[ii]]*L)
+        forceAmpVec = np.array([forceAmp[ii]]*len(force))
 
         inputs.append([freq,forceAmpVec,phase])
         data.append(accel)
@@ -108,7 +111,11 @@ def clean_data_for_F16_example(dfs):
     inputs_stacked = np.array([freq_stacked,forceAmp_stacked,phase_stacked])
     data_stacked = np.array([accel1_stacked,accel2_stacked,accel3_stacked])
 
-    return inputs_stacked, data_stacked
+    # Store third dataset as its own output
+    testinputs = np.array([inputs[2][0], inputs[2][1], inputs[2][2]])
+    testdata = np.array([data[2][0], data[2][1], data[2][2]])
+
+    return inputs_stacked, data_stacked, testinputs, testdata
 
 def use_accelAmp_for_F16_example(inputs, data, sweeps): # return data as Nx2 for [min,max] extrema
     inputs_min = []
@@ -139,51 +146,85 @@ def use_accelAmp_for_F16_example(inputs, data, sweeps): # return data as Nx2 for
 # each dataset combines data from 4.8, 28.8, and 95.6 N for one-out-of-three independent acceleration measurements
 
 # clean raw data (NOT cleaning for machine learning purposes, but cleaning for focus of experiment/research)
-userinputs, userdata = clean_data_for_F16_example(dfs)
+userinputs, userdata, testinputs, testdata = clean_data_for_F16_example(dfs)
 
-# select specific dataset to model
+# select specific dataset to model, and whether modeling oscillations or just min/max contour
 accel_id = dataset[0]
 if dataset[1] == 1:
     inputs_min, inputs_max, data_min, data_max = use_accelAmp_for_F16_example(userinputs, userdata, dataset[3])
+    testinputs_min, testinputs_max, testdata_min, testdata_max = use_accelAmp_for_F16_example(testinputs, testdata, dataset[3])
     if dataset[2] == 'min':
         userinputs = inputs_min[accel_id]
         userdata = data_min[accel_id]
+        testinputs = testinputs_min[accel_id]
+        testdata = testdata_min[accel_id]
     elif dataset[2] == 'max':
         userinputs = inputs_max[accel_id]
         userdata = data_max[accel_id]
+        testinputs = testinputs_max[accel_id]
+        testdata = testdata_max[accel_id]
 elif dataset[1] == 0:
     userdata = userdata[accel_id]
+    testdata = testdata[accel_id]
 
 # for sake of example, shrink datasets to reduce computation time
 if res != 'full':
-    userinputs = userinputs[:, -round(res):]
-    userdata = userdata[-round(res):]
+    res_id = np.linspace(0, len(userdata[0])-1, res)
+    res_id = np.round(res_id)
+    res_id = res_id.astype(int)
+
+    userinputs = userinputs[:, 0, res_id]
+    userdata = userdata[0, res_id]
+
+    res_id = np.linspace(0, len(testdata[0]) - 1, res)
+    res_id = np.round(res_id)
+    res_id = res_id.astype(int)
+
+    testinputs = testinputs[:, 0, res_id]
+    testdata = testdata[0, res_id]
 
 
 # ======================================================================================================================
 # Fit FoKL model:
 
 
-# initialize a FoKL class for the dataset being modeled
-model = FoKLRoutines.FoKL() # leave argument blank to use default hypers
+# initialize a FoKL model with default hyperparameters for the dataset being modeled
+model = FoKLRoutines.FoKL()
 
-# build model using all inputs and data (i.e., train and test both included)
-betas, mtx, evs = model.fit(userinputs, userdata, train=0.8, CatchOutliers='Data')
+# fit model to training inputs/data, i.e., percentage 'p_train' of all inputs/data
+betas, mtx, evs = model.fit(userinputs, userdata, train=p_train)
 
-# this example models frequency resonances so no outliers were removed, but if removing z-scores > 2 from 'data' then:
-# betas, mtx, evs = model.fit(userinputs, userdata, train=0.8, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=2)
-
-
-# ======================================================================================================================
-# Standard post-processing of FoKL model:
-
-
-# return estimated values of default inputs (i.e., 'userinputs' minus outliers if any were removed during model.fit())
-meen, bounds, rmse = model.coverage3(draws=500, plot='sorted', bounds=1, legend=1, title='F16 Vibration Testing', ylabel='Induced Acceleration', PlotTypeFoKL='k', PlotTypeData='ko', PlotSizeData=3, PlotTypeBounds='k--', PlotSizeBounds=1)
+# calculate predicted values of all data from all inputs (default functionality of coverage3)
+z_model, _, rmseAll = model.coverage3()
+print("RMSE = ", rmseAll, " for combined 4.8, 28.8, and 95.6 N train datasets.")
 
 
 # ======================================================================================================================
-# Additional user post-processing of FoKL model (to make contour plots in this example):
+# FoKL prediction of 3rd dataset not included in training:
+
+
+# get scale used to normalize FoKL model
+minmax = model.normalize
+min = np.array([minmax[0][0], minmax[1][0], minmax[2][0]])[np.newaxis]
+max = np.array([minmax[0][1], minmax[1][1], minmax[2][1]])[np.newaxis]
+
+# format inputs for coverage3()
+testinputs = np.transpose(np.squeeze(testinputs)) # reshape to NxM based on manual inspection
+testinputs_norm = (testinputs - min)/(max - min) # normalized to same scale as what FoKL model was trained on
+
+# get mean values (i.e., "best-fit") of acceleration from the trained model given the 67.0N inputs and plot for a visual
+_, _, rmse67N = model.coverage3(inputs=testinputs_norm, data=testdata)
+print("RMSE = ", rmse67N, " for 67.0 N test dataset.")
+
+# use coverage3 just for plotting a portion of the predictions
+if plt_res_2d > len(testdata[0]):
+    plt_res_2d = len(testdata[0])
+portion = np.round(np.linspace(0, len(testdata[0])-1, plt_res_2d)).astype(int)
+_, _, _ = model.coverage3(inputs=testinputs_norm[portion, :], data=testdata[0, portion][:, np.newaxis], plot=1, bounds=1, legend=1, xaxis=testinputs[:,0], title='Predicted Frequency Response at 67.0N', xlabel='Frequency (Hz)', ylabel='Induced Acceleration', PlotTypeFoKL='k', PlotTypeData='ko', PlotSizeData=3, PlotTypeBounds='k--', PlotSizeBounds=1)
+
+
+# ======================================================================================================================
+# Additional user post-processing of FoKL model (to make contour plots of full force amplitude range in this example):
 
 
 # de-normalize inputs
@@ -196,20 +237,20 @@ for ii in range(M):
     inp_max = minmax[ii][1]
     inputs_denorm.append(inputs_np[:, ii] * (inp_max - inp_min) + inp_min)
 
-# data for color map
+# values for contour plot
 x = inputs_denorm[0] # frequency
 y = inputs_denorm[1] # force amplitude
 z = model.data # measured acceleration at location 1
 
 # define grid of force amp and freq pairs
-xi = np.linspace(x.min(), x.max(), 100)
-yi = np.linspace(y.min(), y.max(), 100)
+xi = np.linspace(x.min(), x.max(), plt_res)
+yi = np.linspace(y.min(), y.max(), plt_res)
 xi, yi = np.meshgrid(xi, yi)
 
 # interpolate acceleration on the grid
 zi = griddata((x, y), z, (xi, yi), method='linear')
 zi = np.squeeze(zi)
-zi_model = griddata((x, y), meen, (xi, yi), method='linear')
+zi_model = griddata((x, y), z_model, (xi, yi), method='linear')
 zi_model = np.squeeze(zi_model)
 
 # create figure
@@ -219,7 +260,7 @@ plt.contourf(xi, yi, zi, cmap='viridis', levels=np.linspace(cbar_lim[0], cbar_li
 cbar = plt.colorbar()
 plt.xlabel('Frequency (Hz)')
 plt.ylabel('Force Amplitude (N)')
-plt.title('Acceleration (Actual)')
+plt.title('Acceleration (Actual for 4.8, 28.8, and 95.6 N)')
 plt.subplot(1,3,2) # FOKL MODEL OF RESULTS:
 plt.contourf(xi, yi, zi_model, cmap='viridis', levels=np.linspace(cbar_lim[0], cbar_lim[1], cbar_lim[2]))
 cbar = plt.colorbar()
@@ -227,11 +268,10 @@ plt.xlabel('Frequency (Hz)')
 plt.title('Acceleration (FoKL)')
 plt.subplot(1,3,3) # PERCENT ERROR:
 zi_percDiff = abs(zi_model - zi) / zi
-plt.contourf(xi, yi, zi_percDiff, cmap='hot_r', levels=np.linspace(0, 5, 11))
+plt.contourf(xi, yi, zi_percDiff, cmap='hot_r', levels=np.linspace(0, 10, 11))
 cbar = plt.colorbar()
 plt.xlabel('Frequency (Hz)')
 plt.title('Acceleration (% Error)')
 plt.show()
 
-
-b=1
+breakline = 1
