@@ -178,12 +178,15 @@ class FoKL:
                 plots = plots.lower()
                 if plots in ['yes', 'on', 'y']:
                     kwargs_upd['plot'] = 1
+                elif plots in ['no', 'none', 'off', 'n']:
+                    kwargs_upd['plot'] = 0
                 elif plots in ['sort', 'sorted']:
                     kwargs_upd['plot'] = 'sorted'
                     if kwargs_upd['xlabel'] == 'Index': # if default value, i.e., no user-defined xlabel
                         kwargs_upd['xlabel'] = 'Index (Sorted)'
-                elif plots in ['no', 'none', 'off', 'n']:
-                    kwargs_upd['plot'] = 0
+                elif plots in ['bounds', 'bound', 'bounded']:
+                    kwargs_upd['plot'] = 1
+                    kwargs_upd['bounds'] = 1
                 else:
                     raise_error = 1
             elif plots not in (0, 1):
@@ -192,19 +195,20 @@ class FoKL:
                 raise ValueError(f"Optional keyword argument 'plot' is limited to 0, 1, or 'sorted'.")
 
             xaxis = kwargs_upd['xaxis']
-            if xaxis != 0: # if not default, i.e., user-defined
-                if isinstance(xaxis, str):
-                    xaxis = xaxis.lower()
-                    if xaxis in ['true', 'actual', 'denorm', 'denormed', 'denormalized']:
-                        kwargs_upd['xaxis'] = 1 # assume first input variable is xaxis (e.g., time)
-                    elif xaxis in ['indices', 'none', 'norm', 'normed', 'normalized']:
-                        kwargs_upd['xaxis'] = 0
-                elif not isinstance(xaxis, int):
-                    xaxis = np.squeeze(np.array(xaxis))
-                    if xaxis.ndim == 1: # then not a vector
-                        raise ValueError("Keyword argument 'xaxis' is limited to an integer corresponding to the input variable to plot along the xaxis (e.g., 1, 2, 3, etc.) or to a vector corresponding to the user-provided data. Leave blank or =0 to plot indices along the xaxis.")
-                    else:
-                        kwargs_upd['xaxis'] = xaxis # update as a numpy vector
+            if isinstance(xaxis, int): # then default
+                if xaxis != 0: # if not default, i.e., user-defined
+                    if isinstance(xaxis, str):
+                        xaxis = xaxis.lower()
+                        if xaxis in ['true', 'actual', 'denorm', 'denormed', 'denormalized']:
+                            kwargs_upd['xaxis'] = 1 # assume first input variable is xaxis (e.g., time)
+                        elif xaxis in ['indices', 'none', 'norm', 'normed', 'normalized']:
+                            kwargs_upd['xaxis'] = 0
+                    elif not isinstance(xaxis, int):
+                        xaxis = np.squeeze(np.array(xaxis))
+                        if xaxis.ndim == 1: # then not a vector
+                            raise ValueError("Keyword argument 'xaxis' is limited to an integer corresponding to the input variable to plot along the xaxis (e.g., 1, 2, 3, etc.) or to a vector corresponding to the user-provided data. Leave blank or =0 to plot indices along the xaxis.")
+                        else:
+                            kwargs_upd['xaxis'] = xaxis # update as a numpy vector
 
             plt_labels = kwargs_upd['labels']
             if plt_labels != 1: # if not default, i.e., user-defined
@@ -293,22 +297,22 @@ class FoKL:
             drawset = np.sort(modells[i, :])
             bounds[i, 0] = drawset[cut]
             bounds[i, 1] = drawset[draws - cut]
-# xaxis, sorted .... xaxis, default xlabel
+
         if kwargs_upd.get('plot') != 0: # if user requested a plot
             plt_x = kwargs_upd.get('xaxis') # 0, integer indexing input variable to plot, or user-defined vector
             linspace_needed_if_sorted = 1
-            if plt_x != 0: # if user specified x-axis
-                if isinstance(plt_x, int): # if user-specified an input variable (i.e., not a vector)
-                    warnings.warn("Using default inputs for defining x-axis. Set keyword argument 'xaxis' equal to a vector if using custom inputs.", category=UserWarning)
-                    minmax = self.normalize
-                    min = minmax[plt_x - 1][0]
-                    max = minmax[plt_x - 1][1]
-                    inputs_np = self.inputs_np
-                    plt_x = inputs_np[:, plt_x-1] * (max - min) + min # vector to plot on x-axis
-            else: # if plt_x == 0
-                # plt_x = np.linspace(0, len(data) - 1, len(data))
-                plt_x = np.linspace(0, n - 1, n)
-                linspace_needed_if_sorted = 0
+            if isinstance(plt_x, int): # if not user-defined vector
+                if plt_x != 0: # if user specified x-axis
+                    if isinstance(plt_x, int): # if user-specified an input variable (i.e., not a vector)
+                        warnings.warn("Using default inputs for defining x-axis. Set keyword argument 'xaxis' equal to a vector if using custom inputs.", category=UserWarning)
+                        minmax = self.normalize
+                        min = minmax[plt_x - 1][0]
+                        max = minmax[plt_x - 1][1]
+                        inputs_np = self.inputs_np
+                        plt_x = inputs_np[:, plt_x-1] * (max - min) + min # vector to plot on x-axis
+                else: # if plt_x == 0
+                    plt_x = np.linspace(0, n - 1, n)
+                    linspace_needed_if_sorted = 0
 
             if kwargs_upd.get('plot') == 'sorted': # if user requested a sorted plot
                 if isinstance(kwargs_upd.get('data'), str):
@@ -328,7 +332,7 @@ class FoKL:
 
             plt.figure()
             plt.plot(plt_x, plt_meen, kwargs_upd.get('PlotTypeFoKL'), linewidth=kwargs_upd.get('PlotSizeFoKL'), label=kwargs_upd.get('LegendLabelFoKL'))
-            if not isinstance(kwargs_upd.get('data'), str): # then kwargs_upd.get('data').lower() == 'ignore':
+            if not isinstance(kwargs_upd.get('data'), str): # else kwargs_upd.get('data').lower() == 'ignore':
                 plt.plot(plt_x, plt_data, kwargs_upd.get('PlotTypeData'), markersize=kwargs_upd.get('PlotSizeData'), label=kwargs_upd.get('LegendLabelData'))
             if kwargs_upd.get('bounds'):
                 plt.plot(plt_x, plt_bounds[:, 0], kwargs_upd.get('PlotTypeBounds'), linewidth=kwargs_upd.get('PlotSizeBounds'), label=kwargs_upd.get('LegendLabelBounds'))
