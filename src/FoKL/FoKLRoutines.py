@@ -1,4 +1,4 @@
-from src.FoKL import getKernels # from FoKL import getKernels
+from FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools
@@ -719,7 +719,6 @@ class FoKL:
             # outputs for each set of inputs
             minp, ninp = np.shape(inputs)
             phi_vec = []
-            # CHECK BELOW !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             if np.shape(discmtx) == ():  # part of fix for single input model
                 mmtx = 1
             else:
@@ -735,7 +734,6 @@ class FoKL:
                 X = Xin
             else:
                 X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
-            # CHECK ABOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
             for i in range(minp):
 
