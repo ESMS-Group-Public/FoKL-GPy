@@ -110,7 +110,7 @@ for i in range(2):
 ```
 After fitting the above state derivatives, call the 'GP_Integrate' function to integrate:
 ```
-T, Y = GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
+T, Y = GP_Integrate([np.mean(betas[0],axis=0),np.mean(betas[1],axis=0)], [mtx[0],mtx[1]], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
 ```
 See 'GP_intergrate_example.py' for an example.
 
