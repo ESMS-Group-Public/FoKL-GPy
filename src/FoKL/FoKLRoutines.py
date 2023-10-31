@@ -4,10 +4,10 @@ import warnings
 import itertools
 import math
 import numpy as np
-# import pdb
 from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
+
 
 class FoKL:
     def __init__(self, **kwargs):
@@ -70,20 +70,20 @@ class FoKL:
 
             default values:
     
-                - phis = getKernels.sp500()
-                - relats_in = [] or np.array([[0]]) ??? = [], [1,1,1,1,1,1]
-                - a = 4 ??? 9, 1000
-                - b = 0.1 ??? 0.01, 1
-                - atau = std dev of ??? 3, 4
-                - btau = std dev of ??? 4000, 0.6091
-                - tolerance = 3
-                - draws = 1000 ??? 1000, 2000
-                - gimmie = False
-                - way3 = False
-                - threshav = 0.05 ??? 0.05, 0
-                - threshstda = 0.5 ??? 0.5, 0
-                - threshstdb = 2 ??? 2, 100
-                - aic = False
+                - phis       = getKernels.sp500()
+                - relats_in  = []
+                - a          = 4
+                - b          = f(a, data)
+                - atau       = 4
+                - btau       = f(atau, data)
+                - tolerance  = 3
+                - draws      = 1000
+                - gimmie     = False
+                - way3       = False
+                - threshav   = 0.05
+                - threshstda = 0.5
+                - threshstdb = 2
+                - aic        = False
         """
 
         # Define default hyperparameters:
@@ -102,7 +102,7 @@ class FoKL:
 
     def splineconvert500(self,A):
         """
-        Same as splineconvert, but for a larger basis of 500
+            Same as splineconvert, but for a larger basis of 500
         """
 
         coef = np.loadtxt(A)
@@ -138,8 +138,7 @@ class FoKL:
 
                 Bounds: confidence interval, dotted lines on plot, larger bounds means more uncertainty at location
 
-
-           """
+        """
 
         def process_kwargs(kwargs):
             # Default keywords:
@@ -363,7 +362,7 @@ class FoKL:
 
     def fit(self, inputs, data, **kwargs):
         """
-            inputs: 
+            inputs:
                 'inputs' - normalzied inputs
 
                 'data' - results
@@ -376,39 +375,39 @@ class FoKL:
                     'OutliersMethod' - blah
 
             outputs:
-                 'betas' are a draw from the posterior distribution of coefficients: matrix, with
-                 rows corresponding to draws and columns corresponding to terms in the GP
+                'betas' are a draw from the posterior distribution of coefficients: matrix, with
+                rows corresponding to draws and columns corresponding to terms in the GP
 
-                 'mtx' is the basis function interaction matrix from the
-                 best model: matrix, with rows corresponding to terms in the GP (and thus to the 
-                 columns of 'betas' and columns corresponding to inputs. a given entry in the 
-                 matrix gives the order of the basis function appearing in a given term in the GP.
-                 all basis functions indicated on a given row are multiplied together.
-                 a zero indicates no basis function from a given input is present in a given term
+                'mtx' is the basis function interaction matrix from the
+                best model: matrix, with rows corresponding to terms in the GP (and thus to the
+                columns of 'betas' and columns corresponding to inputs. a given entry in the
+                matrix gives the order of the basis function appearing in a given term in the GP.
+                all basis functions indicated on a given row are multiplied together.
+                a zero indicates no basis function from a given input is present in a given term
 
-                 'ev' is a vector of BIC values from all of the models
-                 evaluated
+                'ev' is a vector of BIC values from all of the models
+                evaluated
 
-             attributes:
-                 > 'inputs' and 'data' get automatically formatted, cleaned, reduced to a train set, and stored as:
-                     > model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus model.testinputs)
-                     > model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
-                 > other useful info related to 'inputs' and 'data' get stored as:
-                     > model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and formatted
-                     > model.rawdata        == all data w/ outliers              == user's 'data' but formatted
-                     > model.traininputs    == train set of model.inputs
-                     > model.traindata      == train set of model.data
-                     > model.testinputs     == test set of model.inputs
-                     > model.testdata       == test set of model.data
-                     > model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of model.rawinputs
-                     > model.outliers       == indices removed from model.rawinputs and model.rawdata as outliers
-                     > model.trainlog       == indices of model.inputs used for model.traininputs
-                     > model.testlog        == indices of model.data used for model.traindata
-                 > to access numpy versions of the above attributes related to 'inputs', use:
-                     > model.inputs_np      == model.inputs as a numpy array of timestamps x input variables
-                     > model.rawinputs_np   == model.rawinputs as a numpy array of timestamps x input variables
-                     > model.traininputs_np == model.traininputs as a numpy array of timestamps x input variables
-                     > model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
+            attributes:
+                > 'inputs' and 'data' get automatically formatted, cleaned, reduced to a train set, and stored as:
+                    > model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus model.testinputs)
+                    > model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
+                > other useful info related to 'inputs' and 'data' get stored as:
+                    > model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and formatted
+                    > model.rawdata        == all data w/ outliers              == user's 'data' but formatted
+                    > model.traininputs    == train set of model.inputs
+                    > model.traindata      == train set of model.data
+                    > model.testinputs     == test set of model.inputs
+                    > model.testdata       == test set of model.data
+                    > model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of model.rawinputs
+                    > model.outliers       == indices removed from model.rawinputs and model.rawdata as outliers
+                    > model.trainlog       == indices of model.inputs used for model.traininputs
+                    > model.testlog        == indices of model.data used for model.traindata
+                > to access numpy versions of the above attributes related to 'inputs', use:
+                    > model.inputs_np      == model.inputs as a numpy array of timestamps x input variables
+                    > model.rawinputs_np   == model.rawinputs as a numpy array of timestamps x input variables
+                    > model.traininputs_np == model.traininputs as a numpy array of timestamps x input variables
+                    > model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
         """
 
         # Check all keywords and update hypers if re-defined by user:
@@ -1058,281 +1057,21 @@ class FoKL:
 
         return betas, mtx, evs
 
-    def GP_Integrate(self, betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs):
-        """""
-          betas is a list of arrays in which each entry to the list contains a specific row of the betas matrix,
-          or the mean of the the betas matrix for each model being integrated
-
-          matrix is a list of arrays containing the interaction matrix of each model
-
-          b is an array of of the values of all the other inputs to the model(s) (including
-          any forcing functions) over the time period we integrate over. The length of b
-          should be equal to the number of points in the final time series (end-start)/h
-          All values in b need to be normalized with respect to the min and max values
-          of their respective values in the training dataset
-
-          h is the step size with respect to time
-
-          norms is a matrix of the min and max values of all the inputs being
-          integrated (in the same order as y0). min values are in the top row, max values in the bottom.
-
-          Start is the time at which integration begins. Stop is the time to
-          end integration.
-
-          y0 is an array of the inital conditions for the models being integrated
-
-          Used inputs is a list of arrays containing the information as to what inputs
-          are used in what model. Each array should contain a vector corresponding to a different model.
-          Inputs should be referred to as those being integrated first, followed by
-          those contained in b (in the same order as they appear in y0 and b
-          respectively)
-          For example, if two models were being integrated, with 3 other inputs total
-          and the 1st model used both models outputs as inputs and the 1st and 3rd additional
-          inputs, while the 2nd model used its own output as an input and the 2nd
-          and 3rd additional inputs, used_inputs would be equal to
-          [[1,1,1,0,1],[0,1,0,1,0]].
-          If the models created do not follow this ordering scheme for their inputs
-          the inputs can be rearranged based upon an alternate
-          numbering scheme provided to used_inputs. E.g. if the inputs need to breordered the the 1st input should have a '1' in its place in the
-          used_inputs vector, the 2nd input should have a '2' and so on. Using the
-          same example as before, if the 1st models inputs needed rearranged so that
-          the 3rd additional input came first, followed by the two model outputs in
-          the same order as they are in y0, and ends with the 1st additional input,
-          then the 1st cell in used_inputs would have the form [2,3,4,0,1]
-
-          T an array of the time steps the models are integrated at.
-
-          Y is an array of the models that have been integrated, at the time steps
-          contained in T.
-          """
-
-        def prediction(inputs):
-            f = []
-            for kk in range(len(inputs)):
-                if len(f) == 0:
-                    f = [bss_eval(inputs[kk], betas[kk], phis, matrix[kk])]
-                else:
-                    f = np.append(f, bss_eval(inputs[kk], betas[kk], phis, matrix[kk]))
-            return f
-
-        def reorder(used, inputs):
-            order = used[used != 0]
-            reinputs = np.array((inputs.shape))
-            for i in range(len(inputs)):
-                reinputs[order[i] - 1] = inputs[i]
-            return reinputs
-
-        def normalize(v, minim, maxim):
-            norm = np.zeros((1, 1))
-            norm[0] = (v - minim) / (maxim - minim)
-            if norm[0] > 1:
-                norm[0] = 1
-            if norm[0] < 0:
-                norm[0] = 0
-            return norm
-
-        def bss_eval(x, betas, phis, mtx, Xin=[]):
-            """
-            x are normalized inputs
-            betas are coefficients. If using 'Xin' include all betas (include constant beta)
-
-            phis are the spline coefficients for the basis functions (cell array)
-
-            mtx is the 'interaction matrix' -- a matrix each row of which corresponds
-            to a term in the expansion, each column corresponds to an input. if the
-            column is zero there's no corresponding basis function in the term; if
-            it's greater than zero it corresponds to the order of the basis function
-
-            Xin is an optional input of the chi matrix. If this was pre-computed with xBuild,
-            one may use it to improve performance.
-            """
-
-            if Xin == []:
-                m, n = np.shape(mtx)  # getting dimensions of the matrix 'mtx'
-
-                mx = 1
-
-                mbet = 1
-
-                delta = np.zeros([mx, mbet])
-
-                phind = []
-
-                for j in range(len(x)):
-                    phind.append(math.floor(x[j] * 498))
-
-                phind_logic = []
-                for k in range(len(phind)):
-                    if phind[k] == 498:
-                        phind_logic.append(1)
-                    else:
-                        phind_logic.append(0)
-
-                phind = np.subtract(phind, phind_logic)
-
-                r = 1 / 498
-                xmin = r * np.array(phind)
-                X = (x - xmin) / r
-                for ii in range(mx):
-                    for i in range(m):
-                        phi = 1
-
-                        for j in range(n):
-
-                            num = mtx[i][j]
-
-                            if num != 0:
-                                phi = phi * (phis[int(num) - 1][0][phind[j]] + phis[int(num) - 1][1][phind[j]] * X[j] \
-                                             + phis[int(num) - 1][2][phind[j]] * X[j] ** 2 + phis[int(num) - 1][3][
-                                                 phind[j]] *
-                                             X[j] ** 3)
-
-                        delta[ii, :] = delta[ii, :] + betas[i + 1] * phi
-                        mmm = 1
-                delta[ii, :] = delta[ii, :] + betas[0]
+    def clear(self, **kwargs):
+        """
+            Delete all attributes from the FoKL class except for hyperparameters and any specified by the user.
+        """
+        attrs_to_keep = ['phis','relats_in','a','b','atau','btau','tolerance','draws','gimmie','way3','threshav','threshstda','threshstdb','aic']
+        for kwarg in kwargs.keys():
+            if isinstance(kwarg, str):
+                attrs_to_keep = attrs_to_keep + [kwarg] # append user-specified attribute to list of what not to delete
             else:
-                if np.ndim(betas) == 1:
-                    betas = np.array([betas])
-                elif np.ndim(betas) > 2:
-                    print("The \'betas\' parameter has %d dimensions, but needs to have only 2." % (np.ndim(betas)))
-                    print("The current shape is:", np.shape(betas))
-                    print("Attempting to get rid of unnecessary dimensions of size 1...")
-                    betas = np.squeeze(betas)
-
-                    if np.ndim(betas) == 1:
-                        betas = np.array([betas])
-                        print("Success! New shape is", np.shape(betas))
-                    elif np.ndim(betas) == 2:
-                        print("Success! New shape is", np.shape(betas))
-
-                delta = Xin.dot(betas.T)
-            dc = 1
-            return delta
-
-        T = np.arange(start, stop + h, h)
-        y = y0
-        Y = np.array([y0])
-        Y = Y.reshape(len(y0), 1)
-
-        ind = 1
-        for t in range(len(T) - 1):
-            inputs1 = list()
-            othinputs = list()
-            inputs2 = list()
-            inputs3 = list()
-            inputs4 = list()
-            for i in range(len(y)):  # initialize inputs1 and othinputs to contain empty arrays
-                inputs1.append([])
-                othinputs.append([])
-                inputs2.append([])
-                inputs3.append([])
-                inputs4.append([])
-            for i in range(len(y)):
-                for j in range(len(y)):
-                    if used_inputs[i][j] != 0:
-                        if len(inputs1[i]) == 0:
-                            inputs1[i] = normalize(y[j], norms[0, j], norms[1, j])
-                        else:
-                            inputs1[i] = np.append(inputs1[i], normalize(y[j], norms[0, j], norms[1, j]), 1)
-
-            nnn = int(b.size / b.shape[0])
-            if b.size > 0:
-                for ii in range(len(y0)):
-                    for jj in range(len(y), nnn + len(y)):
-
-                        if used_inputs[ii][jj] != 0:
-                            if len(othinputs[ii]) == 0:
-                                if ind - 1 == 0:
-                                    othinputs[ii] = b[ind - 1]
-                                else:
-
-                                    othinputs[ii] = b[ind - 1]
-
-                                    ttt = 1
-                            else:
-                                othinputs[ii] = np.append(othinputs[ii], b[ind - 1, jj - len(y0)], 1)
-                for k in range(len(y)):
-                    inputs1[k] = np.append(inputs1[k], othinputs[k])
-            for ii in range(len(y0)):
-                if np.amax(used_inputs[ii]) > 1:
-                    inputs1[ii] = reorder(used_inputs[ii], inputs1[ii])
-
-            dy1 = prediction(inputs1) * h
-
-            for p in range(len(y)):
-                if y[p] >= norms[1, p] and dy1[p] > 0:
-                    dy1[p] = 0
-                else:
-                    if y[p] <= norms[0, p] and dy1[p] < 0:
-                        dy1[p] = 0
-
-            for i in range(len(y)):
-                for j in range(len(y)):
-                    if used_inputs[i][j] != 0:
-                        if len(inputs2[i]) == 0:
-                            inputs2[i] = normalize(y[j] + dy1[j] / 2, norms[0, j], norms[1, j])
-                        else:
-                            inputs2[i] = np.append(inputs2[i], normalize(y[j] + dy1[j] / 2, norms[0, j], norms[1, j]),
-                                                   1)
-
-            for k in range(len(y)):
-                inputs2[k] = np.append(inputs2[k], othinputs[k])
-            for ii in range(len(y0)):
-                if np.amax(used_inputs[ii]) > 1:
-                    inputs2[ii] = reorder(used_inputs[ii], inputs2[ii])
-            dy2 = prediction(inputs2) * h
-            for p in range(len(y)):
-                if (y[p] + dy1[p] / 2) >= norms[1, p] and dy2[p] > 0:
-                    dy2[p] = 0
-                if (y[p] + dy1[p] / 2) <= norms[0, p] and dy2[p] < 0:
-                    dy2[p] = 0
-
-            for i in range(len(y)):
-                for j in range(len(y)):
-                    if used_inputs[i][j] != 0:
-                        if len(inputs3[i]) == 0:
-                            inputs3[i] = normalize(y[j] + dy2[j] / 2, norms[0, j], norms[1, j])
-                        else:
-                            inputs3[i] = np.append(inputs3[i], normalize(y[j] + dy2[j] / 2, norms[0, j], norms[1, j]),
-                                                   1)
-            if b.size > 0:
-                for k in range(len(y)):
-                    inputs3[k] = np.append(inputs3[k], othinputs[k])
-            for ii in range(len(y0)):
-                if np.amax(used_inputs[ii]) > 1:
-                    inputs3[ii] = reorder(used_inputs[ii], inputs3[ii])
-            dy3 = prediction(inputs3) * h
-            for p in range(len(y)):
-                if (y[p] + dy2[p] / 2) >= norms[1, p] and dy3[p] > 0:
-                    dy3[p] = 0
-                if (y[p] + dy2[p] / 2) <= norms[0, p] and dy3[p] < 0:
-                    dy3[p] = 0
-
-            for i in range(len(y)):
-                for j in range(len(y)):
-                    if used_inputs[i][j] != 0:
-                        if len(inputs4[i]) == 0:
-                            inputs4[i] = normalize(y[j] + dy3[j], norms[0, j], norms[1, j])
-                        else:
-                            inputs4[i] = np.append(inputs4[i], normalize(y[j] + dy3[j], norms[0, j], norms[1, j]), 1)
-            if b.size > 0:
-                for k in range(len(y)):
-                    inputs4[k] = np.append(inputs4[k], othinputs[k])
-            for ii in range(len(y0)):
-                if np.amax(used_inputs[ii]) > 1:
-                    inputs4[ii] = reorder(used_inputs[ii], inputs4[ii])
-            dy4 = prediction(inputs4) * h
-            for p in range(len(y)):
-                if (y[p] + dy3[p]) >= norms[1, p] and dy4[p] > 0:
-                    dy4[p] = 0
-                if (y[p] + dy3[p]) <= norms[0, p] and dy4[p] < 0:
-                    dy4[p] = 0
-
-            y += (dy1 + 2 * dy2 + 2 * dy3 + dy4) / 6
-            yt = np.reshape(y, [2, 1])
-            Y = np.append(Y, yt, 1)
-            ind += 1
-
-        return T, Y
-
+                warnings.warn(f"The user-specified attribute, {kwarg}, must be a string.",category=UserWarning)
+        attrs = list(vars(self).keys()) # list of all currently defined attributes
+        for attr in attrs:
+            if attr not in attrs_to_keep:
+                try:
+                    delattr(self, attr)
+                except:
+                    warnings.warn(f"The requested attribute, {attr}, is not defined and so was ignored when attempting to delete.", category=UserWarning)
 
