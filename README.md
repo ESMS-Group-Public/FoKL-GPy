@@ -98,19 +98,31 @@ model.clear()
 ```
 
 ## Integration
-FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states with the same inputs:
+FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states, 'State1' and 'State2', with the same inputs:
 ```
-data = [state1, state2]
+model = FoKLRoutines.FoKL()
+
+dStates = [dState1, dState2]
 betas = []
 mtx = []
 for i in range(2):
-    betas_i, mtx_i, _ = model.fit(inputs, data[i])
+    betas_i, mtx_i, _ = model.fit(inputs, dStates[i])
     betas.append(betas_i)
     mtx.append(mtx_i)
     model.clear()
 ```
 After fitting the above state derivatives, call the 'GP_Integrate' function to integrate:
 ```
+T, Y = GP_Integrate([np.mean(betas[0],axis=0),np.mean(betas[1],axis=0)], [mtx[0],mtx[1]], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
+```
+Alternatively, multiple separate FoKL classes can be created to achieve the same result:
+```
+model1 = FoKLRoutines.FoKL()
+model2 = FoKLRoutines.FoKL()
+
+betas1, mtx1, _ = model1.fit(inputs, dState1)
+betas2, mtx2, _ = model2.fit(inputs, dState2)
+
 T, Y = GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
 ```
 See 'GP_intergrate_example.py' for an example.
