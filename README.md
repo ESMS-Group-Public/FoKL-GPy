@@ -59,13 +59,13 @@ betas, mtx, evs = model.fit(inputs, data, train=0.8)
 ```
 The console will display the index and bic of the model being built in real time. Once completed, the model can be validated with the 'coverage3' function:
 ```
-meens, bounds, rmse = model.converage3(model.inputs, model.data)
+meens, bounds, rmse = model.coverage3()
 ```
-If validating visually, then a sorted plot tends to be most insightful. Explore the function documentation for more information, but to get started:
+By default, 'coverage3' predicts output values for 'model.inputs', which is just the normalized and properly formatted 'inputs' provided in 'fit'. If validating visually, then a sorted plot of the test set (for 'train' < 1) tends to be most insightful:
 ```
-model.converage3(model.inputs, model.data, plot='sorted', bounds=1, legend=1)
+model.coverage3(inputs=model.testinputs, data=model.testdata, plot='sorted', bounds=1, legend=1)
 ```
-Also insightful is the RMSE of the model's fit, which is the third positional output of 'coverage3'.
+Note 'data' must correspond to the set used for 'inputs' to calculate the model's RMSE, which is the third positional output of 'coverage3'.
 
 As a side note, the following attributes were added to your FoKL class 'model' after calling 'fit' which may be useful during user post-processing:
 ```
@@ -107,10 +107,11 @@ for i in range(2):
     betas_i, mtx_i, _ = model.fit(inputs, data[i])
     betas.append(betas_i)
     mtx.append(mtx_i)
+    model.clear()
 ```
 After fitting the above state derivatives, call the 'GP_Integrate' function to integrate:
 ```
-T, Y = GP_Integrate([np.mean(betas[0],axis=0),np.mean(betas[1],axis=0)], [mtx[0],mtx[1]], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
+T, Y = GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
 ```
 See 'GP_intergrate_example.py' for an example.
 
