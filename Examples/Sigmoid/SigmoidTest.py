@@ -1,5 +1,5 @@
 import numpy as np
-from src.FoKL import FoKLRoutines # from FoKL import FoKLRoutines
+from FoKL import FoKLRoutines
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -24,7 +24,7 @@ Z = np.reshape(Z_grid, (m*n,1), order='F')
 model = FoKLRoutines.FoKL(a=9, b=0.01, atau=3, btau=4000, aic=True)
 
 # Training FoKL model on a random selection of 100% (or 100%, 80%, 60%, etc.) of the dataset:
-train_all = [1] # = [1, 0.8, 0.6]
+train_all = [1] # = [1, 0.8, 0.6] etc. if sweeping through the percentage of data to train on
 betas_all = []
 mtx_all = []
 evs_all = []
