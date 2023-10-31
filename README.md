@@ -3,55 +3,113 @@ Karhunen Loève decomposed Gaussian processes with forward variable
 selection. Use this package for scalable GP regression and fast
 inference on static and dynamic datasets.
 
-## How to Use
-To install: 'pip install FoKL', or clone this repo
-
-Once installed, import the package into your environment with:
+## Setup
+To install, use 'pip install FoKL' or clone this repo. Once installed, import the package into your environment with:
 ```
 import FoKL
-```
-and then the proper routines with:
- ```
 from FoKL import FoKLRoutines
-from FoKL import getKernels
 ```
+If integrating, then include:
+```
+from FoKL import GP_Integrate
+```
+Now you are ready to begin creating your model, which can be initialized with:
+```
+model = FoKLRoutines.FoKL()
+```
+If intending to override the default hyperparameters, then you can include keywords in the model's initialization. For example:
+```
+model = FoKLRoutines.FoKL(btau=1000, draws=2000, way3=1)
+```
+Alternatively, hyperparameters can be redefined or updated with:
+```
+model.btau  = 1000
+model.draws = 2000
+model.way3  = 1
+```
+The above is useful for performing sweeps through hyperparameters without needing to initialize a new model (i.e., a new Python class) for each new combination of hyperparameters.
 
-Now you are ready to beginning creating your model. FoKL depends on a kernel to do its linear regression, these kernels can be called with the 'getKernel()' function. 
-The getKernel() function calls a collection of splines that is good for general use, but future updates can add more kernels.
+The default hyperparameters and their keywords are as follows:
 ```
-phis = getKernels()
+phis       = getKernels.sp500()
+relats_in  = []
+a          = 4
+b          = f(a, data)
+atau       = 4
+btau       = f(atau, data)
+tolerance  = 3
+draws      = 1000
+gimmie     = False
+way3       = False
+threshav   = 0.05
+threshstda = 0.5
+threshstdb = 2
+aic        = False
 ```
-Once the kernel is defined, you can initialize your model the required hyper paramters.
-```
-model = FoKLRoutines.FoKL(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
-```
-- The definition of each of these hypers can be found within the function documentation.
+A description of each hyperparameter is listed in the function documentation.
 
-With the model defined the training can begin by calling the fit function:
-```
-model.fit( Normalized Training Inputs, Training Data)
-```
-
-The console will display the index and bic of the model being built in real time.
-Once completed the model can be validated with the coverage3 function:
-```
-model.converage3(Normalized Test Inputs, Test Data, draws, plots)
-```
-Cover
-
-## Integration
-FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently the same functionality cannot be used. The model.fits outputs should be returned to your workspace via:
-
+## Training
+Call the 'fit' function to train the FoKL model on all of 'data'.
 ```
 betas, mtx, evs = model.fit(inputs, data)
 ```
-and then used as 
-
+Or, define the keyword 'train' as the percentage of 'data' to use for training.
 ```
-T,Y = FoKLRoutines.FoKL.GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
+betas, mtx, evs = model.fit(inputs, data, train=0.8)
 ```
+The console will display the index and bic of the model being built in real time. Once completed, the model can be validated with the 'coverage3' function:
+```
+meens, bounds, rmse = model.converage3(model.inputs, model.data)
+```
+If validating visually, then a sorted plot tends to be most insightful. Explore the function documentation for more information, but to get started:
+```
+model.converage3(model.inputs, model.data, plot='sorted', bounds=1, legend=1)
+```
+Also insightful is the RMSE of the model's fit, which is the third positional output of 'coverage3'.
 
-An example of the integration functionality can be seen in GP_intergrate_example.py
+As a side note, the following attributes were added to your FoKL class 'model' after calling 'fit' which may be useful during user post-processing:
+```
+model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus model.testinputs)
+model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
+
+model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and formatted
+model.rawdata        == all data w/ outliers              == user's 'data' but formatted
+model.traininputs    == train set of model.inputs
+model.traindata      == train set of model.data
+model.testinputs     == test set of model.inputs
+model.testdata       == test set of model.data
+model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of model.rawinputs
+model.outliers       == indices removed from model.rawinputs and model.rawdata as outliers
+model.trainlog       == indices of model.inputs used for model.traininputs
+model.testlog        == indices of model.data used for model.traindata
+
+model.inputs_np      == model.inputs as a numpy array of timestamps x input variables
+model.rawinputs_np   == model.rawinputs as a numpy array of timestamps x input variables
+model.traininputs_np == model.traininputs as a numpy array of timestamps x input variables
+model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
+```
+More sophisticated outlier removal methods are currently in development, but for demonstration purposes the following will search through 'data' and remove any points with a z-score greater than 4:
+```
+model.fit(model.inputs, model.data, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=4)
+```
+Also in development are additional methods for splitting 'data' into test/train sets, beyond the current method which is limited to a random split.
+
+## Integration
+FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states with the same inputs:
+```
+data = [state1, state2]
+betas = []
+mtx = []
+for i in range(2):
+    betas_i, mtx_i, _ = model.fit(inputs, data[i])
+    betas.append(betas_i)
+    mtx.append(mtx_i)
+```
+After fitting the above state derivatives, call the 'GP_Integrate' function to integrate:
+```
+T, Y = GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
+```
+See 'GP_intergrate_example.py' for an example.
 
 ## Citations
 Please cite: K. Hayes, M.W. Fouts, A. Baheri and
@@ -63,5 +121,4 @@ Credits: David Mebane (ideas and original code), Kyle Hayes
 (integrator), Derek Slack (Python porting)
 
 Funding provided by National Science Foundation, Award No. 2119688
-
 
