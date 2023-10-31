@@ -1,61 +1,70 @@
 import numpy as np
-import FoKL
-from FoKL import FoKLRoutines
-from FoKL import getKernels
+from src.FoKL import FoKLRoutines # from FoKL import FoKLRoutines
+from src.FoKL.GP_Integrate import GP_Integrate # from FoKL import GP_Integrate
 import matplotlib.pyplot as plt
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
-#inputs
-traininputs = np.loadtxt('traininputs.csv.txt',dtype=float,delimiter=',')
+
+# ======================================================================================================================
+
+# Inputs:
+traininputs = np.loadtxt('traininputs.txt',dtype=float,delimiter=',')
 traindata1 = np.loadtxt('traindata1.txt',dtype=float,delimiter=',')
 traindata2 = np.loadtxt('traindata2.txt',dtype=float,delimiter=',')
+traindata = [traindata1, traindata2]
 y = np.loadtxt('y.txt',dtype=float,delimiter=',')
 utest = np.loadtxt('utest.csv',dtype=float,delimiter=',')
-# data
+
+# User-defined constant hyperparameters (to override default values):
 relats_in = [1,1,1,1,1,1]
-
-# generating phis from the spline coefficients text file in emulator_python
-# combined with the splineconvert script
-
-phis = getKernels.sp500()
-
-# a
 a = 1000
-
-# b
 b = 1
-
-# atau
-atau = 4
-
-# btau
-btau = 0.6091
-
-# tolerance
-tolerance = 3
-relats_in  = [1,1,1,1,1,1]
-# draws
 draws = 2000
-
-gimmie = False
 way3 = True
 threshav = 0
 threshstda = 0
 threshstdb = 100
-aic = False
+
+# Initializing FoKL model with constant hypers:
+model = FoKLRoutines.FoKL(relats_in=relats_in, a=a, b=b, draws=draws, way3=way3, threshav=threshav, threshstda=threshstda, threshstdb=threshstdb)
+
+# User-defined variable hyperparameters (to iterate through either for different data or for sweeping the same data):
+btau = [0.6091, 1]
+
+# Iterating through datasets:
+betas = []
+mtx = []
+for ii in range(2):
+
+    print("\nCurrently fitting model to dataset", int(ii+1),". . .")
+
+    # Updating model with current iteration of variable hyperparameters:
+    model.btau = btau[ii]
+
+    # Running emulator routine for current model/data:
+    betas_i, mtx_i, _ = model.fit(traininputs, traindata[ii])
+
+    print("Done!")
+
+    # Store values for post-processing (i.e., GP integration):
+    betas.append(betas_i[1000:])
+    mtx.append(mtx_i)
+
+    # Clear all attributes (except for hypers) so previous results do not influence the next iteration:
+    model.clear()
+
+# ======================================================================================================================
+
+# Integrating with FoKL.GP_Integrate():
+
+phis = model.phis # same for all models iterated through, so just grab value from most recent model
+
 n,m = np.shape(y)
 norms1 = [np.min(y[0,0:int(m/2)]),np.max(y[0,0:int(m/2)])]
 norms2 = [np.min(y[1,0:int(m/2)]),np.max(y[1,0:int(m/2)])]
 norms = np.transpose([norms1,norms2])
-# Running emulator_Xin routine and visualization
-model1 = FoKLRoutines.FoKL(phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
-model2 = FoKLRoutines.FoKL(phis, relats_in, a, b, atau, 1, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic)
-
-betas1, mtx1, evs1 = model1.fit(traininputs, traindata1)
-betas2, mtx2, evs2 = model2.fit(traininputs, traindata2)
-
-betas1 = betas1[1000:]
-betas2 = betas2[1000:]
 
 start = 4
 stop = 3750*4
@@ -63,7 +72,10 @@ stepsize = 4
 used_inputs = [[1,1,1],[1,1,1]]
 ic = y[:,int(m/2)-1]
 
-T,Y = FoKLRoutines.FoKL.GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
+T, Y = GP_Integrate([np.mean(betas[0],axis=0),np.mean(betas[1],axis=0)], [mtx[0],mtx[1]], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
 
+plt.figure()
 plt.plot(T,Y[0],T,y[0][3750:7500])
 plt.plot(T,Y[1],T,y[1][3750:7500])
+plt.show()
+
