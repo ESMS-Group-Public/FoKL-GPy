@@ -72,6 +72,10 @@ As a side note, the following attributes were added to your FoKL class 'model' a
 model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus model.testinputs)
 model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
 
+model.betas          == betas
+model.mtx            == mtx
+model.evs            == evs
+
 model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and formatted
 model.rawdata        == all data w/ outliers              == user's 'data' but formatted
 model.traininputs    == train set of model.inputs
@@ -88,11 +92,10 @@ model.rawinputs_np   == model.rawinputs as a numpy array of timestamps x input v
 model.traininputs_np == model.traininputs as a numpy array of timestamps x input variables
 model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
 ```
-More sophisticated outlier removal methods are currently in development, but for demonstration purposes the following will search through 'data' and remove any points with a z-score greater than 4:
+To remove all of the above attributes so that only the hyperparameters remain, most importantly so that 'betas' does not influence the training of a new model, use:
 ```
-model.fit(model.inputs, model.data, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=4)
+model.clear()
 ```
-Also in development are additional methods for splitting 'data' into test/train sets, beyond the current method which is limited to a random split.
 
 ## Integration
 FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states with the same inputs:
@@ -110,6 +113,14 @@ After fitting the above state derivatives, call the 'GP_Integrate' function to i
 T, Y = GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
 ```
 See 'GP_intergrate_example.py' for an example.
+
+## Development
+
+More sophisticated outlier removal methods are currently in development, but for demonstration purposes the following will search through 'data' and remove any points with a z-score greater than 4:
+```
+model.fit(model.inputs, model.data, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=4)
+```
+Also in development are additional methods for splitting 'data' into test/train sets, beyond the current method which is limited to a random split.
 
 ## Citations
 Please cite: K. Hayes, M.W. Fouts, A. Baheri and
