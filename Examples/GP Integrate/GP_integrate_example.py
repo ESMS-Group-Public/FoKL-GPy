@@ -1,6 +1,6 @@
 import numpy as np
-from src.FoKL import FoKLRoutines # from FoKL import FoKLRoutines
-from src.FoKL.GP_Integrate import GP_Integrate # from FoKL import GP_Integrate
+from FoKL import FoKLRoutines
+from FoKL.GP_Integrate import GP_Integrate
 import matplotlib.pyplot as plt
 
 import warnings
