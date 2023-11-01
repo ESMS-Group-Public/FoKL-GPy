@@ -35,7 +35,7 @@ model.fit( Normalized Training Inputs, Training Data)
 The console will display the index and bic of the model being built in real time.
 Once completed the model can be validated with the coverage3 function:
 ```
-model.converage3(Normalized Test Inputs, Test Data, draws, plots)
+model.coverage3(Normalized Test Inputs, Test Data, draws, plots)
 ```
 Cover
 
