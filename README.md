@@ -4,9 +4,8 @@ selection. Use this package for scalable GP regression and fast
 inference on static and dynamic datasets.
 
 ## Setup
-To install, use 'pip install FoKL' or clone this repo. Once installed, import the package into your environment with:
+To install, use 'pip install FoKL' or clone this repo. Once installed, import into your environment with:
 ```
-import FoKL
 from FoKL import FoKLRoutines
 ```
 If integrating, then include:
