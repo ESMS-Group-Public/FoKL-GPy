@@ -1,4 +1,3 @@
-import FoKL
 from FoKL import FoKLRoutines
 import numpy as np
 import warnings
