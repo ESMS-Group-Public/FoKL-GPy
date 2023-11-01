@@ -1,4 +1,3 @@
-import FoKL
 from FoKL import FoKLRoutines
 from FoKL.GP_Integrate import GP_Integrate
 import numpy as np
