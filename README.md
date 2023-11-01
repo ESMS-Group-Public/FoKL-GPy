@@ -16,10 +16,11 @@ from FoKL import FoKLRoutines
 from FoKL import getKernels
 ```
 
-Now you are ready to beginning creating your model. FoKL depends on a kernel to do its linear regression, these kernels can be called with the 'getKernel()' function. 
-The getKernel() function calls a collection of splines that is good for general use, but future updates can add more kernels.
+Now you are ready to beginning creating your model. FoKL depends on a kernel to do its linear regression, these kernels can be called with the 'sp500()' function
+from the getKernel module. 
+The sp500() function calls a collection of splines that is good for general use, but future updates can add more kernels.
 ```
-phis = getKernels()
+phis = getKernels.sp500()
 ```
 Once the kernel is defined, you can initialize your model the required hyper paramters.
 ```
