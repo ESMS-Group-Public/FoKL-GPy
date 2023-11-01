@@ -17,7 +17,7 @@ from FoKL import getKernels
 ```
 
 Now you are ready to beginning creating your model. FoKL depends on a kernel to do its linear regression, these kernels can be called with the 'sp500()' function
-from the getKernel module. 
+from the getKernels module. 
 The sp500() function calls a collection of splines that is good for general use, but future updates can add more kernels.
 ```
 phis = getKernels.sp500()
