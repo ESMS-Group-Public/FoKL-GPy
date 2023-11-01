@@ -1,10 +1,8 @@
 import FoKL
 from FoKL import FoKLRoutines
 from FoKL.GP_Integrate import GP_Integrate
-
 import numpy as np
 import matplotlib.pyplot as plt
-
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
