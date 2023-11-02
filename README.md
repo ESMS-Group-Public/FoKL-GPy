@@ -52,7 +52,7 @@ Call the 'fit' function to train the FoKL model on all of 'data'.
 ```
 betas, mtx, evs = model.fit(inputs, data)
 ```
-Or, define the keyword 'train' as the percentage of 'data' to use for training.
+Optionally, include the keyword 'train' as the percentage of 'data' to use for training (e.g., 80%).
 ```
 betas, mtx, evs = model.fit(inputs, data, train=0.8)
 ```
@@ -66,7 +66,18 @@ model.coverage3(inputs=model.testinputs, data=model.testdata, plot='sorted', bou
 ```
 Note 'data' must correspond to the set used for 'inputs' to calculate the model's RMSE, which is the third positional output of 'coverage3'.
 
-As a side note, the following attributes were added to your FoKL class 'model' after calling 'fit' which may be useful during user post-processing:
+If not requiring the RMSE (or a plot), then the 'evaluate' function can be used to bypass 'coverage3' so that any inputs can be evaluated. In other words, 'coverage3' takes 'evaluate' one step farther by returning the RMSE but is limited to validation testing only since the corresponding data must also be provided with the inputs. To evaluate the inputs 'userinputs' for which the output data is not known, use the following to predict the data ('meen') and confidence bounds ('bounds'):
+```
+meen, bounds = model.evaluate(userinputs)
+```
+Note 'userinputs' must be normalized and in the format of a Python list like [[x1(t1), x2(t1), ..., xM(t1)], [x1(t2), x2(t2), ..., xM(t2)], ..., [x1(tN), x2(tN), ..., xM(tN)]] where 'x' is an input variable and 't' is time, or the sequence of datapoints. Automatic normalization and formatting is in development but for now the user must ensure 'userinputs' is correct. The normalization must be the same as how the model was trained, which can be accomplished with something like the following example taken from a case where there were three inputs variables:
+```
+minmax = model.normalize
+min = np.array([minmax[0][0], minmax[1][0], minmax[2][0]])[np.newaxis]
+max = np.array([minmax[0][1], minmax[1][1], minmax[2][1]])[np.newaxis]
+userinputs = (userinputs - min)/(max - min)
+```
+As an appended side note, the following attributes were added to your FoKL class 'model' after calling 'fit' which may be useful during user post-processing:
 ```
 model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus model.testinputs)
 model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
