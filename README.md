@@ -141,9 +141,11 @@ See 'GP_intergrate_example.py' for an example.
 
 More sophisticated outlier removal methods are currently in development, but for demonstration purposes the following will search through 'data' and remove any points with a z-score greater than 4:
 ```
-model.fit(model.inputs, model.data, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=4)
+model.fit(inputs, data, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=4)
 ```
 Also in development are additional methods for splitting 'data' into test/train sets, beyond the current method which is limited to a random split.
+
+It is also intended for the 'evaluate' function to be capable of providing derivatives, sampling through 'betas' of the model, and evaluating at user-defined 'betas'.
 
 ## Citations
 Please cite: K. Hayes, M.W. Fouts, A. Baheri and
@@ -152,7 +154,7 @@ dynamic system identification with Karhunen-Loève decomposed Gaussian
 processes", arXiv:2205.13676
 
 Credits: David Mebane (ideas and original code), Kyle Hayes
-(integrator), Derek Slack (Python porting)
+(integrator), Derek Slack (Python porting), Jacob Krell (Python v3 dev.)
 
 Funding provided by National Science Foundation, Award No. 2119688
 
