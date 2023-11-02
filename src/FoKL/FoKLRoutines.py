@@ -1,3 +1,6 @@
+from FoKL import getKernels
+import pandas as pd
+import warnings
 import itertools
 import math
 import numpy as np
@@ -5,84 +8,101 @@ from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 
+
 class FoKL:
-    def __init__(self, phis, relats_in, a, b, atau, btau, tolerance, draws, gimmie, way3, threshav, threshstda, threshstdb, aic):
+    def __init__(self, **kwargs):
         """
-                initialization inputs:
-
-                'relats' is a boolean matrix indicating which terms should be excluded
-                from the model building; for instance if a certain main effect should be
-                excluded relats will include a row with a 1 in the column for that input
-                and zeros elsewhere; if a certain two way interaction should be excluded
-                there should be a row with ones in those columns and zeros elsewhere
-                to exclude no terms 'relats = np.array([[0]])'. An example of excluding
-                the first input main effect and its interaction with the third input for
-                a case with three total inputs is:'relats = np.array([[1,0,0],[1,0,1]])'
-
-                'phis' are a data structure with the spline coefficients for the basis
+            initialization inputs:
+        
+                - 'phis' is a data structure with the spline coefficients for the basis
                 functions, built with 'spline_coefficient.txt' and 'splineconvert' or
                 'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
                 25 basis functions: enough for most things -- while the latter provides
                 500: definitely enough for anything)
-
-                'a' and 'b' are the shape and scale parameters of the ig distribution for
+    
+                - 'relats_in' is a boolean matrix indicating which terms should be excluded
+                from the model building; for instance if a certain main effect should be
+                excluded relats will include a row with a 1 in the column for that input
+                and zeros elsewhere; if a certain two way interaction should be excluded
+                there should be a row with ones in those columns and zeros elsewhere.
+                to exclude no terms 'relats = np.array([[0]])'. an example of excluding
+                the first input main effect and its interaction with the third input for
+                a case with three total inputs is: 'relats = np.array([[1,0,0],[1,0,1]])'
+    
+                - 'a' and 'b' are the shape and scale parameters of the ig distribution for
                 the observation error variance of the data. the observation error model is
-                white noise choose the mode of the ig distribution to match the noise in
+                white noise. choose the mode of the ig distribution to match the noise in
                 the output dataset and the mean to broaden it some
-
-                'atau' and 'btau' are the parameters of the ig distribution for the 'tau
+    
+                - 'atau' and 'btau' are the parameters of the ig distribution for the 'tau
                 squared' parameter: the variance of the beta priors is iid normal mean
                 zero with variance equal to sigma squared times tau squared. tau squared
                 must be scaled in the prior such that the product of tau squared and sigma
-                squared scales with the output dataset
-
-                'tolerance' controls how hard the function builder tries to find a better
+                squared scales with the output dataset       
+    
+                - 'tolerance' controls how hard the function builder tries to find a better
                 model once adding terms starts to show diminishing returns. a good
                 default is 3 -- large datasets could benefit from higher values
-
-                'draws' is the total number of draws from the posterior for each tested
+    
+                - 'draws' is the total number of draws from the posterior for each tested
                 model
-
-                'draws' is the total number of draws from the posterior for each tested
-
-                 'threshav' is a threshold for proposing terms for elimination based on
-                 their mean values (larger thresholds lead to more elimination)
-
-                 'threshstda' is a threshold standard deviation -- expressed as a fraction 
-                 relative to the mean -- that pairs with 'threshav'.
-                 terms with coefficients that are lower than 'threshav' and higher than
-                 'threshstda' will be proposed for elimination (elimination will happen or not 
-                 based on relative BIC values)
-
-                 'threshstdb' is a threshold standard deviation that is independent of the
-                 mean value of the coefficient -- all with a standard deviation (fraction 
-                 relative to mean) exceeding
-                 this value will be proposed for elimination
-
-                'gimmie' is a boolean causing the routine to return the most complex
+    
+                - 'gimmie' is a boolean causing the routine to return the most complex
                 model tried instead of the model with the optimum bic
+    
+                - 'way3' is a boolean specifying the calculation of three-way interactions
+            
+                - 'threshav' and 'threshstda' form a threshold for the elimination of terms
+                    - 'threshav' is a threshold for proposing terms for elimination based on
+                    their mean values (larger thresholds lead to more elimination)
+                    - 'threshstda' is a threshold standard deviation -- expressed as a fraction 
+                    relative to the mean
+                    - terms with coefficients that are lower than 'threshav' and higher than
+                    'threshstda' will be proposed for elimination (elimination will happen or not 
+                    based on relative BIC values)
+    
+                - 'threshstdb' is a threshold standard deviation that is independent of the
+                mean value of the coefficient -- all with a standard deviation (fraction 
+                relative to mean) exceeding this value will be proposed for elimination
+    
+                - 'aic' is a boolean specifying the use of the aikaike information
+                criterion
 
-                'aic' is a boolean specifying the use of the aikaike information
-                criterion 
-            """
-        self.phis = phis
-        self.relats_in = relats_in
-        self.a = a
-        self.b = b
-        self.atau = atau
-        self.btau = btau
-        self.tolerance = tolerance
-        self.draws = draws
-        self.gimmie = gimmie
-        self.way3 = way3
-        self.threshav = threshav
-        self.threshstda = threshstda
-        self.threshstdb = threshstdb
-        self.aic = aic
+            default values:
+    
+                - phis       = getKernels.sp500()
+                - relats_in  = []
+                - a          = 4
+                - b          = f(a, data)
+                - atau       = 4
+                - btau       = f(atau, data)
+                - tolerance  = 3
+                - draws      = 1000
+                - gimmie     = False
+                - way3       = False
+                - threshav   = 0.05
+                - threshstda = 0.5
+                - threshstdb = 2
+                - aic        = False
+        """
+
+        # Define default hyperparameters:
+        hypers = {'phis': getKernels.sp500(),'relats_in': [],'a': 4,'b': 'default','atau': 4,'btau': 'default','tolerance': 3,'draws': 1000,'gimmie': False,'way3': False,'threshav': 0.05,'threshstda': 0.5,'threshstdb': 2,'aic': False}
+
+        # Update hypers based on user-input:
+        kwargs_expected = hypers.keys()
+        for kwarg in kwargs.keys():
+            if kwarg not in kwargs_expected:
+                raise ValueError(f"Unexpected keyword argument: {kwarg}")
+            else:
+                hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
+        for hyperKey, hyperValue in hypers.items():
+            setattr(self, hyperKey, hyperValue) # defines each hyper as an attribute of 'self'
+            locals()[hyperKey] = hyperValue # defines each hyper as a local variable
 
     def splineconvert500(self,A):
         """
-        Same as splineconvert, but for a larger basis of 500
+            Same as splineconvert, but for a larger basis of 500
         """
 
         coef = np.loadtxt(A)
@@ -98,7 +118,7 @@ class FoKL:
 
         return phi
 
-    def coverage3(self, normputs, data, draws, plots):
+    def coverage3(self, **kwargs):
         """
             Inputs:
                 Interprets outputs of FoKL.fit()
@@ -118,8 +138,108 @@ class FoKL:
 
                 Bounds: confidence interval, dotted lines on plot, larger bounds means more uncertainty at location
 
+        """
 
-           """
+        def process_kwargs(kwargs):
+            # Default keywords:
+            kwargs_upd = {'inputs': 'default', 'data': 'default', 'draws': self.draws, 'plot': 0, 'bounds': 0, 'xaxis': 0, 'labels': 1, 'xlabel': 'Index', 'ylabel': 'Data', 'title': 'FoKL', 'legend': 0, 'PlotTypeFoKL': 'b', 'PlotSizeFoKL': 2, 'PlotTypeBounds': 'k--', 'PlotSizeBounds': 2, 'PlotTypeData': 'ro', 'PlotSizeData': 2, 'LegendLabelFoKL': 'FoKL', 'LegendLabelData': 'Data', 'LegendLabelBounds': 'Bounds'}
+
+            # Update keywords based on user-input:
+            kwargs_expected = kwargs_upd.keys()
+            for kwarg in kwargs.keys():
+                if kwarg not in kwargs_expected:
+                    raise ValueError(f"Unexpected keyword argument: {kwarg}")
+                else:
+                    kwargs_upd[kwarg] = kwargs.get(kwarg, kwargs_upd.get(kwarg))
+
+            # Define default values if no user-input, or if only 'inputs' is user-defined:
+            if isinstance(kwargs_upd.get('data'), str): # if 'data' is default
+                if not isinstance(kwargs_upd.get('inputs'), str): # if 'inputs' is NOT default
+                    kwargs_upd['data'] = 'ignore' # do not plot 'data'
+                    warnings.warn("Keyword argument 'data' must be defined for user-defined 'inputs' if intending to plot 'data'.")
+                elif kwargs_upd.get('data').lower() == 'default': # confirm 'data' is default
+                    kwargs_upd['data'] = self.data # default ... train+test data, i.e., validation
+                    if not isinstance(kwargs_upd.get('inputs'), str): # if 'inputs' is not default
+                        warnings.warn("Keyword argument 'data' should be defined for user-defined 'inputs'. Assuming default value for 'data' which may error if 'inputs' is not also default.")
+                else:
+                    raise ValueError("Keyword argument 'data' was improperly defined.")
+            else: # if 'data' is user-defined
+                if isinstance(kwargs_upd.get('inputs'), str): # if 'inputs' is default
+                    if kwargs_upd.get('inputs').lower() == 'default': # confirm 'inputs' is default
+                        raise ValueError("Keyword argument 'inputs' must be defined for user-defined 'data'.")
+            if isinstance(kwargs_upd.get('inputs'), str): # if 'inputs' is default
+                if kwargs_upd.get('inputs').lower() == 'default': # confirm 'inputs' is default
+                    kwargs_upd['inputs'] = self.inputs # default ... train+test inputs, i.e., validation
+
+            plots = kwargs_upd.get('plot') # 0 by default
+            raise_error = 0
+            if isinstance(plots, str):
+                plots = plots.lower()
+                if plots in ['yes', 'on', 'y']:
+                    kwargs_upd['plot'] = 1
+                elif plots in ['no', 'none', 'off', 'n']:
+                    kwargs_upd['plot'] = 0
+                elif plots in ['sort', 'sorted']:
+                    kwargs_upd['plot'] = 'sorted'
+                    if kwargs_upd['xlabel'] == 'Index': # if default value, i.e., no user-defined xlabel
+                        kwargs_upd['xlabel'] = 'Index (Sorted)'
+                elif plots in ['bounds', 'bound', 'bounded']:
+                    kwargs_upd['plot'] = 1
+                    kwargs_upd['bounds'] = 1
+                else:
+                    raise_error = 1
+            elif plots not in (0, 1):
+                raise_error = 1
+            if raise_error:
+                raise ValueError(f"Optional keyword argument 'plot' is limited to 0, 1, or 'sorted'.")
+
+            xaxis = kwargs_upd['xaxis']
+            if isinstance(xaxis, int): # then default
+                if xaxis != 0: # if not default, i.e., user-defined
+                    if isinstance(xaxis, str):
+                        xaxis = xaxis.lower()
+                        if xaxis in ['true', 'actual', 'denorm', 'denormed', 'denormalized']:
+                            kwargs_upd['xaxis'] = 1 # assume first input variable is xaxis (e.g., time)
+                        elif xaxis in ['indices', 'none', 'norm', 'normed', 'normalized']:
+                            kwargs_upd['xaxis'] = 0
+                    elif not isinstance(xaxis, int):
+                        xaxis = np.squeeze(np.array(xaxis))
+                        if xaxis.ndim == 1: # then not a vector
+                            raise ValueError("Keyword argument 'xaxis' is limited to an integer corresponding to the input variable to plot along the xaxis (e.g., 1, 2, 3, etc.) or to a vector corresponding to the user-provided data. Leave blank or =0 to plot indices along the xaxis.")
+                        else:
+                            kwargs_upd['xaxis'] = xaxis # update as a numpy vector
+
+            plt_labels = kwargs_upd['labels']
+            if plt_labels != 1: # if not default, i.e., user-defined
+                if isinstance(plt_labels, str):
+                    plt_labels = plt_labels.lower()
+                    if plt_labels in ['no', 'off', 'hide', 'none', 'false']:
+                        kwargs_upd['labels'] = 0
+                    elif plt_labels in ['yes', 'on', 'show', 'all', 'plot', 'true' 'y']:
+                        kwargs_upd['labels'] = 1
+                elif plt_labels != 0:
+                    raise ValueError("Keyword argument 'labels' is limited to 0 or 1.")
+
+            plt_legend = kwargs_upd['legend']
+            if plt_legend != 0:  # if not default, i.e., user-defined
+                if isinstance(plt_legend, str):
+                    plt_legend = plt_legend.lower()
+                    if plt_legend in ['y', 'yes', 'on', 'show', 'all', 'plot', 'true']:
+                        kwargs_upd['legend'] = 1
+                    elif plt_legend in ['n', 'no', 'off', 'hide', 'none', 'false']:
+                        kwargs_upd['legend'] = 0
+                elif plt_legend != 1:
+                    raise ValueError("Keyword argument 'legend' is limited to 0 or 1.")
+
+            if not all(isinstance(kwargs_upd[key], str) for key in ['LegendLabelFoKL', 'LegendLabelData', 'LegendLabelBounds']):
+                raise ValueError("Keyword arguments 'LegendLabelFoKL', 'LegendLabelData',and 'LegendLabelBounds' are limited to strings.")
+
+            return kwargs_upd
+        kwargs_upd = process_kwargs(kwargs)
+        normputs = kwargs_upd.get('inputs')
+        data = kwargs_upd.get('data')
+        draws = kwargs_upd.get('draws')
+
         betas = self.betas
         mtx = self.mtx
         phis = self.phis
@@ -166,52 +286,377 @@ class FoKL:
                 X[i, j] = phi
 
         X[:, 0] = np.ones((n,))
-        modells = np.zeros((np.shape(data)[0], draws))
+        modells = np.zeros((n, draws)) # note n == np.shape(data)[0] if data != 'ignore'
         for i in range(draws):
             modells[:, i] = np.matmul(X, betas[setnos[i], :])
         meen = np.mean(modells, 1)
-        bounds = np.zeros((np.shape(data)[0], 2))
+        bounds = np.zeros((n, 2)) # note n == np.shape(data)[0] if data != 'ignore'
         cut = int(np.floor(draws * .025))
-        for i in range(np.shape(data)[0]):
+        for i in range(n): # note n == np.shape(data)[0] if data != 'ignore'
             drawset = np.sort(modells[i, :])
             bounds[i, 0] = drawset[cut]
             bounds[i, 1] = drawset[draws - cut]
 
-        if plots:
-            plt.plot(meen, 'b', linewidth=2)
-            plt.plot(bounds[:, 0], 'k--')
-            plt.plot(bounds[:, 1], 'k--')
+        if kwargs_upd.get('plot') != 0: # if user requested a plot
+            plt_x = kwargs_upd.get('xaxis') # 0, integer indexing input variable to plot, or user-defined vector
+            linspace_needed_if_sorted = 1
+            if isinstance(plt_x, int): # if not user-defined vector
+                if plt_x != 0: # if user specified x-axis
+                    if isinstance(plt_x, int): # if user-specified an input variable (i.e., not a vector)
+                        warnings.warn("Using default inputs for defining x-axis. Set keyword argument 'xaxis' equal to a vector if using custom inputs.", category=UserWarning)
+                        minmax = self.normalize
+                        min = minmax[plt_x - 1][0]
+                        max = minmax[plt_x - 1][1]
+                        inputs_np = self.inputs_np
+                        plt_x = inputs_np[:, plt_x-1] * (max - min) + min # vector to plot on x-axis
+                else: # if plt_x == 0
+                    plt_x = np.linspace(0, n - 1, n)
+                    linspace_needed_if_sorted = 0
 
-            plt.plot(data, 'ro')
+            if kwargs_upd.get('plot') == 'sorted': # if user requested a sorted plot
+                if isinstance(kwargs_upd.get('data'), str):
+                    if kwargs_upd.get('data').lower() == 'ignore':
+                        raise ValueError("Keyword argument 'data' must be defined if using a sorted plot with user-defined 'inputs'.")
+                sort_id = np.squeeze(np.argsort(data, axis=0))
+                plt_meen = meen[sort_id]
+                plt_bounds = bounds[sort_id]
+                plt_data = data[sort_id]
+                if linspace_needed_if_sorted:
+                    plt_x = np.linspace(0, len(data) - 1, len(data))
+                    warnings.warn("Keyword argument 'xaxis' was overwritten. For a sorted plot, the x-axis is of arbitrary indices.", category=UserWarning)
+            else:
+                plt_meen = meen
+                plt_data = data
+                plt_bounds = bounds
+
+            plt.figure()
+            plt.plot(plt_x, plt_meen, kwargs_upd.get('PlotTypeFoKL'), linewidth=kwargs_upd.get('PlotSizeFoKL'), label=kwargs_upd.get('LegendLabelFoKL'))
+            if not isinstance(kwargs_upd.get('data'), str): # else kwargs_upd.get('data').lower() == 'ignore':
+                plt.plot(plt_x, plt_data, kwargs_upd.get('PlotTypeData'), markersize=kwargs_upd.get('PlotSizeData'), label=kwargs_upd.get('LegendLabelData'))
+            if kwargs_upd.get('bounds'):
+                plt.plot(plt_x, plt_bounds[:, 0], kwargs_upd.get('PlotTypeBounds'), linewidth=kwargs_upd.get('PlotSizeBounds'), label=kwargs_upd.get('LegendLabelBounds'))
+                plt.plot(plt_x, plt_bounds[:, 1], kwargs_upd.get('PlotTypeBounds'), linewidth=kwargs_upd.get('PlotSizeBounds'))
+            if kwargs_upd.get('labels'):
+                if not all(isinstance(kwargs_upd.get(key), str) for key in ['xlabel', 'ylabel', 'title']):
+                    if any(kwargs_upd.get(key) != 0 for key in ['xlabel', 'ylabel', 'title']):
+                        raise ValueError("Keyword arguments 'xlabel', 'ylabel', and 'title' are limited to strings.")
+                if kwargs_upd.get('xlabel') != 0:
+                    plt.xlabel(kwargs_upd.get('xlabel'))
+                if kwargs_upd.get('ylabel') != 0:
+                    plt.ylabel(kwargs_upd.get('ylabel'))
+                if kwargs_upd.get('title') != 0:
+                    plt.title(kwargs_upd.get('title'))
+
+            if kwargs_upd.get('legend'):
+                plt.legend()
 
             plt.show()
 
-        rmse = np.sqrt(np.mean(meen - data) ** 2)
+        if isinstance(kwargs_upd.get('data'), str): # then assume kwargs_upd.get('data').lower() == 'ignore':
+            warnings.warn("Keyword argument 'data' must be defined for user-defined 'inputs' in order to calculate RMSE.")
+            rmse = []
+        else:
+            rmse = np.sqrt(np.mean(meen - data) ** 2)
+
         return meen, bounds, rmse
 
-    def fit(self, inputs, data):
+    def fit(self, inputs, data, **kwargs):
         """
-            inputs: 
+            inputs:
                 'inputs' - normalzied inputs
 
                 'data' - results
 
+                keywords (optional):
+                    'train' - percentage 0 to 1 of datapoints to use as a training set
+
+                    'CatchOutliers' - blah
+
+                    'OutliersMethod' - blah
+
             outputs:
-                 'betas' are a draw from the posterior distribution of coefficients: matrix, with
-                 rows corresponding to draws and columns corresponding to terms in the GP
+                'betas' are a draw from the posterior distribution of coefficients: matrix, with
+                rows corresponding to draws and columns corresponding to terms in the GP
 
-                 'mtx' is the basis function interaction matrix from the
-                 best model: matrix, with rows corresponding to terms in the GP (and thus to the 
-                 columns of 'betas' and columns corresponding to inputs. a given entry in the 
-                 matrix gives the order of the basis function appearing in a given term in the GP.
-                 all basis functions indicated on a given row are multiplied together.
-                 a zero indicates no basis function from a given input is present in a given term
+                'mtx' is the basis function interaction matrix from the
+                best model: matrix, with rows corresponding to terms in the GP (and thus to the
+                columns of 'betas' and columns corresponding to inputs. a given entry in the
+                matrix gives the order of the basis function appearing in a given term in the GP.
+                all basis functions indicated on a given row are multiplied together.
+                a zero indicates no basis function from a given input is present in a given term
 
-                 'ev' is a vector of BIC values from all of the models
-                 evaluated
+                'ev' is a vector of BIC values from all of the models
+                evaluated
+
+            attributes:
+                > 'inputs' and 'data' get automatically formatted, cleaned, reduced to a train set, and stored as:
+                    > model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus model.testinputs)
+                    > model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
+                > other useful info related to 'inputs' and 'data' get stored as:
+                    > model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and formatted
+                    > model.rawdata        == all data w/ outliers              == user's 'data' but formatted
+                    > model.traininputs    == train set of model.inputs
+                    > model.traindata      == train set of model.data
+                    > model.testinputs     == test set of model.inputs
+                    > model.testdata       == test set of model.data
+                    > model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of model.rawinputs
+                    > model.outliers       == indices removed from model.rawinputs and model.rawdata as outliers
+                    > model.trainlog       == indices of model.inputs used for model.traininputs
+                    > model.testlog        == indices of model.data used for model.traindata
+                > to access numpy versions of the above attributes related to 'inputs', use:
+                    > model.inputs_np      == model.inputs as a numpy array of timestamps x input variables
+                    > model.rawinputs_np   == model.rawinputs as a numpy array of timestamps x input variables
+                    > model.traininputs_np == model.traininputs as a numpy array of timestamps x input variables
+                    > model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
         """
-        
-        # Initializations
+
+        # Check all keywords and update hypers if re-defined by user:
+        kwargs_hypers = ['phis', 'relats_in', 'a', 'b', 'atau', 'btau', 'tolerance', 'draws', 'gimmie', 'way3',
+                         'threshav', 'threshstda', 'threshstdb', 'aic']
+        kwargs_for_fit = ['train', 'TrainMethod', 'CatchOutliers', 'OutliersMethod', 'OutliersMethodParams']
+        kwargs_expected = kwargs_hypers + kwargs_for_fit
+        for kwarg in kwargs.keys():
+            if kwarg not in kwargs_expected:
+                raise ValueError(f"Unexpected keyword argument: {kwarg}")
+            elif kwarg in kwargs_hypers: # then update hyper as attribute
+                setattr(self, kwarg, kwargs.get(kwarg))
+
+        # Process keywords specific to fit():
+        p_train = 1 # default
+        p_train_method = 'random' # default
+        if 'train' in kwargs:
+            p_train = kwargs.get('train')
+            if 'TrainMethod' in kwargs:
+                p_train_method = kwargs.get('TrainMethod')
+        CatchOutliers = 0  # default
+        OutliersMethod = []  # default
+        OutliersMethodParams = [] # default
+        if 'CatchOutliers' in kwargs:
+            CatchOutliers = kwargs.get('CatchOutliers')
+            if 'OutliersMethod' in kwargs:
+                OutliersMethod = kwargs.get('OutliersMethod')
+                if 'OutliersMethodParams' in kwargs:
+                    OutliersMethodParams = kwargs.get('OutliersMethodParams')
+            if isinstance(CatchOutliers, str): # convert user input to logical for auto_cleanData to interpret
+                if CatchOutliers.lower() in ('all', 'both', 'yes', 'y'):
+                    CatchOutliers = 1
+                elif CatchOutliers.lower() in ('none','no', 'n'):
+                    CatchOutliers = 0
+                elif CatchOutliers.lower() in ('inputs', 'inputsonly', 'input', 'inputonly'):
+                    CatchOutliers = [1, 0] # note 1 will need to be replicated later to match number of input variables
+                elif CatchOutliers.lower() in ('data', 'dataonly', 'outputs', 'outputsonly', 'output', 'outputonly'):
+                    CatchOutliers = [0, 1] # note 0 will need to be replicated later to match number of input variables
+            elif isinstance(CatchOutliers, np.ndarray): # assume 1D list if not, which is the goal
+                if CatchOutliers.ndim == 1:
+                    CatchOutliers = CatchOutliers.to_list() # should return 1D list
+                else:
+                    CatchOutliers = np.squeeze(CatchOutliers)
+                    if CatchOutliers.ndim != 1:
+                        raise ValueError("CatchOutliers, if being applied to a user-selected inputs+data combo, must be a logical 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
+                    else:
+                        CatchOutliers = CatchOutliers.to_list()  # should return 1D list
+            elif not isinstance(CatchOutliers, list):
+                raise ValueError("CatchOutliers must be defined as 'Inputs', 'Data', 'All', or a logical 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
+        # note at this point CatchOutliers might be 0, 1, [1, 0], [0, 1, 0, 0], etc.
+
+        # Automatically handle some data formatting exceptions:
+        def auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod, OutliersMethodParams):
+
+            # Convert 'inputs' and 'datas' to numpy if pandas:
+            if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
+                inputs = inputs.to_numpy()
+                warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+            if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
+                data = data.to_numpy()
+                warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+
+            # Normalize 'inputs' and convert to proper format for FoKL:
+            inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
+            # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
+            # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
+            inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
+            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
+                inputs = inputs[:, np.newaxis]
+            N = inputs.shape[0]
+            M = inputs.shape[1]
+            if M > N: # if more "input variables" than "datapoints", assume user is using transpose of proper format above
+                inputs = inputs.transpose()
+                warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables.", category=UserWarning)
+                N_old = N
+                N = M # number of datapoints (i.e., timestamps)
+                M = N_old # number of input variables
+            inputs_max = np.max(inputs, axis=0) # max of each input variable
+            inputs_scale = []
+            for ii in range(len(inputs_max)):
+                inputs_min = np.min(inputs[:, ii])
+                if inputs_max[ii] != 1 or inputs_min != 0:
+                    if inputs_min == inputs_max[ii]:
+                        inputs[:,ii] = np.ones(len(inputs[:,ii]))
+                        warnings.warn("'inputs' contains a column of constants which will not improve the model's fit.", category=UserWarning)
+                    else: # normalize
+                        inputs[:,ii] = (inputs[:,ii] - inputs_min) / (inputs_max[ii] - inputs_min)
+                inputs_scale.append(np.array([inputs_min, inputs_max[ii]]))  # store for post-processing convenience
+            inputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
+            # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
+
+            # Transpose 'data' if needed:
+            data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
+            if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
+                data = data[:, np.newaxis]
+                warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting.",category=UserWarning)
+            else: # check user provided only one output column/row, then transpose if needed
+                N_data = data.shape[0]
+                M_data = data.shape[1]
+                if (M_data != 1 and N_data != 1) or (M_data == 1 and N_data == 1):
+                    raise ValueError("Error: 'data' must be a vector.")
+                elif M_data != 1 and N_data == 1:
+                    data = data.transpose()
+                    warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
+
+            # Store properly formatted data and normalized inputs BEFORE removing outliers and BEFORE splitting train
+            rawinputs = inputs
+            rawdata = data
+
+            # Catch and remove outliers:
+            if CatchOutliers == [1,0]: # i.e., inputs only
+                CatchOutliers = list(np.ones(M))+[0] # [1,1,...,1,0] as a list
+            elif CatchOutliers == [0,1]: # i.e., data only
+                CatchOutliers = list(np.zeros(M))+[1] # [0,0,...,0,1] as a list
+            elif CatchOutliers == 1: # i.e., all
+                CatchOutliers = list(np.ones(M+1)) # [1,1,...,1,1] as a list
+            elif CatchOutliers == 0: # i.e., none
+                CatchOutliers = list(np.zeros(M+1)) # [0,0,...,0,0] as a list
+            elif len(CatchOutliers) != M+1:
+                raise ValueError(r"CatchOutliers must be defined as 'Inputs', 'Data', 'All', or a logical 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
+            def catch_outliers(inputs, data, CatchOutliers, OutliersMethod, OutliersMethodParams):
+                inputs_wo_outliers = inputs
+                data_wo_outliers = data
+                outliers_indices = [] # if logical true/false, then use np.zeros(len(data))
+                if OutliersMethod != []:
+                    CatchOutliers_np = np.array(CatchOutliers)
+                    CatchOutliers_id = np.where(CatchOutliers_np == 1)[0]
+                    inputs_data = np.hstack((inputs, data))
+                    inputs_data_rel = inputs_data[:, CatchOutliers_id]
+
+                    from scipy import stats
+
+                    if OutliersMethod == 'Z-Score':
+                        z_scores = np.abs(stats.zscore(inputs_data_rel))
+                        if OutliersMethodParams != []: # if user-defined
+                            threshold = OutliersMethodParams
+                        else:
+                            threshold = 3 # default value if threshold of z-score is not user-specified
+                        outliers_indices = np.any(np.where(z_scores > threshold, True, False), axis=1)
+
+                    elif OutliersMethod == 'other': # maybe ... Interquartile Range
+                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
+
+                    elif OutliersMethod == 'other': # maybe ... Kernel Density Estimation (KDE) ... can be multivariate
+                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
+
+                    elif OutliersMethod == 'other': # maybe ... Mahalanobis Distance ... can be multivariate
+                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
+
+                    elif OutliersMethod == 'other': # maybe ... Local Outlier Factor (LOF)
+                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
+
+                    elif OutliersMethod != []:
+                        raise ValueError(r"Keyword argument 'OutliersMethod' is limited to 'Z-Score'. Other methods are in development.")
+
+                    inputs_data_wo_outliers = inputs_data[~outliers_indices, :]
+                    inputs_wo_outliers = inputs_data_wo_outliers[:, :-1]
+                    data_wo_outliers = inputs_data_wo_outliers[:, -1]
+
+                return inputs_wo_outliers, data_wo_outliers, outliers_indices
+            inputs, data, outliers_indices = catch_outliers(inputs, data, CatchOutliers, OutliersMethod, OutliersMethodParams)
+
+            # Spit [inputs,data] into train and test sets (depending on TrainMethod):
+            if p_train < 1: # split inputs+data into training and testing sets for validation of model
+                def random_train(p_train, inputs, data): # random split, if TrainMethod = 'random'
+                    Ldata = len(data)
+                    train_log = np.random.rand(Ldata) < p_train # indices to use as training data
+                    test_log = ~train_log
+
+                    inputs_train = [inputs[ii] for ii, ele in enumerate(train_log) if ele]
+                    data_train = data[train_log]
+                    inputs_test = [inputs[ii] for ii, ele in enumerate(test_log) if ele]
+                    data_test = data[test_log]
+
+                    return inputs_train, data_train, inputs_test, data_test, train_log, test_log
+
+                def other_train(p_train, inputs, data): # IN DEVELOPMENT ... other split, if TrainMethod = 'other'
+                    # WRITE CODE HERE FOR NEW METHOD OF SPLITTING TEST/TRAIN SETS
+                    inputs_train = inputs
+                    data_train = data
+                    inputs_test = []
+                    data_test = []
+                    train_log = np.linspace(0, len(inputs[:, 0]) - 1, len(inputs[:, 0]))
+                    test_log = []
+
+                    return inputs_train, data_train, inputs_test, data_test, train_log, test_log
+
+                def otherN_train(p_train, inputs, data): # IN DEVELOPMENT ... otherN split, if TrainMethod = 'otherN'
+                    # WRITE CODE HERE FOR NEW METHOD OF SPLITTING TEST/TRAIN SETS
+                    inputs_train = inputs
+                    data_train = data
+                    inputs_test = []
+                    data_test = []
+                    train_log = np.linspace(0, len(inputs[:,0]) - 1, len(inputs[:,0]))
+                    test_log = []
+
+                    return inputs_train, data_train, inputs_test, data_test, train_log, test_log
+
+                function_mapping = {'random': random_train,'other': other_train,'otherN': otherN_train}
+                if p_train_method in function_mapping:
+                    inputs_train, data_train, inputs_test, data_test, train_log, test_log = function_mapping[p_train_method](p_train, inputs, data)
+                else:
+                    raise ValueError("Keyword argument 'TrainMethod' is limited to 'random' as of now. Additional methods of splitting are in development.")
+
+            else:
+                inputs_train = inputs
+                data_train = data
+                inputs_test = []
+                data_test = []
+                train_log = []
+                test_log = []
+
+            return inputs, data, rawinputs, rawdata, inputs_train, data_train, inputs_test, data_test, inputs_scale, outliers_indices, train_log, test_log
+
+        inputs, data, rawinputs, rawdata, traininputs, traindata, testinputs, testdata, inputs_scale, outliers_indices, train_log, test_log = auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod, OutliersMethodParams)
+
+        def inputslist_to_np(inputslist, do_transpose):
+            was_auto_transposed = 0
+            if np.any(inputslist): # if inputslist is not empty (i.e., != [] )
+                inputslist_np = np.array(inputslist) # should be N datapoints x M inputs
+                NM = np.shape(inputslist_np)
+                if NM[0] < NM[1] and do_transpose == 'auto':
+                    inputslist_np = np.transpose(inputslist_np)
+                    was_auto_transposed = 1
+                elif do_transpose == 1:
+                    inputslist_np = np.transpose(inputslist_np)
+            else:
+                inputslist_np = np.array([])
+            return inputslist_np, was_auto_transposed
+
+        # Define/update attributes with cleaned data and other relevant variables:
+        setattr(self, 'inputs', inputs)
+        setattr(self, 'data', data)
+        setattr(self, 'rawinputs', rawinputs)
+        setattr(self, 'traininputs', traininputs)
+        setattr(self, 'traindata', traindata)
+        setattr(self, 'testinputs', testinputs)
+        setattr(self, 'testdata', testdata)
+        setattr(self, 'normalize', inputs_scale) # [min,max] of each input before normalization
+        setattr(self, 'outliers', outliers_indices) # indices removed from raw
+        setattr(self, 'trainlog', train_log) # indices AFTER OUTLIERS WERE REMOVED FROM RAW of datapoints used for training
+        setattr(self, 'testlog', test_log) # indices AFTER OUTLIERS WERE REMOVED FROM RAW of datapoints used for validation test
+        inputs_np, do_transpose = inputslist_to_np(self.inputs, 'auto')
+        setattr(self, 'inputs_np', inputs_np)
+        setattr(self, 'rawinputs_np', inputslist_to_np(self.rawinputs, do_transpose)[0])
+        setattr(self, 'traininputs_np', inputslist_to_np(self.traininputs, do_transpose)[0])
+        setattr(self, 'testinputs_np', inputslist_to_np(self.testinputs, do_transpose)[0])
+
+        # Initializations:
         phis = self.phis
         relats_in = self.relats_in
         a = self.a
@@ -226,6 +671,17 @@ class FoKL:
         threshstda = self.threshstda
         threshstdb = self.threshstdb
         aic = self.aic
+
+        # Update 'b' and/or 'btau' if set to default:
+        if btau == 'default' or b == 'default':  # if not user-defined then use 'data' and ('a' and/or 'atau') to define
+            sigmasq = np.var(data)
+            if b == 'default':
+                b = sigmasq * (a + 1)
+                self.b = b
+            if btau == 'default':
+                scale = np.abs(np.mean(data))
+                btau = (scale / sigmasq) * (atau + 1)
+                self.btau = btau
 
         def perms(x):
             """Python equivalent of MATLAB perms."""
@@ -314,7 +770,6 @@ class FoKL:
                             phi = phi * (phis[int(num) - 1][0][phind[k]] + phis[int(num) - 1][1][phind[k]] * xsm +
                                          phis[int(num) - 1][2][phind[k]] * xsm ** 2 + phis[int(num) - 1][3][phind[k]] *
                                          xsm ** 3)
-                            ppp = 1
 
                     X[i][j] = phi
 
@@ -356,6 +811,9 @@ class FoKL:
                 Lamb_tausqd_inv = np.diag(1 / np.diag(Lamb_tausqd))
 
                 mun = Q.dot(Lamb_tausqd_inv).dot(np.transpose(Q)).dot(Xty)
+                if mun.ndim == 1: # if mun.shape == (number,) != (number,1), then add new axis
+                    mun = mun[:, np.newaxis]
+                    warnings.warn("'mun' was made into (n,1) column vector from single list (n,). It is unclear why this was not already the case.",category=UserWarning)
                 S = Q.dot(np.diag(np.diag(Lamb_tausqd_inv) ** (1 / 2)))
 
                 vec = np.random.normal(loc=0, scale=1, size=(mmtx + 1, 1))  # drawing from normal distribution
@@ -597,281 +1055,21 @@ class FoKL:
 
         return betas, mtx, evs
 
-    def GP_Integrate(self, betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs):
-        """""
-          betas is a list of arrays in which each entry to the list contains a specific row of the betas matrix,
-          or the mean of the the betas matrix for each model being integrated
-
-          matrix is a list of arrays containing the interaction matrix of each model
-
-          b is an array of of the values of all the other inputs to the model(s) (including
-          any forcing functions) over the time period we integrate over. The length of b
-          should be equal to the number of points in the final time series (end-start)/h
-          All values in b need to be normalized with respect to the min and max values
-          of their respective values in the training dataset
-
-          h is the step size with respect to time
-
-          norms is a matrix of the min and max values of all the inputs being
-          integrated (in the same order as y0). min values are in the top row, max values in the bottom.
-
-          Start is the time at which integration begins. Stop is the time to
-          end integration.
-
-          y0 is an array of the inital conditions for the models being integrated
-
-          Used inputs is a list of arrays containing the information as to what inputs
-          are used in what model. Each array should contain a vector corresponding to a different model.
-          Inputs should be referred to as those being integrated first, followed by
-          those contained in b (in the same order as they appear in y0 and b
-          respectively)
-          For example, if two models were being integrated, with 3 other inputs total
-          and the 1st model used both models outputs as inputs and the 1st and 3rd additional
-          inputs, while the 2nd model used its own output as an input and the 2nd
-          and 3rd additional inputs, used_inputs would be equal to
-          [[1,1,1,0,1],[0,1,0,1,0]].
-          If the models created do not follow this ordering scheme for their inputs
-          the inputs can be rearranged based upon an alternate
-          numbering scheme provided to used_inputs. E.g. if the inputs need to breordered the the 1st input should have a '1' in its place in the
-          used_inputs vector, the 2nd input should have a '2' and so on. Using the
-          same example as before, if the 1st models inputs needed rearranged so that
-          the 3rd additional input came first, followed by the two model outputs in
-          the same order as they are in y0, and ends with the 1st additional input,
-          then the 1st cell in used_inputs would have the form [2,3,4,0,1]
-
-          T an array of the time steps the models are integrated at.
-
-          Y is an array of the models that have been integrated, at the time steps
-          contained in T.
-          """
-
-        def prediction(inputs):
-            f = []
-            for kk in range(len(inputs)):
-                if len(f) == 0:
-                    f = [bss_eval(inputs[kk], betas[kk], phis, matrix[kk])]
-                else:
-                    f = np.append(f, bss_eval(inputs[kk], betas[kk], phis, matrix[kk]))
-            return f
-
-        def reorder(used, inputs):
-            order = used[used != 0]
-            reinputs = np.array((inputs.shape))
-            for i in range(len(inputs)):
-                reinputs[order[i] - 1] = inputs[i]
-            return reinputs
-
-        def normalize(v, minim, maxim):
-            norm = np.zeros((1, 1))
-            norm[0] = (v - minim) / (maxim - minim)
-            if norm[0] > 1:
-                norm[0] = 1
-            if norm[0] < 0:
-                norm[0] = 0
-            return norm
-
-        def bss_eval(x, betas, phis, mtx, Xin=[]):
-            """
-            x are normalized inputs
-            betas are coefficients. If using 'Xin' include all betas (include constant beta)
-
-            phis are the spline coefficients for the basis functions (cell array)
-
-            mtx is the 'interaction matrix' -- a matrix each row of which corresponds
-            to a term in the expansion, each column corresponds to an input. if the
-            column is zero there's no corresponding basis function in the term; if
-            it's greater than zero it corresponds to the order of the basis function
-
-            Xin is an optional input of the chi matrix. If this was pre-computed with xBuild,
-            one may use it to improve performance.
-            """
-
-            if Xin == []:
-                m, n = np.shape(mtx)  # getting dimensions of the matrix 'mtx'
-
-                mx = 1
-
-                mbet = 1
-
-                delta = np.zeros([mx, mbet])
-
-                phind = []
-
-                for j in range(len(x)):
-                    phind.append(math.floor(x[j] * 498))
-
-                phind_logic = []
-                for k in range(len(phind)):
-                    if phind[k] == 498:
-                        phind_logic.append(1)
-                    else:
-                        phind_logic.append(0)
-
-                phind = np.subtract(phind, phind_logic)
-
-                r = 1 / 498
-                xmin = r * np.array(phind)
-                X = (x - xmin) / r
-                for ii in range(mx):
-                    for i in range(m):
-                        phi = 1
-
-                        for j in range(n):
-
-                            num = mtx[i][j]
-
-                            if num != 0:
-                                phi = phi * (phis[int(num) - 1][0][phind[j]] + phis[int(num) - 1][1][phind[j]] * X[j] \
-                                             + phis[int(num) - 1][2][phind[j]] * X[j] ** 2 + phis[int(num) - 1][3][
-                                                 phind[j]] *
-                                             X[j] ** 3)
-
-                        delta[ii, :] = delta[ii, :] + betas[i + 1] * phi
-                        mmm = 1
-                delta[ii, :] = delta[ii, :] + betas[0]
+    def clear(self, **kwargs):
+        """
+            Delete all attributes from the FoKL class except for hyperparameters and any specified by the user.
+        """
+        attrs_to_keep = ['phis','relats_in','a','b','atau','btau','tolerance','draws','gimmie','way3','threshav','threshstda','threshstdb','aic']
+        for kwarg in kwargs.keys():
+            if isinstance(kwarg, str):
+                attrs_to_keep = attrs_to_keep + [kwarg] # append user-specified attribute to list of what not to delete
             else:
-                if np.ndim(betas) == 1:
-                    betas = np.array([betas])
-                elif np.ndim(betas) > 2:
-                    print("The \'betas\' parameter has %d dimensions, but needs to have only 2." % (np.ndim(betas)))
-                    print("The current shape is:", np.shape(betas))
-                    print("Attempting to get rid of unnecessary dimensions of size 1...")
-                    betas = np.squeeze(betas)
-
-                    if np.ndim(betas) == 1:
-                        betas = np.array([betas])
-                        print("Success! New shape is", np.shape(betas))
-                    elif np.ndim(betas) == 2:
-                        print("Success! New shape is", np.shape(betas))
-
-                delta = Xin.dot(betas.T)
-            dc = 1
-            return delta
-
-        T = np.arange(start, stop + h, h)
-        y = y0
-        Y = np.array([y0])
-        Y = Y.reshape(len(y0), 1)
-
-        ind = 1
-        for t in range(len(T) - 1):
-            inputs1 = list()
-            othinputs = list()
-            inputs2 = list()
-            inputs3 = list()
-            inputs4 = list()
-            for i in range(len(y)):  # initialize inputs1 and othinputs to contain empty arrays
-                inputs1.append([])
-                othinputs.append([])
-                inputs2.append([])
-                inputs3.append([])
-                inputs4.append([])
-            for i in range(len(y)):
-                for j in range(len(y)):
-                    if used_inputs[i][j] != 0:
-                        if len(inputs1[i]) == 0:
-                            inputs1[i] = normalize(y[j], norms[0, j], norms[1, j])
-                        else:
-                            inputs1[i] = np.append(inputs1[i], normalize(y[j], norms[0, j], norms[1, j]), 1)
-
-            nnn = int(b.size / b.shape[0])
-            if b.size > 0:
-                for ii in range(len(y0)):
-                    for jj in range(len(y), nnn + len(y)):
-
-                        if used_inputs[ii][jj] != 0:
-                            if len(othinputs[ii]) == 0:
-                                if ind - 1 == 0:
-                                    othinputs[ii] = b[ind - 1]
-                                else:
-
-                                    othinputs[ii] = b[ind - 1]
-
-                                    ttt = 1
-                            else:
-                                othinputs[ii] = np.append(othinputs[ii], b[ind - 1, jj - len(y0)], 1)
-                for k in range(len(y)):
-                    inputs1[k] = np.append(inputs1[k], othinputs[k])
-            for ii in range(len(y0)):
-                if np.amax(used_inputs[ii]) > 1:
-                    inputs1[ii] = reorder(used_inputs[ii], inputs1[ii])
-
-            dy1 = prediction(inputs1) * h
-
-            for p in range(len(y)):
-                if y[p] >= norms[1, p] and dy1[p] > 0:
-                    dy1[p] = 0
-                else:
-                    if y[p] <= norms[0, p] and dy1[p] < 0:
-                        dy1[p] = 0
-
-            for i in range(len(y)):
-                for j in range(len(y)):
-                    if used_inputs[i][j] != 0:
-                        if len(inputs2[i]) == 0:
-                            inputs2[i] = normalize(y[j] + dy1[j] / 2, norms[0, j], norms[1, j])
-                        else:
-                            inputs2[i] = np.append(inputs2[i], normalize(y[j] + dy1[j] / 2, norms[0, j], norms[1, j]),
-                                                   1)
-
-            for k in range(len(y)):
-                inputs2[k] = np.append(inputs2[k], othinputs[k])
-            for ii in range(len(y0)):
-                if np.amax(used_inputs[ii]) > 1:
-                    inputs2[ii] = reorder(used_inputs[ii], inputs2[ii])
-            dy2 = prediction(inputs2) * h
-            for p in range(len(y)):
-                if (y[p] + dy1[p] / 2) >= norms[1, p] and dy2[p] > 0:
-                    dy2[p] = 0
-                if (y[p] + dy1[p] / 2) <= norms[0, p] and dy2[p] < 0:
-                    dy2[p] = 0
-
-            for i in range(len(y)):
-                for j in range(len(y)):
-                    if used_inputs[i][j] != 0:
-                        if len(inputs3[i]) == 0:
-                            inputs3[i] = normalize(y[j] + dy2[j] / 2, norms[0, j], norms[1, j])
-                        else:
-                            inputs3[i] = np.append(inputs3[i], normalize(y[j] + dy2[j] / 2, norms[0, j], norms[1, j]),
-                                                   1)
-            if b.size > 0:
-                for k in range(len(y)):
-                    inputs3[k] = np.append(inputs3[k], othinputs[k])
-            for ii in range(len(y0)):
-                if np.amax(used_inputs[ii]) > 1:
-                    inputs3[ii] = reorder(used_inputs[ii], inputs3[ii])
-            dy3 = prediction(inputs3) * h
-            for p in range(len(y)):
-                if (y[p] + dy2[p] / 2) >= norms[1, p] and dy3[p] > 0:
-                    dy3[p] = 0
-                if (y[p] + dy2[p] / 2) <= norms[0, p] and dy3[p] < 0:
-                    dy3[p] = 0
-
-            for i in range(len(y)):
-                for j in range(len(y)):
-                    if used_inputs[i][j] != 0:
-                        if len(inputs4[i]) == 0:
-                            inputs4[i] = normalize(y[j] + dy3[j], norms[0, j], norms[1, j])
-                        else:
-                            inputs4[i] = np.append(inputs4[i], normalize(y[j] + dy3[j], norms[0, j], norms[1, j]), 1)
-            if b.size > 0:
-                for k in range(len(y)):
-                    inputs4[k] = np.append(inputs4[k], othinputs[k])
-            for ii in range(len(y0)):
-                if np.amax(used_inputs[ii]) > 1:
-                    inputs4[ii] = reorder(used_inputs[ii], inputs4[ii])
-            dy4 = prediction(inputs4) * h
-            for p in range(len(y)):
-                if (y[p] + dy3[p]) >= norms[1, p] and dy4[p] > 0:
-                    dy4[p] = 0
-                if (y[p] + dy3[p]) <= norms[0, p] and dy4[p] < 0:
-                    dy4[p] = 0
-
-            y += (dy1 + 2 * dy2 + 2 * dy3 + dy4) / 6
-            yt = np.reshape(y, [2, 1])
-            Y = np.append(Y, yt, 1)
-            ind += 1
-
-        return T, Y
-
+                warnings.warn(f"The user-specified attribute, {kwarg}, must be a string.",category=UserWarning)
+        attrs = list(vars(self).keys()) # list of all currently defined attributes
+        for attr in attrs:
+            if attr not in attrs_to_keep:
+                try:
+                    delattr(self, attr)
+                except:
+                    warnings.warn(f"The requested attribute, {attr}, is not defined and so was ignored when attempting to delete.", category=UserWarning)
 
