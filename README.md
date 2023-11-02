@@ -48,11 +48,11 @@ aic        = False
 A description of each hyperparameter is listed in the function documentation.
 
 ## Training
-Call the 'fit' function to train the FoKL model on all of 'data'.
+Call the 'fit' function to train the FoKL model on all of 'data':
 ```
 betas, mtx, evs = model.fit(inputs, data)
 ```
-Optionally, include the keyword 'train' as the percentage of 'data' to use for training (e.g., 80%).
+Optionally, include the keyword 'train' as the percentage of 'data' to use for training (e.g., 80%):
 ```
 betas, mtx, evs = model.fit(inputs, data, train=0.8)
 ```
