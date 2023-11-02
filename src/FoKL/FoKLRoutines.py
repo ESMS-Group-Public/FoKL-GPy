@@ -118,6 +118,86 @@ class FoKL:
 
         return phi
 
+    def evaluate(self, normputs, **kwargs):
+        """
+            Evaluate, or predict, the data values of any inputs.
+
+            normputs - normalized inputs formatted as a list like [[x1(t1), ..., xM(t1)], ..., [x1(tN), ..., xM(tN)]]
+        """
+
+        # Default keywords:
+        kwargs_upd = {'draws': self.draws}
+
+        # Update keywords based on user-input:
+        kwargs_expected = kwargs_upd.keys()
+        for kwarg in kwargs.keys():
+            if kwarg not in kwargs_expected:
+                raise ValueError(f"Unexpected keyword argument: {kwarg}")
+            else:
+                kwargs_upd[kwarg] = kwargs.get(kwarg, kwargs_upd.get(kwarg))
+
+        # Define local variables from updated keywords:
+        draws = kwargs_upd.get('draws')
+
+        betas = self.betas
+        mtx = self.mtx
+        phis = self.phis
+
+        m, mbets = np.shape(betas)  # Size of betas
+        n, mputs = np.shape(normputs)  # Size of normalized inputs
+
+        setnos_p = np.random.randint(m, size=(1, draws))  # Random draws  from integer distribution
+        i = 1
+        while i == 1:
+            setnos = np.unique(setnos_p)
+
+            if np.size(setnos) == np.size(setnos_p):
+                i = 0
+            else:
+                setnos_p = np.append(setnos, np.random.randint(m, size=(1, draws - np.shape(setnos)[0])))
+
+        X = np.zeros((n, mbets))
+        normputs = np.asarray(normputs)
+        for i in range(n):
+            phind = []  # Rounded down point of input from 0-499
+            for j in range(len(normputs[i])):
+                phind.append(math.floor(normputs[i, j] * 498))
+                # 499 changed to 498 for python indexing
+
+            phind_logic = []
+            for k in range(len(phind)):
+                if phind[k] == 498:
+                    phind_logic.append(1)
+                else:
+                    phind_logic.append(0)
+
+            phind = np.subtract(phind, phind_logic)
+
+            for j in range(1, mbets):
+                phi = 1
+                for k in range(mputs):
+                    num = mtx[j - 1, k]
+                    if num > 0:
+                        xsm = 498 * normputs[i][k] - phind[k]
+                        phi = phi * (phis[int(num) - 1][0][phind[k]] + phis[int(num) - 1][1][phind[k]] * xsm +
+                                     phis[int(num) - 1][2][phind[k]] * xsm ** 2 + phis[int(num) - 1][3][
+                                         phind[k]] * xsm ** 3)
+                X[i, j] = phi
+
+        X[:, 0] = np.ones((n,))
+        modells = np.zeros((n, draws))  # note n == np.shape(data)[0] if data != 'ignore'
+        for i in range(draws):
+            modells[:, i] = np.matmul(X, betas[setnos[i], :])
+        meen = np.mean(modells, 1)
+        bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
+        cut = int(np.floor(draws * .025))
+        for i in range(n):  # note n == np.shape(data)[0] if data != 'ignore'
+            drawset = np.sort(modells[i, :])
+            bounds[i, 0] = drawset[cut]
+            bounds[i, 1] = drawset[draws - cut]
+
+        return meen, bounds
+
     def coverage3(self, **kwargs):
         """
             Inputs:
@@ -240,62 +320,8 @@ class FoKL:
         data = kwargs_upd.get('data')
         draws = kwargs_upd.get('draws')
 
-        betas = self.betas
-        mtx = self.mtx
-        phis = self.phis
-
-        m, mbets = np.shape(betas)  # Size of betas
-        n, mputs = np.shape(normputs)  # Size of normalized inputs
-
-        setnos_p = np.random.randint(m, size=(1, draws))  # Random draws  from integer distribution
-        i = 1
-        while i == 1:
-            setnos = np.unique(setnos_p)
-
-            if np.size(setnos) == np.size(setnos_p):
-                i = 0
-            else:
-                setnos_p = np.append(setnos, np.random.randint(m, size=(1, draws - np.shape(setnos)[0])))
-
-        X = np.zeros((n, mbets))
-        normputs = np.asarray(normputs)
-        for i in range(n):
-            phind = []  # Rounded down point of input from 0-499
-            for j in range(len(normputs[i])):
-                phind.append(math.floor(normputs[i, j] * 498))
-                # 499 changed to 498 for python indexing
-
-            phind_logic = []
-            for k in range(len(phind)):
-                if phind[k] == 498:
-                    phind_logic.append(1)
-                else:
-                    phind_logic.append(0)
-
-            phind = np.subtract(phind, phind_logic)
-
-            for j in range(1, mbets):
-                phi = 1
-                for k in range(mputs):
-                    num = mtx[j - 1, k]
-                    if num > 0:
-                        xsm = 498 * normputs[i][k] - phind[k]
-                        phi = phi * (phis[int(num) - 1][0][phind[k]] + phis[int(num) - 1][1][phind[k]] * xsm +
-                                     phis[int(num) - 1][2][phind[k]] * xsm ** 2 + phis[int(num) - 1][3][
-                                         phind[k]] * xsm ** 3)
-                X[i, j] = phi
-
-        X[:, 0] = np.ones((n,))
-        modells = np.zeros((n, draws)) # note n == np.shape(data)[0] if data != 'ignore'
-        for i in range(draws):
-            modells[:, i] = np.matmul(X, betas[setnos[i], :])
-        meen = np.mean(modells, 1)
-        bounds = np.zeros((n, 2)) # note n == np.shape(data)[0] if data != 'ignore'
-        cut = int(np.floor(draws * .025))
-        for i in range(n): # note n == np.shape(data)[0] if data != 'ignore'
-            drawset = np.sort(modells[i, :])
-            bounds[i, 0] = drawset[cut]
-            bounds[i, 1] = drawset[draws - cut]
+        meen, bounds = self.evaluate(normputs, draws=draws)
+        n, mputs = np.shape(normputs)  # Size of normalized inputs ... calculated in 'evaluate' but not returned
 
         if kwargs_upd.get('plot') != 0: # if user requested a plot
             plt_x = kwargs_upd.get('xaxis') # 0, integer indexing input variable to plot, or user-defined vector
