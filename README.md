@@ -70,12 +70,9 @@ If not requiring the RMSE (or a plot), then the 'evaluate' function can be used 
 ```
 meen, bounds = model.evaluate(userinputs)
 ```
-Note 'userinputs' must be normalized and in the format of a Python list like [[x1(t1), x2(t1), ..., xM(t1)], [x1(t2), x2(t2), ..., xM(t2)], ..., [x1(tN), x2(tN), ..., xM(tN)]] where 'x' is an input variable and 't' is time, or the sequence of datapoints. Automatic normalization and formatting is in development but for now the user must ensure 'userinputs' is correct. The normalization must be the same as how the model was trained, which can be accomplished with something like the following example taken from a case where there were three inputs variables:
+Note 'userinputs' will be automatically normalized to the same scale as the training inputs that the model was fitted to, as well as automatically formatted. In the rare case that 'userinputs' is already normalized and formatted properly, then this automatic treatment of 'userinputs' can be turned off with the following keyword:
 ```
-minmax = model.normalize
-min = np.array([minmax[0][0], minmax[1][0], minmax[2][0]])[np.newaxis]
-max = np.array([minmax[0][1], minmax[1][1], minmax[2][1]])[np.newaxis]
-userinputs = (userinputs - min)/(max - min)
+meen, bounds = model.evaluate(userinputs, nform=0)
 ```
 As an appended side note, the following attributes were added to your FoKL class 'model' after calling 'fit' which may be useful during user post-processing:
 ```
@@ -107,8 +104,19 @@ To remove all of the above attributes so that only the hyperparameters remain, m
 model.clear()
 ```
 
+## Differentiation
+FoKL can be used to calculate the derivatives of the states (i.e., input variables). By default, 'model.inputs_np' is used with a finite differences approximation of second order. The default functionality is as follows:
+```
+dState = bss_derivatives()
+```
+In the following example, the first state's derivative is evaluated using a second order approximation whereas the second state uses a first order approximation. The keywords are as follows: 
+```
+dStates = bss_derivatives(inputs=[State1,State2], derv=[2,1])
+```
+Note the states provided, if not default, should follow a dynamic system such that the datapoints are sampled at regular intervals through time. Setting 'inputs=model.testinputs', for example, may produce erroneous results due to the selection of the test set not accounting for regular intervals of time.
+
 ## Integration
-FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states, 'State1' and 'State2', with the same inputs:
+As discussed in the previous section, FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states, 'State1' and 'State2', with the same inputs:
 ```
 model = FoKLRoutines.FoKL()
 
