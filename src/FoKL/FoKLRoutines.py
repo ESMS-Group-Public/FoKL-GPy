@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 class FoKL:
     def __init__(self, **kwargs):
         """
-            initialization inputs:
+            Initialization Inputs (i.e., hyperparameters and their descriptions):
         
                 - 'phis' is a data structure with the spline coefficients for the basis
                 functions, built with 'spline_coefficient.txt' and 'splineconvert' or
@@ -68,7 +68,7 @@ class FoKL:
                 - 'aic' is a boolean specifying the use of the aikaike information
                 criterion
 
-            default values:
+            Default Values:
     
                 - phis       = getKernels.sp500()
                 - relats_in  = []
@@ -118,26 +118,150 @@ class FoKL:
 
         return phi
 
-    def evaluate(self, normputs, **kwargs):
-        """
-            Evaluate, or predict, the data values of any inputs.
+    # def bss_derivatives(self, **kwargs):
+    #     """
+    #         For returning derivative of !!!!!!!!!!STUFF STUFF STUFF RTW UPDATE HERE!!!!!!!!!.
+    #
+    #         Keyword Inputs:
+    #             inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM) == self.inputs_np (default)
+    #             derv   == order of differentiation per input variable (e.g., [2,1,2])  == 2 (default)
+    #             betas  == draw from the posterior distribution of coefficients         == self.betas (default)
+    #             phis   == spline coefficients for the basis functions                  == self.phis (default)
+    #             mtx    == basis function interaction matrix from the best model        == self.mtx (default)
+    #             minmax == list of [min, max]'s of input data used in the normalization == self.normalize (default)
+    #
+    #         Return Outputs:
+    #             dState == derivative of input variables (i.e., states)
+    #     """
+    #
+    #     # Default keywords:
+    #     kwargs_all = {'inputs': self.inputs_np, 'derv': 2, 'betas': self.betas, 'phis': self.phis, 'mtx': self.mtx, 'range': self.normalize}
+    #
+    #     # Update keywords based on user-input:
+    #     for kwarg in kwargs.keys():
+    #         if kwarg not in kwargs_all.keys():
+    #             raise ValueError(f"Unexpected keyword argument: {kwarg}")
+    #         else:
+    #             kwargs_all[kwarg] = kwargs.get(kwarg, kwargs_all.get(kwarg))
+    #     for kwarg in kwargs_all.keys():
+    #         locals()[kwarg] = kwargs_all.get(kwarg)  # defines each keyword (including defaults) as a local variable
+    #
+    #     B,M = np.shape(mtx) # B == beta terms in function, M == number of input variables
+    #
+    #     L_derv = np.size(np.array(derv))
+    #     if L_derv != M:
+    #         if L_derv != 1:
+    #             raise ValueError("Variable 'derv' must be equal in size to the number of input variables.")
+    #         else: # apply single value to all input variables
+    #             derv = np.repeat(derv, M)
+    #     else:
+    #         for m in range(M):
+    #             if derv[m] > 2 or derv[m] < 1:
+    #                 raise ValueError("Keyword input 'derv' is limited to values of 1 or 2.")
+    #
+    #     dState = 0
+    #
+    #     L_phi = len(phis[0][0]) # = 499
+    #     phind = np.ceil(inputs * L_phi)
+    #
+    #     set = (phind == 0)
+    #     phind = phind + set
+    #
+    #     r = 1 / L_phi
+    #     xmin = (phind - 1) * r
+    #     X = (inputs - xmin) / r
+    #
+    #     for b in range(B): # for index of beta term in total number of betas in function
+    #
+    #         phi = 1
+    #         for m in range(M): # for index of input variable in total number of input variables
+    #
+    #             num = mtx[b,m]
+    #
+    #             if num:
+    #                 derp = derv(m)
+    #                 if derp == 0:
+    #                     phi = phi*(phis[num].zero(phind[m]) + phis[num].one(phind[m])*X[m] + phis[num].two(phind[m])*math.pow(X[m],2) + phis[num].three(phind[m])*math.pow(X[m],3))
+    #                 elif derp == 1:
+    #                     phi = phi*(phis[num].one(phind[m]) + 2*phis[num].two(phind[m])*X[m] + 3*phis[num].three(phind[m])*math.pow(X[m],2))/(range/L_phis)
+    #                 elif derp == 2:
+    #                     phi = phi*(2*phis[num].two(phind[m]) + 6*phis[num].three(phind[m])*X[m])/math.pow(range/L_phis,2)
+    #
+    #         dState = dState + betas[b + 1] * phi
+    #
+    #     return dState
 
-            normputs - normalized inputs formatted as a list like [[x1(t1), ..., xM(t1)], ..., [x1(tN), ..., xM(tN)]]
+    def evaluate(self, inputs, **kwargs):
+        """
+            Evaluate the inputs and output the predicted values of corresponding data.
+
+            Input:
+                inputs == matrix of independent (or non-linearly dependent) 'x' variables for evaluating f(x1, ..., xM)
+
+            Keyword Inputs:
+                draws == number of beta terms used                              == self.draws (default)
+                nform == logical to automatically normalize and format 'inputs' == 1 (default)
         """
 
         # Default keywords:
-        kwargs_upd = {'draws': self.draws}
+        kwargs_all = {'draws': self.draws, 'nform': 1, 'deriv': 0}
 
         # Update keywords based on user-input:
-        kwargs_expected = kwargs_upd.keys()
         for kwarg in kwargs.keys():
-            if kwarg not in kwargs_expected:
+            if kwarg not in kwargs_all.keys():
                 raise ValueError(f"Unexpected keyword argument: {kwarg}")
             else:
-                kwargs_upd[kwarg] = kwargs.get(kwarg, kwargs_upd.get(kwarg))
+                kwargs_all[kwarg] = kwargs.get(kwarg, kwargs_all.get(kwarg))
+        for kwarg in kwargs_all.keys():
+            locals()[kwarg] = kwargs_all.get(kwarg) # defines each keyword (including defaults) as a local variable
 
-        # Define local variables from updated keywords:
-        draws = kwargs_upd.get('draws')
+        # Process nform:
+        if isinstance(nform, str):
+            if nform in ['yes','on','auto','default']:
+                nform = 1
+            elif nform in ['no','off']:
+                nform = 0
+        else:
+            if nform not in [0,1]:
+                raise ValueError("Keyword argument 'nform' must a logical 1 (default) or 0.")
+
+        # Automatically normalize and format inputs:
+        def auto_nform(inputs):
+
+            # Convert 'inputs' to numpy if pandas:
+            if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
+                inputs = inputs.to_numpy()
+                warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+
+            # Normalize 'inputs' and convert to proper format for FoKL:
+            inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
+            # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
+            # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
+            inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
+            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
+                inputs = inputs[:, np.newaxis]
+            N = inputs.shape[0]
+            M = inputs.shape[1]
+            if M > N: # if more "input variables" than "datapoints", assume user is using transpose of proper format above
+                inputs = inputs.transpose()
+                warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables.", category=UserWarning)
+                N_old = N
+                N = M # number of datapoints (i.e., timestamps)
+                M = N_old # number of input variables
+            minmax = self.normalize
+            inputs_min = np.array([minmax[ii][0] for ii in range(len(minmax))])
+            inputs_max = np.array([minmax[ii][1] for ii in range(len(minmax))])
+            inputs = (inputs - inputs_min) / (inputs_max - inputs_min)
+
+            nformputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
+            # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
+
+            return nformputs
+
+        if nform:
+            normputs = auto_nform(inputs)
+        else: # assume provided inputs are already normalized and formatted
+            normputs = inputs
 
         betas = self.betas
         mtx = self.mtx
@@ -200,24 +324,38 @@ class FoKL:
 
     def coverage3(self, **kwargs):
         """
-            Inputs:
-                Interprets outputs of FoKL.fit()
+            For validation testing of FoKL model.
 
-                betas - betas emulator output
+            Keyword Inputs:
+                inputs == normalized and properly formatted inputs to evaluate              == self.inputs (default)
+                data   == properly formatted data outputs to use for validating predictions == self.data (default)
+                draws  == number of beta terms used                                         == self.draws (default)
 
-                normputs - normalized inputs
+            Keyword Inputs for Plotting:
+                plot   == binary for generating plot, or 'sorted' for plot of ordered data == 0 (default)
+                bounds == binary for plotting bounds                                       == 0 (default)
+                xaxis  == vector to plot on x-axis                                         == indices (default)
+                labels == binary for adding labels to plot                                 == 1 (default)
+                xlabel == string for x-axis label                                          == 'Index' (default)
+                ylabel == string for y-axis label                                          == 'Data' (default)
+                title  == string for plot title                                            == 'FoKL' (default)
+                legend == binary for adding legend to plot                                 == 0 (default)
 
-                draws - number of beta terms used
+            Additional Keyword Inputs for Plotting:
+                PlotTypeFoKL      == string for FoKL's color and line type  == 'b' (default)
+                PlotSizeFoKL      == scalar for FoKL's line size            == 2 (default)
+                PlotTypeBounds    == string for Bounds' color and line type == 'k--' (default)
+                PlotSizeBounds    == scalar for Bounds' line size           == 2 (default)
+                PlotTypeData      == string for Data's color and line type  == 'ro' (default)
+                PlotSizeData      == scalar for Data's line size            == 2 (default)
+                LegendLabelFoKL   == string for FoKL's label in legend      == 'FoKL' (default)
+                LegendLabelData   == string for Data's label in legend      == 'Data' (default)
+                LegendLabelBounds == string for Bounds's label in legend    == 'Bounds' (default)
 
-                plots - binary for plot output
-
-            returns:
-                Meen: Predicted values for each indexed input
-
-                RSME: root mean squared deviation
-
-                Bounds: confidence interval, dotted lines on plot, larger bounds means more uncertainty at location
-
+            Return Outputs:
+                meen   == predicted output values for each indexed input
+                rmse   == root mean squared deviation (RMSE) of prediction versus known data
+                bounds == confidence interval for each predicted output value
         """
 
         def process_kwargs(kwargs):
@@ -320,7 +458,7 @@ class FoKL:
         data = kwargs_upd.get('data')
         draws = kwargs_upd.get('draws')
 
-        meen, bounds = self.evaluate(normputs, draws=draws)
+        meen, bounds = self.evaluate(normputs, draws=draws, nform=0)
         n, mputs = np.shape(normputs)  # Size of normalized inputs ... calculated in 'evaluate' but not returned
 
         if kwargs_upd.get('plot') != 0: # if user requested a plot
@@ -388,19 +526,20 @@ class FoKL:
 
     def fit(self, inputs, data, **kwargs):
         """
-            inputs:
-                'inputs' - normalzied inputs
+            For fitting model to known inputs and data (i.e., training of model).
 
-                'data' - results
+            Inputs:
+                inputs == NxM matrix of independent (or non-linearly dependent) 'x' variables for fitting f(x1, ..., xM)
+                data   == Nx1 vector of dependent variable to create model for predicting the value of f(x1, ..., xM)
 
-                keywords (optional):
-                    'train' - percentage 0 to 1 of datapoints to use as a training set
+            Keyword Inputs:
+                train                == percentage (0-1) of N datapoints to use for training  == 1 (default)
+                TrainMethod          == method for splitting test/train set for train < 1     == 'random' (default)
+                CatchOutliers        == logical for removing outliers from inputs and/or data == 0 (default)
+                OutliersMethod       == string defining the method to use for removing outliers (e.g., 'Z-Score)
+                OutliersMethodParams == parameters to modify OutliersMethod (format varies per method)
 
-                    'CatchOutliers' - blah
-
-                    'OutliersMethod' - blah
-
-            outputs:
+            Return Outputs:
                 'betas' are a draw from the posterior distribution of coefficients: matrix, with
                 rows corresponding to draws and columns corresponding to terms in the GP
 
@@ -414,18 +553,21 @@ class FoKL:
                 'ev' is a vector of BIC values from all of the models
                 evaluated
 
-            attributes:
+            Added Attributes:
                 > 'inputs' and 'data' get automatically formatted, cleaned, reduced to a train set, and stored as:
-                    > model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus model.testinputs)
+                    > model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus
+                                              model.testinputs)
                     > model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
                 > other useful info related to 'inputs' and 'data' get stored as:
-                    > model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and formatted
+                    > model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and
+                                                                                   formatted
                     > model.rawdata        == all data w/ outliers              == user's 'data' but formatted
                     > model.traininputs    == train set of model.inputs
                     > model.traindata      == train set of model.data
                     > model.testinputs     == test set of model.inputs
                     > model.testdata       == test set of model.data
-                    > model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of model.rawinputs
+                    > model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of
+                                              model.rawinputs
                     > model.outliers       == indices removed from model.rawinputs and model.rawdata as outliers
                     > model.trainlog       == indices of model.inputs used for model.traininputs
                     > model.testlog        == indices of model.data used for model.traindata
@@ -1084,6 +1226,12 @@ class FoKL:
     def clear(self, **kwargs):
         """
             Delete all attributes from the FoKL class except for hyperparameters and any specified by the user.
+
+            Keyword Inputs:
+                Assign any value to a keyword representing the attribute that should be kept.
+
+                For example, to keep only the hyperparameters, self.inputs_np, and self.normalize, use:
+                > self.clear(inputs_np=1, normalize=1)
         """
         attrs_to_keep = ['phis','relats_in','a','b','atau','btau','tolerance','draws','gimmie','way3','threshav','threshstda','threshstdb','aic']
         for kwarg in kwargs.keys():
