@@ -105,15 +105,31 @@ model.clear()
 ```
 
 ## Differentiation
-FoKL can be used to calculate the derivatives of the states (i.e., input variables). By default, 'model.inputs_np' is used with a finite differences approximation of second order. The default functionality is as follows:
+FoKL can be used to calculate the partial derivatives of the model's function with respect to each input variable. By default, the gradient (i.e., first derivative) of 'inputs' from 'model.fit()' is calculated:
 ```
-dState = bss_derivatives()
+dState = model.bss_derivatives()
 ```
-In the following example, the first state's derivative is evaluated using a second order approximation whereas the second state uses a first order approximation. The keywords are as follows: 
+The keywords 'd1' (first derivative) and 'd2' (second derivative) can be specified to select specific input variables with which to differentiate the function. For example, in a materials science application where pressure and temperature are inputs, perhaps only the modeled function differentiated twice with respect to the second input variable, temperature, is needed:
 ```
-dStates = bss_derivatives(inputs=[State1,State2], derv=[2,1])
+dState = model.bss_derivatives(d1='none', d2=2)
 ```
-Note the states provided, if not default, should follow a dynamic system such that the datapoints are sampled at regular intervals through time. Setting 'inputs=model.testinputs', for example, may produce erroneous results due to the selection of the test set not accounting for regular intervals of time.
+If pressure (P), temperature (T), and volume (V) are inputs and the requested derivatives are d(f(P,T,V))/dP, d(f(P,T,V))/dV, d2(f(P,T,V))/dP2, and d2(f(P,T,V))/dT2, then boolean indexing can be used:
+```
+dState = model.bss_derivatives(d1=[1,0,1], d2=[1,1,0])
+```
+The output will be an Nx4 numpy array since 4 derivatives were requested, where N is the number of datapoints or experiments. To return an Nx3x2 array, where the '3' dimension refers to the number of input variables and the '2' dimension refers to the order of the derivative, use the following keyword to output a full array but with 0's in the columns for which derivatives were not requested:
+```
+dState = model.bss_derivatives(d1=[1,0,1], d2=[1,1,0], ReturnFullArray=1)
+```
+Note with 'ReturnFullArray' equal to 1, the derivatives will map to dState[:, 0, 0], dState[:, 2, 0], dState[:, 0, 1], and dState[:, 1, 1], respectively.
+
+If all derivatives are required, then simply set 'd2' equal to 'all' since 'd1' is already set to 'all' by default:
+```
+dState = bss_derivatives(d2='all')
+```
+Other useful features are the ability to return the derivative at each draw, rather than averaging across draws. To do this, set keyword 'IndividualDraws' equal to 1 and note an additional dimension indexing the draws will be appended to your returned output.
+
+While the default functionality outlined above is most recommended, also useful is the ability to pass your own inputs into the function with keyword 'inputs'. Other potentially useful keywords are 'draws', 'betas', 'phis', 'mtx', and 'span', which is the range of normalization per input variable.
 
 ## Integration
 As discussed in the previous section, FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states, 'State1' and 'State2', with the same inputs:
