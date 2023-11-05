@@ -98,7 +98,7 @@ class FoKL:
                 hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
         for hyperKey, hyperValue in hypers.items():
             setattr(self, hyperKey, hyperValue) # defines each hyper as an attribute of 'self'
-            locals()[hyperKey] = hyperValue # defines each hyper as a local variable
+            # locals()[hyperKey] = hyperValue # defines each hyper as a local variable (not needed for init)
 
     def splineconvert500(self,A):
         """
@@ -135,7 +135,7 @@ class FoKL:
         """
 
         # Default keywords:
-        kwargs_all = {'inputs': self.inputs_np, 'd1': 'default', 'd2': 'default', 'draws': self.draws, 'betas': self.betas, 'phis': self.phis, 'mtx': self.mtx, 'span': self.normalize, 'IndividualDraws': 0}
+        kwargs_all = {'inputs': self.inputs_np, 'd1': 'default', 'd2': 'default', 'draws': self.draws, 'betas': self.betas, 'phis': self.phis, 'mtx': self.mtx, 'span': self.normalize, 'IndividualDraws': 0, 'ReturnFullArray': 0}
 
         # Update keywords based on user-input:
         for kwarg in kwargs.keys():
@@ -156,6 +156,13 @@ class FoKL:
         mtx = kwargs_all.get('mtx')
         span = kwargs_all.get('span')
         IndividualDraws = kwargs_all.get('IndividualDraws')
+        ReturnFullArray = kwargs_all.get('ReturnFullArray')
+        if isinstance(ReturnFullArray, str): # handle exception of user-defined string (not boolean)
+            ReturnFullArray = ReturnFullArray.lower()
+            if ReturnFullArray in ['yes', 'y', 'on', 'all', 'true']:
+                ReturnFullArray = 1
+            elif ReturnFullArray in ['no', 'n', 'off', 'none', 'n/a', 'false']:
+                ReturnFullArray = 0
 
         N = np.shape(inputs)[0]  # number of datapoints (i.e., experiments/timepoints)
         B,M = np.shape(mtx) # B == beta terms in function (not including betas0), M == number of input variables
@@ -166,21 +173,24 @@ class FoKL:
             i = i + 1
             error_di = 1
             if isinstance(di, str):
+                di = di.lower()
                 if di == 'default' and i == 1:
                     di = np.ones(M) # default is all first derivatives (i.e., gradient)
                 elif di == 'default' and i == 2:
                     di = np.zeros(M) # default is no second derivatives (i.e., gradient)
-                elif di in ['on', 'yes', 'all']:
+                elif di in ['on', 'yes', 'y', 'all', 'true']:
                     di = np.ones(M)
-                elif di in ['off', 'no', 'none', 'n/a']:
+                elif di in ['off', 'no', 'n', 'none', 'n/a', 'false']:
                     di = np.zeros(M)
                 else:
                     raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a string, is limited to 'all' or 'none'.")
                 error_di = 0
             elif isinstance(di, list): # e.g., d1 = [0, 0, 1, 0] for M = 4
                 if len(di) == 1: # e.g., d1 = [3] instead of d1 = 3
-                    di = di[0] # list to integer
-                elif len(di) != M:
+                    di = di[0] # list to integer, --> error_di = 0 later
+                elif len(di) == M:
+                    error_di = 0
+                else:
                     raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a list, must be of equal length to the number of input variables.")
             if isinstance(di, int): # not elif because d1 might have gone list to integer in above elif
                 di_id = di - 1 # input var index to Python index
@@ -214,7 +224,6 @@ class FoKL:
             d1d2_log = [1]  # index for only second derivative
         else:
             warnings.warn("Function 'bss_derivatives' was called but no derivatives were requested.")
-            return
 
         span_m = []
         for m in range(M):
@@ -222,16 +231,16 @@ class FoKL:
             span_m.append(span_mi)
 
         # Initialization before loops:
-        dState = np.zeros([draws,N,M,len(d1d2_log)])
+        dState = np.zeros([draws,N,M,2])
         phis_func_if_d0_for_nm = np.zeros([N,M,B]) # constant term for (n,md,b) that avoids repeat calculations
-        phi = np.zeros([N,M,len(d1d2_log)])
+        phi = np.zeros([N,M,2])
 
         # Cycle through each timepoint, input variable, and perform 'bss_derivatives' like in MATLAB:
         for n in range(N): # loop through experiments (i.e., each timepoint/datapoint)
             for m in range(M): # loop through input variables (i.e., the current one to differentiate wrt if requested)
-                span_L = span_m[m] / L_phis # used multiple times in calculations below
                 for di in d1d2_log: # for first through second derivatives (or, only first/second depending on d1d2_log)
                     if derv[di][m]: # if integrating, then do so once or twice (depending on di) wrt to xm ONLY
+                        span_L = span_m[m] / L_phis  # used multiple times in calculations below
                         derv_nm = np.zeros(M)
                         derv_nm[m] = di + 1 # if d2 = [1, 1, 1, 1], then for m = 2, derv_nm = [0, 0, 2, 0] like MATLAB
 
@@ -264,20 +273,16 @@ class FoKL:
 
                             dState[:,n,m,di] = dState[:,n,m,di] + betas[-draws:,b+1]*phi[n,m,di] # update after md loop
 
-        if len(d1d2_log) == 2: # reshape from (draws,N,M,2) to (draws,N,2M)
-            dState = np.concatenate([dState[:, :, :, 0], dState[:, :, :, 1]], axis=2)
+        dState = np.transpose(dState, (1, 2, 3, 0)) # move draws dimension to back so that dState is like (N,M,di,draws)
 
         if not IndividualDraws and draws > 1:  # then average draws
-            dState = np.mean(dState, axis=0)
-        elif draws > 1:  # then move draws dimension to back so that dState is like (N,M,draws) or (N,2M,draws)
-            try:
-                dState = np.transpose(dState, (1, 2, 0))
-            except: # assume only one input variable (i.e., M = 1) was squeezed beforehand and caused error since 2 dims
-                try:
-                    dState = np.transpose(dState, (1, 0))
-                except:
-                    warnings.warn("Output 'dState' could not be properly transposed and is being returned as is. The first dimension indexes draws.", category=UserWarning)
-        dState = np.squeeze(dState)
+            dState = np.mean(dState, axis=3) # note 3rd axis index (i.e., 4th) automatically removed (i.e., 'squeezed')
+            dState = dState[:, :, :, np.newaxis] # add new axis to avoid error in concatenate below
+
+        if not ReturnFullArray: # then return only columns with values and stack d1 and d2 next to each other
+            dState = np.concatenate([dState[:, :, 0, :], dState[:, :, 1, :]], axis=1)  # (N,M,2,draws) to (N,2M,draws)
+            dState = dState[:, ~np.all(dState == 0, axis=0)] # remove columns ('N') with all zeros
+        dState = np.squeeze(dState) # remove unnecessary axes
 
         return dState
 
@@ -302,14 +307,19 @@ class FoKL:
                 raise ValueError(f"Unexpected keyword argument: {kwarg}")
             else:
                 kwargs_all[kwarg] = kwargs.get(kwarg, kwargs_all.get(kwarg))
-        for kwarg in kwargs_all.keys():
-            locals()[kwarg] = kwargs_all.get(kwarg) # defines each keyword (including defaults) as a local variable
+
+        # Define local variables:
+        # for kwarg in kwargs_all.keys():
+        #     locals()[kwarg] = kwargs_all.get(kwarg) # defines each keyword (including defaults) as a local variable
+        draws = kwargs_all.get('draws')
+        nform = kwargs_all.get('nform')
+        deriv = kwargs_all.get('deriv')
 
         # Process nform:
         if isinstance(nform, str):
-            if nform in ['yes','on','auto','default']:
+            if nform.lower() in ['yes','y','on','auto','default','true']:
                 nform = 1
-            elif nform in ['no','off']:
+            elif nform.lower() in ['no','n','off','false']:
                 nform = 0
         else:
             if nform not in [0,1]:
@@ -483,9 +493,9 @@ class FoKL:
             raise_error = 0
             if isinstance(plots, str):
                 plots = plots.lower()
-                if plots in ['yes', 'on', 'y']:
+                if plots in ['yes', 'on', 'y','true']:
                     kwargs_upd['plot'] = 1
-                elif plots in ['no', 'none', 'off', 'n']:
+                elif plots in ['no', 'none', 'off', 'n','false']:
                     kwargs_upd['plot'] = 0
                 elif plots in ['sort', 'sorted']:
                     kwargs_upd['plot'] = 'sorted'
@@ -696,9 +706,9 @@ class FoKL:
                 if 'OutliersMethodParams' in kwargs:
                     OutliersMethodParams = kwargs.get('OutliersMethodParams')
             if isinstance(CatchOutliers, str): # convert user input to logical for auto_cleanData to interpret
-                if CatchOutliers.lower() in ('all', 'both', 'yes', 'y'):
+                if CatchOutliers.lower() in ('all', 'both', 'yes', 'y', 'true'):
                     CatchOutliers = 1
-                elif CatchOutliers.lower() in ('none','no', 'n'):
+                elif CatchOutliers.lower() in ('none','no', 'n', 'false'):
                     CatchOutliers = 0
                 elif CatchOutliers.lower() in ('inputs', 'inputsonly', 'input', 'inputonly'):
                     CatchOutliers = [1, 0] # note 1 will need to be replicated later to match number of input variables
@@ -761,7 +771,7 @@ class FoKL:
             data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
             if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
                 data = data[:, np.newaxis]
-                warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting.",category=UserWarning)
+                # warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting.",category=UserWarning)
             else: # check user provided only one output column/row, then transpose if needed
                 N_data = data.shape[0]
                 M_data = data.shape[1]
@@ -769,7 +779,7 @@ class FoKL:
                     raise ValueError("Error: 'data' must be a vector.")
                 elif M_data != 1 and N_data == 1:
                     data = data.transpose()
-                    warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
+                    # warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
 
             # Store properly formatted data and normalized inputs BEFORE removing outliers and BEFORE splitting train
             rawinputs = inputs
