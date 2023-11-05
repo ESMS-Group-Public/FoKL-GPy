@@ -125,7 +125,7 @@ Note with 'ReturnFullArray' equal to 1, the derivatives will map to dState[:, 0,
 
 If all derivatives are required, then simply set 'd2' equal to 'all' since 'd1' is already set to 'all' by default:
 ```
-dState = bss_derivatives(d2='all')
+dState = model.bss_derivatives(d2='all')
 ```
 Other useful features are the ability to return the derivative at each draw, rather than averaging across draws. To do this, set keyword 'IndividualDraws' equal to 1 and note an additional dimension indexing the draws will be appended to your returned output.
 
