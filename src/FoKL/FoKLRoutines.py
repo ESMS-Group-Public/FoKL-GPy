@@ -120,15 +120,20 @@ class FoKL:
 
     def bss_derivatives(self, **kwargs):
         """
-            For returning derivative of !!!!!!!!!!STUFF STUFF STUFF RTW UPDATE HERE!!!!!!!!!.
+            For returning gradient of modeled function with respect to each input variable.
+            If user overrides default settings, then 1st and 2nd partial derivatives can be returned for any variables.
 
             Keyword Inputs:
-                inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM) == self.inputs_np (default)
-                derv   == order of differentiation per input variable (e.g., [2,1,2])  == 2 (default)
-                betas  == draw from the posterior distribution of coefficients         == self.betas (default)
-                phis   == spline coefficients for the basis functions                  == self.phis (default)
-                mtx    == basis function interaction matrix from the best model        == self.mtx (default)
-                minmax == list of [min, max]'s of input data used in the normalization == self.normalize (default)
+                inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM)    == self.inputs_np (default)
+                d1     == index of input variable(s) to use for first partial derivative  == 'all' (default)
+                d2     == index of input variable(s) to use for second partial derivative == 'none' (default)
+                draws  == number of beta terms used                                       == self.draws (default)
+                betas  == draw from the posterior distribution of coefficients            == self.betas (default)
+                phis   == spline coefficients for the basis functions                     == self.phis (default)
+                mtx    == basis function interaction matrix from the best model           == self.mtx (default)
+                span   == list of [min, max]'s of input data used in the normalization    == self.normalize (default)
+                IndividualDraws == boolean for returning derivative(s) at each draw       == 0 (default)
+                ReturnFullArray == boolean for returning NxMx2 array instead of Nx2M      == 0 (default)
 
             Return Outputs:
                 dState == derivative of input variables (i.e., states)
