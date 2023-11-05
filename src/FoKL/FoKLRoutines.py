@@ -118,78 +118,168 @@ class FoKL:
 
         return phi
 
-    # def bss_derivatives(self, **kwargs):
-    #     """
-    #         For returning derivative of !!!!!!!!!!STUFF STUFF STUFF RTW UPDATE HERE!!!!!!!!!.
-    #
-    #         Keyword Inputs:
-    #             inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM) == self.inputs_np (default)
-    #             derv   == order of differentiation per input variable (e.g., [2,1,2])  == 2 (default)
-    #             betas  == draw from the posterior distribution of coefficients         == self.betas (default)
-    #             phis   == spline coefficients for the basis functions                  == self.phis (default)
-    #             mtx    == basis function interaction matrix from the best model        == self.mtx (default)
-    #             minmax == list of [min, max]'s of input data used in the normalization == self.normalize (default)
-    #
-    #         Return Outputs:
-    #             dState == derivative of input variables (i.e., states)
-    #     """
-    #
-    #     # Default keywords:
-    #     kwargs_all = {'inputs': self.inputs_np, 'derv': 2, 'betas': self.betas, 'phis': self.phis, 'mtx': self.mtx, 'range': self.normalize}
-    #
-    #     # Update keywords based on user-input:
-    #     for kwarg in kwargs.keys():
-    #         if kwarg not in kwargs_all.keys():
-    #             raise ValueError(f"Unexpected keyword argument: {kwarg}")
-    #         else:
-    #             kwargs_all[kwarg] = kwargs.get(kwarg, kwargs_all.get(kwarg))
-    #     for kwarg in kwargs_all.keys():
-    #         locals()[kwarg] = kwargs_all.get(kwarg)  # defines each keyword (including defaults) as a local variable
-    #
-    #     B,M = np.shape(mtx) # B == beta terms in function, M == number of input variables
-    #
-    #     L_derv = np.size(np.array(derv))
-    #     if L_derv != M:
-    #         if L_derv != 1:
-    #             raise ValueError("Variable 'derv' must be equal in size to the number of input variables.")
-    #         else: # apply single value to all input variables
-    #             derv = np.repeat(derv, M)
-    #     else:
-    #         for m in range(M):
-    #             if derv[m] > 2 or derv[m] < 1:
-    #                 raise ValueError("Keyword input 'derv' is limited to values of 1 or 2.")
-    #
-    #     dState = 0
-    #
-    #     L_phi = len(phis[0][0]) # = 499
-    #     phind = np.ceil(inputs * L_phi)
-    #
-    #     set = (phind == 0)
-    #     phind = phind + set
-    #
-    #     r = 1 / L_phi
-    #     xmin = (phind - 1) * r
-    #     X = (inputs - xmin) / r
-    #
-    #     for b in range(B): # for index of beta term in total number of betas in function
-    #
-    #         phi = 1
-    #         for m in range(M): # for index of input variable in total number of input variables
-    #
-    #             num = mtx[b,m]
-    #
-    #             if num:
-    #                 derp = derv(m)
-    #                 if derp == 0:
-    #                     phi = phi*(phis[num].zero(phind[m]) + phis[num].one(phind[m])*X[m] + phis[num].two(phind[m])*math.pow(X[m],2) + phis[num].three(phind[m])*math.pow(X[m],3))
-    #                 elif derp == 1:
-    #                     phi = phi*(phis[num].one(phind[m]) + 2*phis[num].two(phind[m])*X[m] + 3*phis[num].three(phind[m])*math.pow(X[m],2))/(range/L_phis)
-    #                 elif derp == 2:
-    #                     phi = phi*(2*phis[num].two(phind[m]) + 6*phis[num].three(phind[m])*X[m])/math.pow(range/L_phis,2)
-    #
-    #         dState = dState + betas[b + 1] * phi
-    #
-    #     return dState
+    def bss_derivatives(self, **kwargs):
+        """
+            For returning derivative of !!!!!!!!!!STUFF STUFF STUFF RTW UPDATE HERE!!!!!!!!!.
+
+            Keyword Inputs:
+                inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM) == self.inputs_np (default)
+                derv   == order of differentiation per input variable (e.g., [2,1,2])  == 2 (default)
+                betas  == draw from the posterior distribution of coefficients         == self.betas (default)
+                phis   == spline coefficients for the basis functions                  == self.phis (default)
+                mtx    == basis function interaction matrix from the best model        == self.mtx (default)
+                minmax == list of [min, max]'s of input data used in the normalization == self.normalize (default)
+
+            Return Outputs:
+                dState == derivative of input variables (i.e., states)
+        """
+
+        # Default keywords:
+        kwargs_all = {'inputs': self.inputs_np, 'd1': 'default', 'd2': 'default', 'draws': self.draws, 'betas': self.betas, 'phis': self.phis, 'mtx': self.mtx, 'span': self.normalize, 'IndividualDraws': 0}
+
+        # Update keywords based on user-input:
+        for kwarg in kwargs.keys():
+            if kwarg not in kwargs_all.keys():
+                raise ValueError(f"Unexpected keyword argument: {kwarg}")
+            else:
+                kwargs_all[kwarg] = kwargs.get(kwarg, kwargs_all.get(kwarg)) # update
+
+        # Define local variables from keywords:
+        # for kwarg in kwargs_all.keys():
+            # locals()[kwarg] = kwargs_all.get(kwarg)  # defines each keyword (including defaults) as a local variable
+        inputs = kwargs_all.get('inputs')
+        d1 = kwargs_all.get('d1')
+        d2 = kwargs_all.get('d2')
+        draws = kwargs_all.get('draws')
+        betas = kwargs_all.get('betas')
+        phis = kwargs_all.get('phis')
+        mtx = kwargs_all.get('mtx')
+        span = kwargs_all.get('span')
+        IndividualDraws = kwargs_all.get('IndividualDraws')
+
+        N = np.shape(inputs)[0]  # number of datapoints (i.e., experiments/timepoints)
+        B,M = np.shape(mtx) # B == beta terms in function (not including betas0), M == number of input variables
+
+        derv = []
+        i = 0
+        for di in [d1, d2]:
+            i = i + 1
+            error_di = 1
+            if isinstance(di, str):
+                if di == 'default' and i == 1:
+                    di = np.ones(M) # default is all first derivatives (i.e., gradient)
+                elif di == 'default' and i == 2:
+                    di = np.zeros(M) # default is no second derivatives (i.e., gradient)
+                elif di in ['on', 'yes', 'all']:
+                    di = np.ones(M)
+                elif di in ['off', 'no', 'none', 'n/a']:
+                    di = np.zeros(M)
+                else:
+                    raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a string, is limited to 'all' or 'none'.")
+                error_di = 0
+            elif isinstance(di, list): # e.g., d1 = [0, 0, 1, 0] for M = 4
+                if len(di) == 1: # e.g., d1 = [3] instead of d1 = 3
+                    di = di[0] # list to integer
+                elif len(di) != M:
+                    raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a list, must be of equal length to the number of input variables.")
+            if isinstance(di, int): # not elif because d1 might have gone list to integer in above elif
+                di_id = di - 1 # input var index to Python index
+                di = np.zeros(M)
+                di[di_id] = 1
+                error_di = 0
+            if error_di:
+                raise ValueError("Keyword input 'd1' and/or 'd2' is limited to an integer indexing an input variable, or to a list of booleans corresponding to the input variables.")
+            derv.append(di) # --> derv = [d1, d2], after properly formatted
+
+        L_phis = len(phis[0][0]) # = 499, length of first coeff. in first basis funtion of f(x1,x2,...,xM) expansion
+        phind = np.ceil(inputs * L_phis) # 0-1 normalization to 0-499 normalization
+
+        set = (phind == 0) # set = 1 if phind = 0, otherwise set = 0
+        phind = phind + set # makes sense assuming L_phis > M
+
+        r = 1 / L_phis # interval of when basis function changes (i.e., when next cubic function defines spline)
+        xmin = (phind - 1) * r
+        X = (inputs - xmin) / r # twice normalized inputs (0-1 first then to size of phis second)
+
+        phind = phind - 1  # adjust MATLAB indexing to Python indexing after twice normalization
+
+        # Determine if only one or both derivatives should be run through in for loop:
+        d1_log = any(derv[0])
+        d2_log = any(derv[1])
+        if d1_log and d2_log:
+            d1d2_log = [0,1] # index for both first and second derivatives
+        elif d1_log:
+            d1d2_log = [0]  # index for only first derivative
+        elif d2_log:
+            d1d2_log = [1]  # index for only second derivative
+        else:
+            warnings.warn("Function 'bss_derivatives' was called but no derivatives were requested.")
+            return
+
+        span_m = []
+        for m in range(M):
+            span_mi = span[m][1] - span[m][0]  # max minus min, = range of normalization per input variable
+            span_m.append(span_mi)
+
+        # Initialization before loops:
+        dState = np.zeros([draws,N,M,len(d1d2_log)])
+        phis_func_if_d0_for_nm = np.zeros([N,M,B]) # constant term for (n,md,b) that avoids repeat calculations
+        phi = np.zeros([N,M,len(d1d2_log)])
+
+        # Cycle through each timepoint, input variable, and perform 'bss_derivatives' like in MATLAB:
+        for n in range(N): # loop through experiments (i.e., each timepoint/datapoint)
+            for m in range(M): # loop through input variables (i.e., the current one to differentiate wrt if requested)
+                span_L = span_m[m] / L_phis # used multiple times in calculations below
+                for di in d1d2_log: # for first through second derivatives (or, only first/second depending on d1d2_log)
+                    if derv[di][m]: # if integrating, then do so once or twice (depending on di) wrt to xm ONLY
+                        derv_nm = np.zeros(M)
+                        derv_nm[m] = di + 1 # if d2 = [1, 1, 1, 1], then for m = 2, derv_nm = [0, 0, 2, 0] like MATLAB
+
+                        # The following is like the MATLAB function, with indexing for looping through n and m:
+                        for b in range(B):  # loop through betas
+                            phi[n,m,di] = 1 # reset after looping through non-wrt input variables (i.e., md)
+                            for md in range(M):  # for input variable PER single differentiation, m of d(xm)
+                                num = int(mtx[b,md])
+                                if num: # if not 0
+                                    derp = derv_nm[md]
+                                    num = int(num - 1) # MATLAB to Python indexing
+                                    phind_md = int(phind[n,md]) # make integer for indexing syntax
+                                    if derp == 0: # if not wrt x_md
+                                        try:
+                                            if not phis_func_if_d0_for_nm[n,md,b]: # if this constant (for n,b,md) was not already calculated
+                                                phis_func_if_d0_for_nm[n,md,b] = phis[num][0][phind_md] + phis[num][1][phind_md]*X[n,md] + phis[num][2][phind_md]*math.pow(X[n,md],2) + phis[num][3][phind_md]*math.pow(X[n,md],3)
+                                            phi[n,m,di] = phi[n,m,di] * phis_func_if_d0_for_nm[n,md,b]
+                                        except:
+                                            breakpoint()
+                                    elif derp == 1: # if wrt x_md and first derivative
+                                        try:
+                                            phi[n,m,di] = phi[n,m,di]*(phis[num][1][phind_md] + 2*phis[num][2][phind_md]*X[n,md] + 3*phis[num][3][phind_md]*math.pow(X[n,md],2))/span_L
+                                        except:
+                                            breakpoint()
+                                    elif derp == 2: # if wrt x_md and second derivative
+                                        try:
+                                            phi[n,m,di] = phi[n,m,di]*(2*phis[num][2][phind_md] + 6*phis[num][3][phind_md]*X[n,md])/math.pow(span_L,2)
+                                        except:
+                                            breakpoint()
+
+                            dState[:,n,m,di] = dState[:,n,m,di] + betas[-draws:,b+1]*phi[n,m,di] # update after md loop
+
+        if len(d1d2_log) == 2: # reshape from (draws,N,M,2) to (draws,N,2M)
+            dState = np.concatenate([dState[:, :, :, 0], dState[:, :, :, 1]], axis=2)
+
+        if not IndividualDraws and draws > 1:  # then average draws
+            dState = np.mean(dState, axis=0)
+        elif draws > 1:  # then move draws dimension to back so that dState is like (N,M,draws) or (N,2M,draws)
+            try:
+                dState = np.transpose(dState, (1, 2, 0))
+            except: # assume only one input variable (i.e., M = 1) was squeezed beforehand and caused error since 2 dims
+                try:
+                    dState = np.transpose(dState, (1, 0))
+                except:
+                    warnings.warn("Output 'dState' could not be properly transposed and is being returned as is. The first dimension indexes draws.", category=UserWarning)
+        dState = np.squeeze(dState)
+
+        return dState
 
     def evaluate(self, inputs, **kwargs):
         """
@@ -979,9 +1069,6 @@ class FoKL:
                 Lamb_tausqd_inv = np.diag(1 / np.diag(Lamb_tausqd))
 
                 mun = Q.dot(Lamb_tausqd_inv).dot(np.transpose(Q)).dot(Xty)
-                if mun.ndim == 1: # if mun.shape == (number,) != (number,1), then add new axis
-                    mun = mun[:, np.newaxis]
-                    warnings.warn("'mun' was made into (n,1) column vector from single list (n,). It is unclear why this was not already the case.",category=UserWarning)
                 S = Q.dot(np.diag(np.diag(Lamb_tausqd_inv) ** (1 / 2)))
 
                 vec = np.random.normal(loc=0, scale=1, size=(mmtx + 1, 1))  # drawing from normal distribution
