@@ -140,7 +140,7 @@ class FoKL:
         """
 
         # Default keywords:
-        kwargs_all = {'inputs': self.inputs_np, 'd1': 'default', 'd2': 'default', 'draws': self.draws, 'betas': self.betas, 'phis': self.phis, 'mtx': self.mtx, 'span': self.normalize, 'IndividualDraws': 0, 'ReturnFullArray': 0}
+        kwargs_all = {'inputs': 'default', 'd1': 'default', 'd2': 'default', 'draws': 'default', 'betas': 'default', 'phis': 'default', 'mtx': 'default', 'span': 'default', 'IndividualDraws': 0, 'ReturnFullArray': 0, 'ReturnBasis': 0}
 
         # Update keywords based on user-input:
         for kwarg in kwargs.keys():
@@ -162,6 +162,27 @@ class FoKL:
         span = kwargs_all.get('span')
         IndividualDraws = kwargs_all.get('IndividualDraws')
         ReturnFullArray = kwargs_all.get('ReturnFullArray')
+        ReturnBasis = kwargs_all.get('ReturnBasis')
+
+        # Further processing of keyword arguments:
+        if isinstance(inputs, str): # handle case of user using bss_derivatives without first calling model.fit
+            if inputs.lower() == 'default':
+                inputs = self.inputs_np
+        if isinstance(draws, str): # handle case of user using bss_derivatives without first calling model.fit
+            if draws.lower() == 'default':
+                draws = self.draws
+        if isinstance(betas, str): # handle case of user using bss_derivatives without first calling model.fit
+            if betas.lower() == 'default':
+                betas = self.betas
+        if isinstance(phis, str): # handle case of user using bss_derivatives without first calling model.fit
+            if phis.lower() == 'default':
+                phis = self.phis
+        if isinstance(mtx, str): # handle case of user using bss_derivatives without first calling model.fit
+            if mtx.lower() == 'default':
+                mtx = self.mtx
+        if isinstance(span, str): # handle case of user using bss_derivatives without first calling model.fit
+            if span.lower() == 'default':
+                span = self.normalize
         if isinstance(ReturnFullArray, str): # handle exception of user-defined string (not boolean)
             ReturnFullArray = ReturnFullArray.lower()
             if ReturnFullArray in ['yes', 'y', 'on', 'all', 'true']:
@@ -169,8 +190,31 @@ class FoKL:
             elif ReturnFullArray in ['no', 'n', 'off', 'none', 'n/a', 'false']:
                 ReturnFullArray = 0
 
+        inputs = np.array(inputs)
+        if inputs.ndim == 1:
+            inputs = inputs[:, np.newaxis]
+        if isinstance(betas, list): # then most likely user-input, e.g., [0,1]
+            betas = np.array(betas)
+            if betas.ndim == 1:
+                betas = betas[:, np.newaxis]
+        if isinstance(mtx, int): # then most likely user-input, e.g., 1
+            mtx = np.array(mtx)
+            mtx = mtx[np.newaxis, np.newaxis]
+        else:
+            mtx = np.array(mtx)
+            if mtx.ndim == 1:
+                mtx = mtx[:, np.newaxis]
+        if len(span) == 2: # if span=[0,1], span=[[0,1],[0,1]], or span=[array([0,1]),array([0,1])]
+            if not (isinstance(span[0], list) or isinstance(span[0], np.ndarray)):
+                span = [span] # make list of list to handle indexing errors for one input variable case, i.e., [0,1]
+
         N = np.shape(inputs)[0]  # number of datapoints (i.e., experiments/timepoints)
         B,M = np.shape(mtx) # B == beta terms in function (not including betas0), M == number of input variables
+
+        if B != np.shape(betas)[1]-1: # second axis is beta terms (first is draws)
+            betas = np.transpose(betas)
+            if B != np.shape(betas)[1]-1:
+                raise ValueError("The shape of 'betas' does not align with the shape of 'mtx'. Transposing did not fix this.")
 
         derv = []
         i = 0
@@ -209,6 +253,9 @@ class FoKL:
         L_phis = len(phis[0][0]) # = 499, length of first coeff. in first basis funtion of f(x1,x2,...,xM) expansion
         phind = np.ceil(inputs * L_phis) # 0-1 normalization to 0-499 normalization
 
+        if phind.ndim == 1:  # if phind.shape == (number,) != (number,1), then add new axis to match indexing format
+            phind = phind[:, np.newaxis]
+
         set = (phind == 0) # set = 1 if phind = 0, otherwise set = 0
         phind = phind + set # makes sense assuming L_phis > M
 
@@ -241,7 +288,8 @@ class FoKL:
         phi = np.zeros([N,M,2])
 
         # Cycle through each timepoint, input variable, and perform 'bss_derivatives' like in MATLAB:
-        TEST_phis = np.zeros(N)
+        if ReturnBasis:  # mostly for development to confirm basis function of single input variable for mtx=1 and betas=[0,1]
+            basis = np.zeros(N)
         for n in range(N): # loop through experiments (i.e., each timepoint/datapoint)
             for m in range(M): # loop through input variables (i.e., the current one to differentiate wrt if requested)
                 for di in d1d2_log: # for first through second derivatives (or, only first/second depending on d1d2_log)
@@ -267,7 +315,8 @@ class FoKL:
                                         phi[n,m,di] = phi[n,m,di]*(phis[num][1][phind_md] + 2*phis[num][2][phind_md]*X[n,md] + 3*phis[num][3][phind_md]*math.pow(X[n,md],2))/span_L
                                     elif derp == 2: # if wrt x_md and second derivative
                                         phi[n,m,di] = phi[n,m,di]*(2*phis[num][2][phind_md] + 6*phis[num][3][phind_md]*X[n,md])/math.pow(span_L,2)
-                                    TEST_phis[n] = phis[num][0][phind_md] + phis[num][1][phind_md] * X[n,md] + phis[num][2][phind_md] * math.pow(X[n,md],2) + phis[num][3][phind_md] * math.pow(X[n,md],3)
+                                    if ReturnBasis:  # mostly for development
+                                        basis[n] = phis[num][0][phind_md] + phis[num][1][phind_md] * X[n,md] + phis[num][2][phind_md] * math.pow(X[n,md],2) + phis[num][3][phind_md] * math.pow(X[n,md],3)
 
                             dState[:,n,m,di] = dState[:,n,m,di] + betas[-draws:,b+1]*phi[n,m,di] # update after md loop
 
@@ -282,22 +331,26 @@ class FoKL:
             dState = dState[:, ~np.all(dState == 0, axis=0)] # remove columns ('N') with all zeros
         dState = np.squeeze(dState) # remove unnecessary axes
 
-        return dState, TEST_phis
+        if ReturnBasis: # mostly for development
+            return dState, basis
+        else: # standard
+            return dState
 
     def evaluate(self, inputs, **kwargs):
         """
-            Evaluate the inputs and output the predicted values of corresponding data.
+            Evaluate the inputs and output the predicted values of corresponding data. Optionally, calculate bounds.
 
             Input:
                 inputs == matrix of independent (or non-linearly dependent) 'x' variables for evaluating f(x1, ..., xM)
 
             Keyword Inputs:
-                draws == number of beta terms used                              == self.draws (default)
-                nform == logical to automatically normalize and format 'inputs' == 1 (default)
+                draws        == number of beta terms used                              == self.draws (default)
+                nform        == logical to automatically normalize and format 'inputs' == 1 (default)
+                ReturnBounds == logical to return confidence bounds as second output   == 0 (default)
         """
 
         # Default keywords:
-        kwargs_all = {'draws': self.draws, 'nform': 1, 'deriv': 0}
+        kwargs_all = {'draws': self.draws, 'nform': 1, 'ReturnBounds': 0}
 
         # Update keywords based on user-input:
         for kwarg in kwargs.keys():
@@ -311,7 +364,7 @@ class FoKL:
         #     locals()[kwarg] = kwargs_all.get(kwarg) # defines each keyword (including defaults) as a local variable
         draws = kwargs_all.get('draws')
         nform = kwargs_all.get('nform')
-        deriv = kwargs_all.get('deriv')
+        ReturnBounds = kwargs_all.get('ReturnBounds')
 
         # Process nform:
         if isinstance(nform, str):
@@ -411,14 +464,17 @@ class FoKL:
         for i in range(draws):
             modells[:, i] = np.matmul(X, betas[setnos[i], :])
         meen = np.mean(modells, 1)
-        bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
-        cut = int(np.floor(draws * .025))
-        for i in range(n):  # note n == np.shape(data)[0] if data != 'ignore'
-            drawset = np.sort(modells[i, :])
-            bounds[i, 0] = drawset[cut]
-            bounds[i, 1] = drawset[draws - cut]
 
-        return meen, bounds
+        if ReturnBounds:
+            bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
+            cut = int(np.floor(draws * .025))
+            for i in range(n):  # note n == np.shape(data)[0] if data != 'ignore'
+                drawset = np.sort(modells[i, :])
+                bounds[i, 0] = drawset[cut]
+                bounds[i, 1] = drawset[draws - cut]
+            return meen, bounds
+        else:
+            return meen
 
     def coverage3(self, **kwargs):
         """
@@ -556,7 +612,7 @@ class FoKL:
         data = kwargs_upd.get('data')
         draws = kwargs_upd.get('draws')
 
-        meen, bounds = self.evaluate(normputs, draws=draws, nform=0)
+        meen, bounds = self.evaluate(normputs, draws=draws, nform=0, ReturnBounds=1)
         n, mputs = np.shape(normputs)  # Size of normalized inputs ... calculated in 'evaluate' but not returned
 
         if kwargs_upd.get('plot') != 0: # if user requested a plot
