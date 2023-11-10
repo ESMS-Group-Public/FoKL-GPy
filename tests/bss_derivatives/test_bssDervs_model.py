@@ -3,8 +3,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+function = 'exponential' # exponential, quadratic
+
+# ======================================================================================================================
+# ======================================================================================================================
+
 x = np.linspace(0,1,10001)
-y = np.exp(x)
+
+if function == 'exponential':
+    y = np.exp(x)
+elif function == 'quadratic':
+    y = x*x + x
 
 model = FoKLRoutines.FoKL()
 
@@ -14,7 +23,10 @@ y_model = model.evaluate(x)
 d_model = model.bss_derivatives(d2=1)
 
 plt.figure(1)
-plt.title('FoKL model of e^x')
+if function == 'exponential':
+    plt.title('FoKL model of e^x')
+elif function == 'quadratic':
+    plt.title('FoKL model of x^2+x')
 plt.xlabel('x')
 plt.plot(x, y_model)
 plt.plot(x, d_model[:,0]) # 1st derivative
