@@ -241,6 +241,7 @@ class FoKL:
         phi = np.zeros([N,M,2])
 
         # Cycle through each timepoint, input variable, and perform 'bss_derivatives' like in MATLAB:
+        TEST_phis = np.zeros(N)
         for n in range(N): # loop through experiments (i.e., each timepoint/datapoint)
             for m in range(M): # loop through input variables (i.e., the current one to differentiate wrt if requested)
                 for di in d1d2_log: # for first through second derivatives (or, only first/second depending on d1d2_log)
@@ -259,22 +260,14 @@ class FoKL:
                                     num = int(num - 1) # MATLAB to Python indexing
                                     phind_md = int(phind[n,md]) # make integer for indexing syntax
                                     if derp == 0: # if not wrt x_md
-                                        try:
-                                            if not phis_func_if_d0_for_nm[n,md,b]: # if this constant (for n,b,md) was not already calculated
-                                                phis_func_if_d0_for_nm[n,md,b] = phis[num][0][phind_md] + phis[num][1][phind_md]*X[n,md] + phis[num][2][phind_md]*math.pow(X[n,md],2) + phis[num][3][phind_md]*math.pow(X[n,md],3)
-                                            phi[n,m,di] = phi[n,m,di] * phis_func_if_d0_for_nm[n,md,b]
-                                        except:
-                                            breakpoint()
+                                        if not phis_func_if_d0_for_nm[n,md,b]: # if this constant (for n,b,md) was not already calculated
+                                            phis_func_if_d0_for_nm[n,md,b] = phis[num][0][phind_md] + phis[num][1][phind_md]*X[n,md] + phis[num][2][phind_md]*math.pow(X[n,md],2) + phis[num][3][phind_md]*math.pow(X[n,md],3)
+                                        phi[n,m,di] = phi[n,m,di] * phis_func_if_d0_for_nm[n,md,b]
                                     elif derp == 1: # if wrt x_md and first derivative
-                                        try:
-                                            phi[n,m,di] = phi[n,m,di]*(phis[num][1][phind_md] + 2*phis[num][2][phind_md]*X[n,md] + 3*phis[num][3][phind_md]*math.pow(X[n,md],2))/span_L
-                                        except:
-                                            breakpoint()
+                                        phi[n,m,di] = phi[n,m,di]*(phis[num][1][phind_md] + 2*phis[num][2][phind_md]*X[n,md] + 3*phis[num][3][phind_md]*math.pow(X[n,md],2))/span_L
                                     elif derp == 2: # if wrt x_md and second derivative
-                                        try:
-                                            phi[n,m,di] = phi[n,m,di]*(2*phis[num][2][phind_md] + 6*phis[num][3][phind_md]*X[n,md])/math.pow(span_L,2)
-                                        except:
-                                            breakpoint()
+                                        phi[n,m,di] = phi[n,m,di]*(2*phis[num][2][phind_md] + 6*phis[num][3][phind_md]*X[n,md])/math.pow(span_L,2)
+                                    TEST_phis[n] = phis[num][0][phind_md] + phis[num][1][phind_md] * X[n,md] + phis[num][2][phind_md] * math.pow(X[n,md],2) + phis[num][3][phind_md] * math.pow(X[n,md],3)
 
                             dState[:,n,m,di] = dState[:,n,m,di] + betas[-draws:,b+1]*phi[n,m,di] # update after md loop
 
@@ -289,7 +282,7 @@ class FoKL:
             dState = dState[:, ~np.all(dState == 0, axis=0)] # remove columns ('N') with all zeros
         dState = np.squeeze(dState) # remove unnecessary axes
 
-        return dState
+        return dState, TEST_phis
 
     def evaluate(self, inputs, **kwargs):
         """
