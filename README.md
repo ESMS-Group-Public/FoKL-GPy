@@ -48,11 +48,11 @@ aic        = False
 A description of each hyperparameter is listed in the function documentation.
 
 ## Training
-Call the 'fit' function to train the FoKL model on all of 'data'.
+Call the 'fit' function to train the FoKL model on all of 'data':
 ```
 betas, mtx, evs = model.fit(inputs, data)
 ```
-Or, define the keyword 'train' as the percentage of 'data' to use for training.
+Optionally, include the keyword 'train' as the percentage of 'data' to use for training (e.g., 80%):
 ```
 betas, mtx, evs = model.fit(inputs, data, train=0.8)
 ```
@@ -66,7 +66,15 @@ model.coverage3(inputs=model.testinputs, data=model.testdata, plot='sorted', bou
 ```
 Note 'data' must correspond to the set used for 'inputs' to calculate the model's RMSE, which is the third positional output of 'coverage3'.
 
-As a side note, the following attributes were added to your FoKL class 'model' after calling 'fit' which may be useful during user post-processing:
+If not requiring the RMSE (or a plot), then the 'evaluate' function can be used to bypass 'coverage3' so that any inputs can be evaluated. In other words, 'coverage3' takes 'evaluate' one step farther by returning the RMSE but is limited to validation testing only since the corresponding data must also be provided with the inputs. To evaluate the inputs 'userinputs' for which the output data is not known, use the following to predict the data ('meen') and confidence bounds ('bounds'):
+```
+meen, bounds = model.evaluate(userinputs)
+```
+Note 'userinputs' will be automatically normalized to the same scale as the training inputs that the model was fitted to, as well as automatically formatted. In the rare case that 'userinputs' is already normalized and formatted properly, then this automatic treatment of 'userinputs' can be turned off with the following keyword:
+```
+meen, bounds = model.evaluate(userinputs, nform=0)
+```
+As an appended side note, the following attributes were added to your FoKL class 'model' after calling 'fit' which may be useful during user post-processing:
 ```
 model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus model.testinputs)
 model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
@@ -96,8 +104,29 @@ To remove all of the above attributes so that only the hyperparameters remain, m
 model.clear()
 ```
 
+## Differentiation
+FoKL can be used to calculate the partial first derivative of the model's function with respect to any input variable. By default, the gradient of 'inputs' from 'model.fit()' is calculated:
+```
+dState = model.bss_derivatives()
+```
+The keyword 'd1' can be used to specify the input variable(s) with which to differentiate the model. For example, in a materials science application where pressure and temperature are inputs, perhaps the modeled function only needs to be differentiated with respect to the second input variable, temperature:
+```
+dState = model.bss_derivatives(d1=2)
+```
+If pressure (P), temperature (T), and volume (V) are inputs and the requested derivatives are d(f(P,T,V))/dP and d(f(P,T,V))/dV, then boolean indexing can be used:
+```
+dState = model.bss_derivatives(d1=[1,0,1])
+```
+The output will be an Nx2 numpy array since 2 derivatives were requested, where N is the number of experimental datapoints. To preserve the same indexing as the input variables, a full array can be returned with 0's occupying the columns of input variables not requested:
+```
+dState = model.bss_derivatives(d1=[1,0,1], ReturnFullArray=1)
+```
+Note with 'ReturnFullArray' equal to 1, the df/dP and df/dV derivatives will map to dState[:, 0] and dState[:, 2], respectively.
+
+Other useful features are the ability to return the derivative at each draw, rather than averaging across draws. To do this, set keyword 'IndividualDraws' equal to 1 and note an additional dimension indexing the draws will be appended to your returned output. While the default functionality outlined above is most recommended, also useful is the ability to pass your own inputs into the function with keyword 'inputs'. Other potentially useful keywords are 'draws', 'betas', 'phis', 'mtx', and 'span', which is the range of normalization per input variable.
+
 ## Integration
-FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states, 'State1' and 'State2', with the same inputs:
+As discussed in the previous section, FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states, 'State1' and 'State2', with the same inputs:
 ```
 model = FoKLRoutines.FoKL()
 
@@ -130,9 +159,11 @@ See 'GP_intergrate_example.py' for an example.
 
 More sophisticated outlier removal methods are currently in development, but for demonstration purposes the following will search through 'data' and remove any points with a z-score greater than 4:
 ```
-model.fit(model.inputs, model.data, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=4)
+model.fit(inputs, data, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=4)
 ```
 Also in development are additional methods for splitting 'data' into test/train sets, beyond the current method which is limited to a random split.
+
+It is also intended for the 'evaluate' function to be capable of providing derivatives, sampling through 'betas' of the model, and evaluating at user-defined 'betas'.
 
 ## Citations
 Please cite: K. Hayes, M.W. Fouts, A. Baheri and
@@ -141,7 +172,7 @@ dynamic system identification with Karhunen-Loève decomposed Gaussian
 processes", arXiv:2205.13676
 
 Credits: David Mebane (ideas and original code), Kyle Hayes
-(integrator), Derek Slack (Python porting)
+(integrator), Derek Slack (Python porting), Jacob Krell (Python v3 dev.)
 
 Funding provided by National Science Foundation, Award No. 2119688
 
