@@ -1,4 +1,4 @@
-from FoKL import getKernels
+from src.FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools
@@ -100,6 +100,7 @@ class FoKL:
             setattr(self, hyperKey, hyperValue) # defines each hyper as an attribute of 'self'
             # locals()[hyperKey] = hyperValue # defines each hyper as a local variable (not needed for init)
 
+
     def splineconvert500(self,A):
         """
             Same as splineconvert, but for a larger basis of 500
@@ -118,13 +119,16 @@ class FoKL:
 
         return phi
 
+
     def bss_derivatives(self, **kwargs):
         """
             For returning gradient of modeled function with respect to each, or specified, input variable.
+            If user overrides default settings, then 1st and 2nd partial derivatives can be returned for any variables.
 
             Keyword Inputs:
                 inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM)    == self.inputs_np (default)
                 d1     == index of input variable(s) to use for first partial derivative  == 'all' (default)
+                d2     == index of input variable(s) to use for second partial derivative == 'none' (default)
                 draws  == number of beta terms used                                       == self.draws (default)
                 betas  == draw from the posterior distribution of coefficients            == self.betas (default)
                 phis   == spline coefficients for the basis functions                     == self.phis (default)
@@ -138,7 +142,7 @@ class FoKL:
         """
 
         # Default keywords:
-        kwargs_all = {'inputs': 'default', 'd1': 'default', 'draws': 'default', 'betas': 'default', 'phis': 'default', 'mtx': 'default', 'span': 'default', 'IndividualDraws': 0, 'ReturnFullArray': 0, 'ReturnBasis': 0}
+        kwargs_all = {'inputs': 'default', 'd1': 'default', 'd2': 'default', 'draws': 'default', 'betas': 'default', 'phis': 'default', 'mtx': 'default', 'span': 'default', 'IndividualDraws': 0, 'ReturnFullArray': 0, 'ReturnBasis': 0}
 
         # Update keywords based on user-input:
         for kwarg in kwargs.keys():
@@ -152,7 +156,7 @@ class FoKL:
             # locals()[kwarg] = kwargs_all.get(kwarg)  # defines each keyword (including defaults) as a local variable
         inputs = kwargs_all.get('inputs')
         d1 = kwargs_all.get('d1')
-        # d2 = kwargs_all.get('d2') # d2 IN DEVELOPMENT
+        d2 = kwargs_all.get('d2')
         draws = kwargs_all.get('draws')
         betas = kwargs_all.get('betas')
         phis = kwargs_all.get('phis')
@@ -219,7 +223,7 @@ class FoKL:
 
         derv = []
         i = 0
-        for di in [d1]: # [d1, d2]:
+        for di in [d1, d2]:
             i = i + 1
             error_di = 1
             if isinstance(di, str):
@@ -233,8 +237,7 @@ class FoKL:
                 elif di in ['off', 'no', 'n', 'none', 'n/a', 'false']:
                     di = np.zeros(M)
                 else:
-                    raise ValueError("Keyword input 'd1', if entered as a string, is limited to 'all' or 'none'.")
-                    # raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a string, is limited to 'all' or 'none'.")
+                    raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a string, is limited to 'all' or 'none'.")
                 error_di = 0
             elif isinstance(di, list): # e.g., d1 = [0, 0, 1, 0] for M = 4
                 if len(di) == 1: # e.g., d1 = [3] instead of d1 = 3
@@ -242,82 +245,84 @@ class FoKL:
                 elif len(di) == M:
                     error_di = 0
                 else:
-                    raise ValueError("Keyword input 'd1', if entered as a list, must be of equal length to the number of input variables.")
-                    # raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a list, must be of equal length to the number of input variables.")
+                    raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a list, must be of equal length to the number of input variables.")
             if isinstance(di, int): # not elif because d1 might have gone list to integer in above elif
                 if di != 0:
                     di_id = di - 1 # input var index to Python index
                     di = np.zeros(M)
                     di[di_id] = 1
-                else: # treat as d1='none'
+                else: # treat as di = 'none'
                     di = np.zeros(M)
                 error_di = 0
             if error_di:
                 raise ValueError("Keyword input 'd1' and/or 'd2' is limited to an integer indexing an input variable, or to a list of booleans corresponding to the input variables.")
-                # raise ValueError("Keyword input 'd1' and/or 'd2' is limited to an integer indexing an input variable, or to a list of booleans corresponding to the input variables.")
             derv.append(di) # --> derv = [d1, d2], after properly formatted
 
         # ==============================================================================================================
         # ==============================================================================================================
-        # IN DEVELOPMENT ... jake's initial method of porting twice normalization of inputs
+        # IN DEVELOPMENT ... jake's initial method of porting twice normalization of inputs (method was to do same as
+        #                    MATLAB then adjust Python indexing after math was done)
         # ==============================================================================================================
 
-        # L_phis = len(phis[0][0]) # = 499, length of first coeff. in first basis funtion of f(x1,x2,...,xM) expansion
-        # phind = np.ceil(inputs * L_phis) # 0-1 normalization to 0-499 normalization
-        #
-        # if phind.ndim == 1:  # if phind.shape == (number,) != (number,1), then add new axis to match indexing format
-        #     phind = phind[:, np.newaxis]
-        #
-        # set = (phind == 0) # set = 1 if phind = 0, otherwise set = 0
-        # phind = phind + set # makes sense assuming L_phis > M
-        #
-        # r = 1 / L_phis # interval of when basis function changes (i.e., when next cubic function defines spline)
-        # xmin = (phind - 1) * r
-        # X = (inputs - xmin) / r # twice normalized inputs (0-1 first then to size of phis second)
-        #
-        # phind = phind - 1  # adjust MATLAB indexing to Python indexing after twice normalization
+        L_phis = len(phis[0][0]) # = 499, length of first coeff. in first basis funtion of f(x1,x2,...,xM) expansion
+        phind = np.ceil(inputs * L_phis) # 0-1 normalization to 0-499 normalization
+
+        if phind.ndim == 1:  # if phind.shape == (number,) != (number,1), then add new axis to match indexing format
+            phind = phind[:, np.newaxis]
+
+        set = (phind == 0) # set = 1 if phind = 0, otherwise set = 0
+        phind = phind + set # makes sense assuming L_phis > M
+
+        r = 1 / L_phis # interval of when basis function changes (i.e., when next cubic function defines spline)
+        xmin = (phind - 1) * r
+        X = (inputs - xmin) / r # twice normalized inputs (0-1 first then to size of phis second)
+
+        phind = phind - 1  # adjust MATLAB indexing to Python indexing after twice normalization
+
+        # dev1_X = X  # == dev2_X
+        # dev1_phind = phind  # != dev2_phind
 
         # ==============================================================================================================
         # ==============================================================================================================
         # IN DEVELOPMENT ... method of porting twice normalization of inputs based on evaluate function
 
-        L_phis = len(phis[0][0])  # = 499, length of first coeff. in first basis funtion of f(x1,x2,...,xM) expansion
-        L_498 = L_phis - 1
+        # L_phis = len(phis[0][0])  # = 499, length of first coeff. in first basis funtion of f(x1,x2,...,xM) expansion
+        # L_498 = L_phis - 1
+        #
+        # phind = np.zeros_like(inputs)  # Rounded down point of input from 0-499
+        # phind_logic = np.zeros_like(inputs)
+        #
+        # for n in range(N):
+        #     for m in range(M):
+        #         phind[n, m] = math.floor(inputs[n, m] * L_498)
+        #         # 499 changed to 498 for python indexing
+        #
+        #         if phind[n, m] == L_498:
+        #             phind_logic[n, m] = 1
+        #
+        # phind = np.subtract(phind, phind_logic)
+        #
+        # r = 1 / L_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
+        # xmin = phind * r
+        # X = (inputs - xmin) / r # twice normalized inputs (0-1 first then to size of phis second)
 
-        phind = np.zeros_like(inputs)  # Rounded down point of input from 0-499
-        phind_logic = np.zeros_like(inputs)
-
-        for n in range(N):
-            for m in range(M):
-                phind[n, m] = math.floor(inputs[n, m] * L_498)
-                # 499 changed to 498 for python indexing
-
-                if phind[n, m] == L_498:
-                    phind_logic[n, m] = 1
-
-        phind = np.subtract(phind, phind_logic)
-
-        r = 1 / L_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
-        xmin = phind * r
-        X = (inputs - xmin) / r # twice normalized inputs (0-1 first then to size of phis second)
+        # dev2_X = X
+        # dev2_phind = phind
 
         # ==============================================================================================================
         # END OF DEVELOPMENT
         # ==============================================================================================================
         # ==============================================================================================================
 
+        # Determine if only one or both derivatives should be run through in for loop:
         d1_log = any(derv[0])
-        if d1_log:
-            d1d2_log = [0] # index for only first derivative
-        # # Determine if only one or both derivatives should be run through in for loop:
-        # d1_log = any(derv[0])
-        # d2_log = any(derv[1]) # d2 IN DEVELOPMENT
-        # if d1_log and d2_log:
-        #     d1d2_log = [0,1] # index for both first and second derivatives
-        # elif d1_log:
-        #     d1d2_log = [0]  # index for only first derivative
-        # elif d2_log:
-        #     d1d2_log = [1]  # index for only second derivative
+        d2_log = any(derv[1])
+        if d1_log and d2_log:
+            d1d2_log = [0,1] # index for both first and second derivatives
+        elif d1_log:
+            d1d2_log = [0]  # index for only first derivative
+        elif d2_log:
+            d1d2_log = [1]  # index for only second derivative
         else:
             warnings.warn("Function 'bss_derivatives' was called but no derivatives were requested.", category=UserWarning)
             return
@@ -328,11 +333,9 @@ class FoKL:
             span_m.append(span_mi)
 
         # Initialization before loops:
-        dState = np.zeros([draws, N, M, 1])
-        # dState = np.zeros([draws,N,M,2])
+        dState = np.zeros([draws,N,M,2])
         phis_func_if_d0_for_nm = np.zeros([N,M,B]) # constant term for (n,md,b) that avoids repeat calculations
-        phi = np.zeros([N, M, 1])
-        # phi = np.zeros([N,M,2])
+        phi = np.zeros([N,M,2])
 
         # Cycle through each timepoint, input variable, and perform 'bss_derivatives' like in MATLAB:
         if ReturnBasis:  # mostly for development to confirm basis function of single input variable for mtx=1 and betas=[0,1]
@@ -374,19 +377,15 @@ class FoKL:
             dState = dState[:, :, :, np.newaxis] # add new axis to avoid error in concatenate below
 
         if not ReturnFullArray: # then return only columns with values and stack d1 and d2 next to each other
-            dState = np.squeeze(dState, axis=2) # (N,M,1,draws) to (N,1M,draws)
-            # dState = np.concatenate([dState[:, :, 0, :], dState[:, :, 1, :]], axis=1)  # (N,M,2,draws) to (N,2M,draws)
-            if not IndividualDraws and draws > 1: # d2 IN DEVELOPMENT (THIS IS ONLY FOR d1)
-                dState = dState.reshape(N, -1)[:, ~np.all(dState.reshape(N, -1) == 0, axis=0)].reshape(N, -1, 1)
-            else:
-                dState = dState.reshape(N, -1)[:, ~np.all(dState.reshape(N, -1) == 0, axis=0)].reshape(N, -1, draws)
-            # dState = dState[:, ~np.all(dState == 0, axis=0)] # remove columns ('N') with all zeros
+            dState = np.concatenate([dState[:, :, 0, :], dState[:, :, 1, :]], axis=1)  # (N,M,2,draws) to (N,2M,draws)
+            dState = dState[:, ~np.all(dState == 0, axis=0)] # remove columns ('N') with all zeros
         dState = np.squeeze(dState) # remove unnecessary axes
 
         if ReturnBasis: # mostly for development
             return dState, basis
         else: # standard
             return dState
+
 
     def evaluate(self, inputs, **kwargs):
         """
@@ -527,6 +526,7 @@ class FoKL:
             return meen, bounds
         else:
             return meen
+
 
     def coverage3(self, **kwargs):
         """
@@ -729,6 +729,7 @@ class FoKL:
             rmse = np.sqrt(np.mean(meen - data) ** 2)
 
         return meen, bounds, rmse
+
 
     def fit(self, inputs, data, **kwargs):
         """
@@ -1425,6 +1426,7 @@ class FoKL:
         self.evs = evs
 
         return betas, mtx, evs
+
 
     def clear(self, **kwargs):
         """
