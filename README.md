@@ -105,11 +105,13 @@ model.clear()
 ```
 
 ## Differentiation
-FoKL can be used to calculate the partial first derivative of the model's function with respect to any input variable. By default, the gradient of 'inputs' from 'model.fit()' is calculated:
+FoKL can be used to calculate the partial derivatives of the model's function with respect to any input variable. By default, the gradient of 'inputs' from 'model.fit()' is calculated (i.e., all partial first derivatives):
 ```
 dState = model.bss_derivatives()
 ```
-The keyword 'd1' can be used to specify the input variable(s) with which to differentiate the model. For example, in a materials science application where pressure and temperature are inputs, perhaps the modeled function only needs to be differentiated with respect to the second input variable, temperature:
+The keywords 'd1' and 'd2' can be used to specify the input variable(s) with which to differentiate the model, where 'd1' dictates the first-order and 'd2' dictates the second-order derivatives.
+
+For example, in a materials science application where pressure and temperature are inputs, perhaps the modeled function only needs to be differentiated once with respect to the second input variable, temperature:
 ```
 dState = model.bss_derivatives(d1=2)
 ```
@@ -121,7 +123,13 @@ The output will be an Nx2 numpy array since 2 derivatives were requested, where 
 ```
 dState = model.bss_derivatives(d1=[1,0,1], ReturnFullArray=1)
 ```
-Note with 'ReturnFullArray' equal to 1, the df/dP and df/dV derivatives will map to dState[:, 0] and dState[:, 2], respectively.
+Note with 'ReturnFullArray' equal to 1, the df/dP and df/dV derivatives will map to dState[:, 0, 0] and dState[:, 2, 0], respectively.
+
+Furthermore, to also return the second derivatives with respect to pressure and volume:
+```
+dState = model.bss_derivatives(d1=[1,0,1], d2=[2,0,2], ReturnFullArray=1)
+```
+Similarly, d2f/dP2 and d2f/dV2 will map to dState[:, 0, 1] and dState[:, 2, 1]. Note the third dimension of dState indexes the order of the derivative.
 
 Other useful features are the ability to return the derivative at each draw, rather than averaging across draws. To do this, set keyword 'IndividualDraws' equal to 1 and note an additional dimension indexing the draws will be appended to your returned output. While the default functionality outlined above is most recommended, also useful is the ability to pass your own inputs into the function with keyword 'inputs'. Other potentially useful keywords are 'draws', 'betas', 'phis', 'mtx', and 'span', which is the range of normalization per input variable.
 
