@@ -367,6 +367,9 @@ class FoKL:
                                         phi[n,m,di] = phi[n,m,di]*(2*phis[num][2][phind_md] + 6*phis[num][3][phind_md]*X[n,md])/math.pow(span_L,2)
                                     if ReturnBasis:  # mostly for development
                                         basis[n] = phis[num][0][phind_md] + phis[num][1][phind_md] * X[n,md] + phis[num][2][phind_md] * math.pow(X[n,md],2) + phis[num][3][phind_md] * math.pow(X[n,md],3)
+                                elif derv_nm[md]:  # for terms that do not contain the variable being differentiated by
+                                    phi[n,m,di] = 0
+                                    break
 
                             dState[:,n,m,di] = dState[:,n,m,di] + betas[-draws:,b+1]*phi[n,m,di] # update after md loop
 
