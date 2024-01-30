@@ -506,7 +506,7 @@ class FoKL:
         normputs = np.asarray(normputs)
 
         # # ================================================================
-        # # Outdated as of v3.0.4 because of new 'inputs_to_phind' function:
+        # # Outdated as of v3.1.0 because of new 'inputs_to_phind' function:
         #
         # for i in range(n):
         #     phind = []  # Rounded down point of input from 0-499
@@ -535,7 +535,7 @@ class FoKL:
         #
         # # End
         # # ================================================================
-        # v3.0.4 update:
+        # v3.1.0 update:
 
         phind, xsm = self.inputs_to_phind(normputs, phis)
         for i in range(n):
@@ -548,7 +548,7 @@ class FoKL:
                         phi = phi * (phis[nid][0][phind[i, k]] + phis[nid][1][phind[i, k]] * xsm[i, k] + \
                             phis[nid][2][phind[i, k]] * xsm[i, k] ** 2 + phis[nid][3][phind[i, k]] * xsm[i, k] ** 3)
 
-        # End # v3.0.4 update
+        # End # v3.1.0 update
         # ==================================================================
 
                 X[i, j] = phi
@@ -1167,12 +1167,12 @@ class FoKL:
             else:
                 X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
 
-            phind, xsm = self.inputs_to_phind(inputs=inputs, phis=phis)  # v3.0.4 update
+            phind, xsm = self.inputs_to_phind(inputs=inputs, phis=phis)  # v3.1.0 update
 
             for i in range(minp):
 
                 # # =================================================================
-                # # Outdated as of v3.0.4 because results differ from MATLAB results:
+                # # Outdated as of v3.1.0 because results differ from MATLAB results:
                 #
                 # phind = []
                 # for j in range(len(inputs[i])):
@@ -1407,7 +1407,7 @@ class FoKL:
                     #     np.mean(np.abs(np.mean(beters[int(np.ceil(draws/2 +1)):draws, 0]))):
                     if betavs[i, 1] > threshstdb or betavs[i, 1] > threshstda and betavs[i, 0] < threshav * \
                         np.mean(np.abs(np.mean(beters[int(np.ceil(draws/2)):draws, 0]))):  # index to 'beters' \
-                        # adjusted for matlab to python [JPK DEV v3.0.4 20240129]
+                        # adjusted for matlab to python [JPK DEV v3.1.0 20240129]
 
                         killtest = np.append(killset, (betavs[i, 2] - 1))
                         if killtest.size > 1:
