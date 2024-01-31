@@ -12,98 +12,122 @@ import matplotlib.pyplot as plt
 class FoKL:
     def __init__(self, **kwargs):
         """
-            Initialization Inputs (i.e., hyperparameters and their descriptions):
-        
-                - 'phis' is a data structure with the spline coefficients for the basis
-                functions, built with 'spline_coefficient.txt' and 'splineconvert' or
-                'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
-                25 basis functions: enough for most things -- while the latter provides
-                500: definitely enough for anything)
-    
-                - 'relats_in' is a boolean matrix indicating which terms should be excluded
-                from the model building; for instance if a certain main effect should be
-                excluded relats will include a row with a 1 in the column for that input
-                and zeros elsewhere; if a certain two way interaction should be excluded
-                there should be a row with ones in those columns and zeros elsewhere.
-                to exclude no terms 'relats = np.array([[0]])'. an example of excluding
-                the first input main effect and its interaction with the third input for
-                a case with three total inputs is: 'relats = np.array([[1,0,0],[1,0,1]])'
-    
-                - 'a' and 'b' are the shape and scale parameters of the ig distribution for
-                the observation error variance of the data. the observation error model is
-                white noise. choose the mode of the ig distribution to match the noise in
-                the output dataset and the mean to broaden it some
-    
-                - 'atau' and 'btau' are the parameters of the ig distribution for the 'tau
-                squared' parameter: the variance of the beta priors is iid normal mean
-                zero with variance equal to sigma squared times tau squared. tau squared
-                must be scaled in the prior such that the product of tau squared and sigma
-                squared scales with the output dataset       
-    
-                - 'tolerance' controls how hard the function builder tries to find a better
-                model once adding terms starts to show diminishing returns. a good
-                default is 3 -- large datasets could benefit from higher values
-    
-                - 'draws' is the total number of draws from the posterior for each tested
-                model
-    
-                - 'gimmie' is a boolean causing the routine to return the most complex
-                model tried instead of the model with the optimum bic
-    
-                - 'way3' is a boolean specifying the calculation of three-way interactions
-            
-                - 'threshav' and 'threshstda' form a threshold for the elimination of terms
-                    - 'threshav' is a threshold for proposing terms for elimination based on
-                    their mean values (larger thresholds lead to more elimination)
-                    - 'threshstda' is a threshold standard deviation -- expressed as a fraction 
-                    relative to the mean
-                    - terms with coefficients that are lower than 'threshav' and higher than
-                    'threshstda' will be proposed for elimination (elimination will happen or not 
-                    based on relative BIC values)
-    
-                - 'threshstdb' is a threshold standard deviation that is independent of the
-                mean value of the coefficient -- all with a standard deviation (fraction 
-                relative to mean) exceeding this value will be proposed for elimination
-    
-                - 'aic' is a boolean specifying the use of the aikaike information
-                criterion
+        Initialization Inputs (i.e., hyperparameters and their descriptions):
 
-            Default Values:
-    
-                - phis       = getKernels.sp500()
-                - relats_in  = []
-                - a          = 4
-                - b          = f(a, data)
-                - atau       = 4
-                - btau       = f(atau, data)
-                - tolerance  = 3
-                - draws      = 1000
-                - gimmie     = False
-                - way3       = False
-                - threshav   = 0.05
-                - threshstda = 0.5
-                - threshstdb = 2
-                - aic        = False
+            - 'phis' is a data structure with the spline coefficients for the basis
+            functions, built with 'spline_coefficient.txt' and 'splineconvert' or
+            'spline_coefficient_500.txt' and 'splineconvert500' (the former provides
+            25 basis functions: enough for most things -- while the latter provides
+            500: definitely enough for anything)
+
+            - 'relats_in' is a boolean matrix indicating which terms should be excluded
+            from the model building; for instance if a certain main effect should be
+            excluded relats will include a row with a 1 in the column for that input
+            and zeros elsewhere; if a certain two way interaction should be excluded
+            there should be a row with ones in those columns and zeros elsewhere.
+            to exclude no terms 'relats = np.array([[0]])'. an example of excluding
+            the first input main effect and its interaction with the third input for
+            a case with three total inputs is: 'relats = np.array([[1,0,0],[1,0,1]])'
+
+            - 'a' and 'b' are the shape and scale parameters of the ig distribution for
+            the observation error variance of the data. the observation error model is
+            white noise. choose the mode of the ig distribution to match the noise in
+            the output dataset and the mean to broaden it some
+
+            - 'atau' and 'btau' are the parameters of the ig distribution for the 'tau
+            squared' parameter: the variance of the beta priors is iid normal mean
+            zero with variance equal to sigma squared times tau squared. tau squared
+            must be scaled in the prior such that the product of tau squared and sigma
+            squared scales with the output dataset
+
+            - 'tolerance' controls how hard the function builder tries to find a better
+            model once adding terms starts to show diminishing returns. a good
+            default is 3 -- large datasets could benefit from higher values
+
+            - 'draws' is the total number of draws from the posterior for each tested
+            model
+
+            - 'gimmie' is a boolean causing the routine to return the most complex
+            model tried instead of the model with the optimum bic
+
+            - 'way3' is a boolean specifying the calculation of three-way interactions
+
+            - 'threshav' and 'threshstda' form a threshold for the elimination of terms
+                - 'threshav' is a threshold for proposing terms for elimination based on
+                their mean values (larger thresholds lead to more elimination)
+                - 'threshstda' is a threshold standard deviation -- expressed as a fraction
+                relative to the mean
+                - terms with coefficients that are lower than 'threshav' and higher than
+                'threshstda' will be proposed for elimination (elimination will happen or not
+                based on relative BIC values)
+
+            - 'threshstdb' is a threshold standard deviation that is independent of the
+            mean value of the coefficient -- all with a standard deviation (fraction
+            relative to mean) exceeding this value will be proposed for elimination
+
+            - 'aic' is a boolean specifying the use of the aikaike information
+            criterion
+
+        Default Values:
+
+            - phis       = getKernels.sp500()
+            - relats_in  = []
+            - a          = 4
+            - b          = f(a, data)
+            - atau       = 4
+            - btau       = f(atau, data)
+            - tolerance  = 3
+            - draws      = 1000
+            - gimmie     = False
+            - way3       = False
+            - threshav   = 0.05
+            - threshstda = 0.5
+            - threshstdb = 2
+            - aic        = False
+
+        Other Optional Inputs:
+
+            - UserWarnings == boolean to output user-warnings to the command terminal == 0 (default)
         """
 
-        # Define default hyperparameters:
-        hypers = {'phis': getKernels.sp500(),'relats_in': [],'a': 4,'b': 'default','atau': 4,'btau': 'default','tolerance': 3,'draws': 1000,'gimmie': False,'way3': False,'threshav': 0.05,'threshstda': 0.5,'threshstdb': 2,'aic': False}
+        # Define default keywords:
+        hypers = {'phis': getKernels.sp500(), 'relats_in': [], 'a': 4, 'b': 'default', 'atau': 4, 'btau': 'default',
+                  'tolerance': 3, 'draws': 1000, 'gimmie': False, 'way3': False, 'threshav': 0.05, 'threshstda': 0.5,
+                  'threshstdb': 2, 'aic': False}
+        other_kwargs = {'UserWarnings': 0}
 
-        # Update hypers based on user-input:
-        kwargs_expected = hypers.keys()
+        # Update keywords based on user-input:
+        kwargs_expected = set(hypers.keys()).union(other_kwargs.keys())
         for kwarg in kwargs.keys():
             if kwarg not in kwargs_expected:
                 raise ValueError(f"Unexpected keyword argument: {kwarg}")
             else:
-                hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
+                if kwarg in other_kwargs.keys():
+                    other_kwargs[kwarg] = kwargs.get(kwarg, other_kwargs.get(kwarg))
+                else:
+                    hypers[kwarg] = kwargs.get(kwarg, hypers.get(kwarg))
+
+        # Define each hyperparameter as an attribute of 'self':
         for hyperKey, hyperValue in hypers.items():
-            setattr(self, hyperKey, hyperValue) # defines each hyper as an attribute of 'self'
-            # locals()[hyperKey] = hyperValue # defines each hyper as a local variable (not needed for init)
+            setattr(self, hyperKey, hyperValue)
+
+        # Turn off/on user-warnings:
+        UserWarnings = other_kwargs.get('UserWarnings')
+        if isinstance(UserWarnings, str):
+            UserWarnings = UserWarnings.lower()
+            if UserWarnings in ['yes', 'y', 'on', 'all', 'true']:
+                UserWarnings = 1
+            elif UserWarnings in ['no', 'n', 'off', 'none', 'n/a', 'false']:
+                UserWarnings = 0
+        if UserWarnings:
+            warnings.filterwarnings("default", category=UserWarning)
+        else:
+            warnings.filterwarnings("ignore", category=UserWarning)
 
 
     def splineconvert500(self,A):
         """
-            Same as splineconvert, but for a larger basis of 500
+        Same as splineconvert, but for a larger basis of 500
         """
 
         coef = np.loadtxt(A)
@@ -120,29 +144,63 @@ class FoKL:
         return phi
 
 
+    def inputs_to_phind(self, inputs, phis):
+        """
+        Twice normalize the inputs to index the spline coefficients.
+
+        Inputs:
+            - inputs == normalized inputs as numpy array (i.e., self.inputs.np)
+            - phis   == spline coefficients
+
+        Output (and appended class attributes):
+            - phind == index to spline coefficients
+            - xsm   ==
+        """
+
+        L_phis = len(phis[0][0])  # = 499, length of coeff. in basis funtions
+        phind = np.array(np.ceil(inputs * L_phis), dtype=int)  # 0-1 normalization to 0-499 normalization
+
+        if phind.ndim == 1:  # if phind.shape == (number,) != (number,1), then add new axis to match indexing format
+            phind = phind[:, np.newaxis]
+
+        set = (phind == 0)  # set = 1 if phind = 0, otherwise set = 0
+        phind = phind + set  # makes sense assuming L_phis > M
+
+        r = 1 / L_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
+        xmin = (phind - 1) * r
+        X = (inputs - xmin) / r  # twice normalized inputs (0-1 first then to size of phis second)
+
+        self.phind = phind - 1  # adjust MATLAB indexing to Python indexing after twice normalization
+        self.xsm = L_phis * inputs - phind
+
+        return self.phind, self.xsm
+
+
     def bss_derivatives(self, **kwargs):
         """
-            For returning gradient of modeled function with respect to each, or specified, input variable.
-            If user overrides default settings, then 1st and 2nd partial derivatives can be returned for any variables.
+        For returning gradient of modeled function with respect to each, or specified, input variable.
+        If user overrides default settings, then 1st and 2nd partial derivatives can be returned for any variables.
 
-            Keyword Inputs:
-                inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM)    == self.inputs_np (default)
-                d1     == index of input variable(s) to use for first partial derivative  == 'all' (default)
-                d2     == index of input variable(s) to use for second partial derivative == 'none' (default)
-                draws  == number of beta terms used                                       == self.draws (default)
-                betas  == draw from the posterior distribution of coefficients            == self.betas (default)
-                phis   == spline coefficients for the basis functions                     == self.phis (default)
-                mtx    == basis function interaction matrix from the best model           == self.mtx (default)
-                span   == list of [min, max]'s of input data used in the normalization    == self.normalize (default)
-                IndividualDraws == boolean for returning derivative(s) at each draw       == 0 (default)
-                ReturnFullArray == boolean for returning NxMx2 array instead of Nx2M      == 0 (default)
+        Keyword Inputs:
+            inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM)    == self.inputs_np (default)
+            d1     == index of input variable(s) to use for first partial derivative  == 'all' (default)
+            d2     == index of input variable(s) to use for second partial derivative == 'none' (default)
+            draws  == number of beta terms used                                       == self.draws (default)
+            betas  == draw from the posterior distribution of coefficients            == self.betas (default)
+            phis   == spline coefficients for the basis functions                     == self.phis (default)
+            mtx    == basis function interaction matrix from the best model           == self.mtx (default)
+            span   == list of [min, max]'s of input data used in the normalization    == self.normalize (default)
+            IndividualDraws == boolean for returning derivative(s) at each draw       == 0 (default)
+            ReturnFullArray == boolean for returning NxMx2 array instead of Nx2M      == 0 (default)
 
-            Return Outputs:
-                dState == derivative of input variables (i.e., states)
+        Return Outputs:
+            dState == derivative of input variables (i.e., states)
         """
 
         # Default keywords:
-        kwargs_all = {'inputs': 'default', 'd1': 'default', 'd2': 'default', 'draws': 'default', 'betas': 'default', 'phis': 'default', 'mtx': 'default', 'span': 'default', 'IndividualDraws': 0, 'ReturnFullArray': 0, 'ReturnBasis': 0}
+        kwargs_all = {'inputs': 'default', 'd1': 'default', 'd2': 'default', 'draws': 'default', 'betas': 'default',
+                      'phis': 'default', 'mtx': 'default', 'span': 'default', 'IndividualDraws': 0,
+                      'ReturnFullArray': 0, 'ReturnBasis': 0}
 
         # Update keywords based on user-input:
         for kwarg in kwargs.keys():
@@ -152,8 +210,6 @@ class FoKL:
                 kwargs_all[kwarg] = kwargs.get(kwarg, kwargs_all.get(kwarg)) # update
 
         # Define local variables from keywords:
-        # for kwarg in kwargs_all.keys():
-            # locals()[kwarg] = kwargs_all.get(kwarg)  # defines each keyword (including defaults) as a local variable
         inputs = kwargs_all.get('inputs')
         d1 = kwargs_all.get('d1')
         d2 = kwargs_all.get('d2')
@@ -211,7 +267,8 @@ class FoKL:
                 span = [span] # make list of list to handle indexing errors for one input variable case, i.e., [0,1]
 
         if np.max(np.max(inputs)) > 1 or np.min(np.min(inputs)) < 0:
-            warnings.warn("Input 'inputs' should be normalized. Auto-normalization is in-development.", category=UserWarning)
+            warnings.warn("Input 'inputs' should be normalized (0-1). Auto-normalization is in-development.",
+                          category=UserWarning)
 
         N = np.shape(inputs)[0]  # number of datapoints (i.e., experiments/timepoints)
         B,M = np.shape(mtx) # B == beta terms in function (not including betas0), M == number of input variables
@@ -219,7 +276,8 @@ class FoKL:
         if B != np.shape(betas)[1]-1: # second axis is beta terms (first is draws)
             betas = np.transpose(betas)
             if B != np.shape(betas)[1]-1:
-                raise ValueError("The shape of 'betas' does not align with the shape of 'mtx'. Transposing did not fix this.")
+                raise ValueError(
+                    "The shape of 'betas' does not align with the shape of 'mtx'. Transposing did not fix this.")
 
         derv = []
         i = 0
@@ -237,7 +295,8 @@ class FoKL:
                 elif di in ['off', 'no', 'n', 'none', 'n/a', 'false']:
                     di = np.zeros(M)
                 else:
-                    raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a string, is limited to 'all' or 'none'.")
+                    raise ValueError(
+                        "Keyword input 'd1' and/or 'd2', if entered as a string, is limited to 'all' or 'none'.")
                 error_di = 0
             elif isinstance(di, list): # e.g., d1 = [0, 0, 1, 0] for M = 4
                 if len(di) == 1: # e.g., d1 = [3] instead of d1 = 3
@@ -245,7 +304,8 @@ class FoKL:
                 elif len(di) == M:
                     error_di = 0
                 else:
-                    raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a list, must be of equal length to the number of input variables.")
+                    raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a list, must be of equal length to "
+                                     "the number of input variables.")
             if isinstance(di, int): # not elif because d1 might have gone list to integer in above elif
                 if di != 0:
                     di_id = di - 1 # input var index to Python index
@@ -255,64 +315,12 @@ class FoKL:
                     di = np.zeros(M)
                 error_di = 0
             if error_di:
-                raise ValueError("Keyword input 'd1' and/or 'd2' is limited to an integer indexing an input variable, or to a list of booleans corresponding to the input variables.")
+                raise ValueError(
+                    "Keyword input 'd1' and/or 'd2' is limited to an integer indexing an input variable, or to a list "
+                    "of booleans corresponding to the input variables.")
             derv.append(di) # --> derv = [d1, d2], after properly formatted
 
-        # ==============================================================================================================
-        # ==============================================================================================================
-        # IN DEVELOPMENT ... jake's initial method of porting twice normalization of inputs (method was to do same as
-        #                    MATLAB then adjust Python indexing after math was done)
-        # ==============================================================================================================
-
-        L_phis = len(phis[0][0]) # = 499, length of first coeff. in first basis funtion of f(x1,x2,...,xM) expansion
-        phind = np.ceil(inputs * L_phis) # 0-1 normalization to 0-499 normalization
-
-        if phind.ndim == 1:  # if phind.shape == (number,) != (number,1), then add new axis to match indexing format
-            phind = phind[:, np.newaxis]
-
-        set = (phind == 0) # set = 1 if phind = 0, otherwise set = 0
-        phind = phind + set # makes sense assuming L_phis > M
-
-        r = 1 / L_phis # interval of when basis function changes (i.e., when next cubic function defines spline)
-        xmin = (phind - 1) * r
-        X = (inputs - xmin) / r # twice normalized inputs (0-1 first then to size of phis second)
-
-        phind = phind - 1  # adjust MATLAB indexing to Python indexing after twice normalization
-
-        # dev1_X = X  # == dev2_X
-        # dev1_phind = phind  # != dev2_phind
-
-        # ==============================================================================================================
-        # ==============================================================================================================
-        # IN DEVELOPMENT ... method of porting twice normalization of inputs based on evaluate function
-
-        # L_phis = len(phis[0][0])  # = 499, length of first coeff. in first basis funtion of f(x1,x2,...,xM) expansion
-        # L_498 = L_phis - 1
-        #
-        # phind = np.zeros_like(inputs)  # Rounded down point of input from 0-499
-        # phind_logic = np.zeros_like(inputs)
-        #
-        # for n in range(N):
-        #     for m in range(M):
-        #         phind[n, m] = math.floor(inputs[n, m] * L_498)
-        #         # 499 changed to 498 for python indexing
-        #
-        #         if phind[n, m] == L_498:
-        #             phind_logic[n, m] = 1
-        #
-        # phind = np.subtract(phind, phind_logic)
-        #
-        # r = 1 / L_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
-        # xmin = phind * r
-        # X = (inputs - xmin) / r # twice normalized inputs (0-1 first then to size of phis second)
-
-        # dev2_X = X
-        # dev2_phind = phind
-
-        # ==============================================================================================================
-        # END OF DEVELOPMENT
-        # ==============================================================================================================
-        # ==============================================================================================================
+        phind, _ = self.inputs_to_phind(inputs, phis)
 
         # Determine if only one or both derivatives should be run through in for loop:
         d1_log = any(derv[0])
@@ -324,7 +332,8 @@ class FoKL:
         elif d2_log:
             d1d2_log = [1]  # index for only second derivative
         else:
-            warnings.warn("Function 'bss_derivatives' was called but no derivatives were requested.", category=UserWarning)
+            warnings.warn("Function 'bss_derivatives' was called but no derivatives were requested.",
+                          category=UserWarning)
             return
 
         span_m = []
@@ -338,7 +347,7 @@ class FoKL:
         phi = np.zeros([N,M,2])
 
         # Cycle through each timepoint, input variable, and perform 'bss_derivatives' like in MATLAB:
-        if ReturnBasis:  # mostly for development to confirm basis function of single input variable for mtx=1 and betas=[0,1]
+        if ReturnBasis:  # mostly for development to confirm basis function for mtx=1 and betas=[0,1]
             basis = np.zeros(N)
         for n in range(N): # loop through experiments (i.e., each timepoint/datapoint)
             for m in range(M): # loop through input variables (i.e., the current one to differentiate wrt if requested)
@@ -358,15 +367,23 @@ class FoKL:
                                     num = int(num - 1) # MATLAB to Python indexing
                                     phind_md = int(phind[n,md]) # make integer for indexing syntax
                                     if derp == 0: # if not wrt x_md
-                                        if not phis_func_if_d0_for_nm[n,md,b]: # if this constant (for n,b,md) was not already calculated
-                                            phis_func_if_d0_for_nm[n,md,b] = phis[num][0][phind_md] + phis[num][1][phind_md]*X[n,md] + phis[num][2][phind_md]*math.pow(X[n,md],2) + phis[num][3][phind_md]*math.pow(X[n,md],3)
+                                        if not phis_func_if_d0_for_nm[n,md,b]: # constant per (n,b,md)
+                                            phis_func_if_d0_for_nm[n,md,b] = phis[num][0][phind_md] + \
+                                                phis[num][1][phind_md]*X[n,md] + \
+                                                phis[num][2][phind_md]*math.pow(X[n,md],2) + \
+                                                phis[num][3][phind_md]*math.pow(X[n,md],3)
                                         phi[n,m,di] = phi[n,m,di] * phis_func_if_d0_for_nm[n,md,b]
                                     elif derp == 1: # if wrt x_md and first derivative
-                                        phi[n,m,di] = phi[n,m,di]*(phis[num][1][phind_md] + 2*phis[num][2][phind_md]*X[n,md] + 3*phis[num][3][phind_md]*math.pow(X[n,md],2))/span_L
+                                        phi[n,m,di] = phi[n,m,di]*(phis[num][1][phind_md] + \
+                                            2*phis[num][2][phind_md]*X[n,md] + \
+                                            3*phis[num][3][phind_md]*math.pow(X[n,md],2))/span_L
                                     elif derp == 2: # if wrt x_md and second derivative
-                                        phi[n,m,di] = phi[n,m,di]*(2*phis[num][2][phind_md] + 6*phis[num][3][phind_md]*X[n,md])/math.pow(span_L,2)
+                                        phi[n,m,di] = phi[n,m,di]*(2*phis[num][2][phind_md] + \
+                                            6*phis[num][3][phind_md]*X[n,md])/math.pow(span_L,2)
                                     if ReturnBasis:  # mostly for development
-                                        basis[n] = phis[num][0][phind_md] + phis[num][1][phind_md] * X[n,md] + phis[num][2][phind_md] * math.pow(X[n,md],2) + phis[num][3][phind_md] * math.pow(X[n,md],3)
+                                        basis[n] = phis[num][0][phind_md] + phis[num][1][phind_md] * X[n,md] + \
+                                            phis[num][2][phind_md] * math.pow(X[n,md],2) + \
+                                            phis[num][3][phind_md] * math.pow(X[n,md],3)
                                 elif derv_nm[md]:  # for terms that do not contain the variable being differentiated by
                                     phi[n,m,di] = 0
                                     break
@@ -392,15 +409,15 @@ class FoKL:
 
     def evaluate(self, inputs, **kwargs):
         """
-            Evaluate the inputs and output the predicted values of corresponding data. Optionally, calculate bounds.
+        Evaluate the inputs and output the predicted values of corresponding data. Optionally, calculate bounds.
 
-            Input:
-                inputs == matrix of independent (or non-linearly dependent) 'x' variables for evaluating f(x1, ..., xM)
+        Input:
+            inputs == matrix of independent (or non-linearly dependent) 'x' variables for evaluating f(x1, ..., xM)
 
-            Keyword Inputs:
-                draws        == number of beta terms used                              == self.draws (default)
-                nform        == logical to automatically normalize and format 'inputs' == 1 (default)
-                ReturnBounds == logical to return confidence bounds as second output   == 0 (default)
+        Keyword Inputs:
+            draws        == number of beta terms used                              == self.draws (default)
+            nform        == logical to automatically normalize and format 'inputs' == 1 (default)
+            ReturnBounds == logical to return confidence bounds as second output   == 0 (default)
         """
 
         # Default keywords:
@@ -487,30 +504,53 @@ class FoKL:
 
         X = np.zeros((n, mbets))
         normputs = np.asarray(normputs)
+
+        # # ================================================================
+        # # Outdated as of v3.1.0 because of new 'inputs_to_phind' function:
+        #
+        # for i in range(n):
+        #     phind = []  # Rounded down point of input from 0-499
+        #     for j in range(len(normputs[i])):
+        #         phind.append(math.floor(normputs[i, j] * 498))
+        #         # 499 changed to 498 for python indexing
+        #
+        #     phind_logic = []
+        #     for k in range(len(phind)):
+        #         if phind[k] == 498:
+        #             phind_logic.append(1)
+        #         else:
+        #             phind_logic.append(0)
+        #
+        #     phind = np.subtract(phind, phind_logic)
+        #
+        #     for j in range(1, mbets):
+        #         phi = 1
+        #         for k in range(mputs):
+        #             num = mtx[j - 1, k]
+        #             if num > 0:
+        #                 xsm = 498 * normputs[i][k] - phind[k]
+        #                 phi = phi * (phis[int(num) - 1][0][phind[k]] + phis[int(num) - 1][1][phind[k]] * xsm +
+        #                              phis[int(num) - 1][2][phind[k]] * xsm ** 2 + phis[int(num) - 1][3][
+        #                                  phind[k]] * xsm ** 3)
+        #
+        # # End
+        # # ================================================================
+        # v3.1.0 update:
+
+        phind, xsm = self.inputs_to_phind(normputs, phis)
         for i in range(n):
-            phind = []  # Rounded down point of input from 0-499
-            for j in range(len(normputs[i])):
-                phind.append(math.floor(normputs[i, j] * 498))
-                # 499 changed to 498 for python indexing
-
-            phind_logic = []
-            for k in range(len(phind)):
-                if phind[k] == 498:
-                    phind_logic.append(1)
-                else:
-                    phind_logic.append(0)
-
-            phind = np.subtract(phind, phind_logic)
-
             for j in range(1, mbets):
                 phi = 1
                 for k in range(mputs):
                     num = mtx[j - 1, k]
                     if num > 0:
-                        xsm = 498 * normputs[i][k] - phind[k]
-                        phi = phi * (phis[int(num) - 1][0][phind[k]] + phis[int(num) - 1][1][phind[k]] * xsm +
-                                     phis[int(num) - 1][2][phind[k]] * xsm ** 2 + phis[int(num) - 1][3][
-                                         phind[k]] * xsm ** 3)
+                        nid = int(num - 1)
+                        phi = phi * (phis[nid][0][phind[i, k]] + phis[nid][1][phind[i, k]] * xsm[i, k] + \
+                            phis[nid][2][phind[i, k]] * xsm[i, k] ** 2 + phis[nid][3][phind[i, k]] * xsm[i, k] ** 3)
+
+        # End # v3.1.0 update
+        # ==================================================================
+
                 X[i, j] = phi
 
         X[:, 0] = np.ones((n,))
@@ -533,38 +573,38 @@ class FoKL:
 
     def coverage3(self, **kwargs):
         """
-            For validation testing of FoKL model.
+        For validation testing of FoKL model.
 
-            Keyword Inputs:
-                inputs == normalized and properly formatted inputs to evaluate              == self.inputs (default)
-                data   == properly formatted data outputs to use for validating predictions == self.data (default)
-                draws  == number of beta terms used                                         == self.draws (default)
+        Keyword Inputs:
+            inputs == normalized and properly formatted inputs to evaluate              == self.inputs (default)
+            data   == properly formatted data outputs to use for validating predictions == self.data (default)
+            draws  == number of beta terms used                                         == self.draws (default)
 
-            Keyword Inputs for Plotting:
-                plot   == binary for generating plot, or 'sorted' for plot of ordered data == 0 (default)
-                bounds == binary for plotting bounds                                       == 0 (default)
-                xaxis  == vector to plot on x-axis                                         == indices (default)
-                labels == binary for adding labels to plot                                 == 1 (default)
-                xlabel == string for x-axis label                                          == 'Index' (default)
-                ylabel == string for y-axis label                                          == 'Data' (default)
-                title  == string for plot title                                            == 'FoKL' (default)
-                legend == binary for adding legend to plot                                 == 0 (default)
+        Keyword Inputs for Plotting:
+            plot   == binary for generating plot, or 'sorted' for plot of ordered data == 0 (default)
+            bounds == binary for plotting bounds                                       == 0 (default)
+            xaxis  == vector to plot on x-axis                                         == indices (default)
+            labels == binary for adding labels to plot                                 == 1 (default)
+            xlabel == string for x-axis label                                          == 'Index' (default)
+            ylabel == string for y-axis label                                          == 'Data' (default)
+            title  == string for plot title                                            == 'FoKL' (default)
+            legend == binary for adding legend to plot                                 == 0 (default)
 
-            Additional Keyword Inputs for Plotting:
-                PlotTypeFoKL      == string for FoKL's color and line type  == 'b' (default)
-                PlotSizeFoKL      == scalar for FoKL's line size            == 2 (default)
-                PlotTypeBounds    == string for Bounds' color and line type == 'k--' (default)
-                PlotSizeBounds    == scalar for Bounds' line size           == 2 (default)
-                PlotTypeData      == string for Data's color and line type  == 'ro' (default)
-                PlotSizeData      == scalar for Data's line size            == 2 (default)
-                LegendLabelFoKL   == string for FoKL's label in legend      == 'FoKL' (default)
-                LegendLabelData   == string for Data's label in legend      == 'Data' (default)
-                LegendLabelBounds == string for Bounds's label in legend    == 'Bounds' (default)
+        Additional Keyword Inputs for Plotting:
+            PlotTypeFoKL      == string for FoKL's color and line type  == 'b' (default)
+            PlotSizeFoKL      == scalar for FoKL's line size            == 2 (default)
+            PlotTypeBounds    == string for Bounds' color and line type == 'k--' (default)
+            PlotSizeBounds    == scalar for Bounds' line size           == 2 (default)
+            PlotTypeData      == string for Data's color and line type  == 'ro' (default)
+            PlotSizeData      == scalar for Data's line size            == 2 (default)
+            LegendLabelFoKL   == string for FoKL's label in legend      == 'FoKL' (default)
+            LegendLabelData   == string for Data's label in legend      == 'Data' (default)
+            LegendLabelBounds == string for Bounds's label in legend    == 'Bounds' (default)
 
-            Return Outputs:
-                meen   == predicted output values for each indexed input
-                rmse   == root mean squared deviation (RMSE) of prediction versus known data
-                bounds == confidence interval for each predicted output value
+        Return Outputs:
+            meen   == predicted output values for each indexed input
+            rmse   == root mean squared deviation (RMSE) of prediction versus known data
+            bounds == confidence interval for each predicted output value
         """
 
         def process_kwargs(kwargs):
@@ -736,56 +776,56 @@ class FoKL:
 
     def fit(self, inputs, data, **kwargs):
         """
-            For fitting model to known inputs and data (i.e., training of model).
+        For fitting model to known inputs and data (i.e., training of model).
 
-            Inputs:
-                inputs == NxM matrix of independent (or non-linearly dependent) 'x' variables for fitting f(x1, ..., xM)
-                data   == Nx1 vector of dependent variable to create model for predicting the value of f(x1, ..., xM)
+        Inputs:
+            inputs == NxM matrix of independent (or non-linearly dependent) 'x' variables for fitting f(x1, ..., xM)
+            data   == Nx1 vector of dependent variable to create model for predicting the value of f(x1, ..., xM)
 
-            Keyword Inputs:
-                train                == percentage (0-1) of N datapoints to use for training  == 1 (default)
-                TrainMethod          == method for splitting test/train set for train < 1     == 'random' (default)
-                CatchOutliers        == logical for removing outliers from inputs and/or data == 0 (default)
-                OutliersMethod       == string defining the method to use for removing outliers (e.g., 'Z-Score)
-                OutliersMethodParams == parameters to modify OutliersMethod (format varies per method)
+        Keyword Inputs:
+            train                == percentage (0-1) of N datapoints to use for training  == 1 (default)
+            TrainMethod          == method for splitting test/train set for train < 1     == 'random' (default)
+            CatchOutliers        == logical for removing outliers from inputs and/or data == 0 (default)
+            OutliersMethod       == string defining the method to use for removing outliers (e.g., 'Z-Score)
+            OutliersMethodParams == parameters to modify OutliersMethod (format varies per method)
 
-            Return Outputs:
-                'betas' are a draw from the posterior distribution of coefficients: matrix, with
-                rows corresponding to draws and columns corresponding to terms in the GP
+        Return Outputs:
+            'betas' are a draw from the posterior distribution of coefficients: matrix, with
+            rows corresponding to draws and columns corresponding to terms in the GP
 
-                'mtx' is the basis function interaction matrix from the
-                best model: matrix, with rows corresponding to terms in the GP (and thus to the
-                columns of 'betas' and columns corresponding to inputs. a given entry in the
-                matrix gives the order of the basis function appearing in a given term in the GP.
-                all basis functions indicated on a given row are multiplied together.
-                a zero indicates no basis function from a given input is present in a given term
+            'mtx' is the basis function interaction matrix from the
+            best model: matrix, with rows corresponding to terms in the GP (and thus to the
+            columns of 'betas' and columns corresponding to inputs. a given entry in the
+            matrix gives the order of the basis function appearing in a given term in the GP.
+            all basis functions indicated on a given row are multiplied together.
+            a zero indicates no basis function from a given input is present in a given term
 
-                'ev' is a vector of BIC values from all of the models
-                evaluated
+            'ev' is a vector of BIC values from all of the models
+            evaluated
 
-            Added Attributes:
-                > 'inputs' and 'data' get automatically formatted, cleaned, reduced to a train set, and stored as:
-                    > model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus
-                                              model.testinputs)
-                    > model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
-                > other useful info related to 'inputs' and 'data' get stored as:
-                    > model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and
-                                                                                   formatted
-                    > model.rawdata        == all data w/ outliers              == user's 'data' but formatted
-                    > model.traininputs    == train set of model.inputs
-                    > model.traindata      == train set of model.data
-                    > model.testinputs     == test set of model.inputs
-                    > model.testdata       == test set of model.data
-                    > model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of
-                                              model.rawinputs
-                    > model.outliers       == indices removed from model.rawinputs and model.rawdata as outliers
-                    > model.trainlog       == indices of model.inputs used for model.traininputs
-                    > model.testlog        == indices of model.data used for model.traindata
-                > to access numpy versions of the above attributes related to 'inputs', use:
-                    > model.inputs_np      == model.inputs as a numpy array of timestamps x input variables
-                    > model.rawinputs_np   == model.rawinputs as a numpy array of timestamps x input variables
-                    > model.traininputs_np == model.traininputs as a numpy array of timestamps x input variables
-                    > model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
+        Added Attributes:
+            > 'inputs' and 'data' get automatically formatted, cleaned, reduced to a train set, and stored as:
+                > model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus
+                                          model.testinputs)
+                > model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
+            > other useful info related to 'inputs' and 'data' get stored as:
+                > model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and
+                                                                               formatted
+                > model.rawdata        == all data w/ outliers              == user's 'data' but formatted
+                > model.traininputs    == train set of model.inputs
+                > model.traindata      == train set of model.data
+                > model.testinputs     == test set of model.inputs
+                > model.testdata       == test set of model.data
+                > model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of
+                                          model.rawinputs
+                > model.outliers       == indices removed from model.rawinputs and model.rawdata as outliers
+                > model.trainlog       == indices of model.inputs used for model.traininputs
+                > model.testlog        == indices of model.data used for model.traindata
+            > to access numpy versions of the above attributes related to 'inputs', use:
+                > model.inputs_np      == model.inputs as a numpy array of timestamps x input variables
+                > model.rawinputs_np   == model.rawinputs as a numpy array of timestamps x input variables
+                > model.traininputs_np == model.traininputs as a numpy array of timestamps x input variables
+                > model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
         """
 
         # Check all keywords and update hypers if re-defined by user:
@@ -830,11 +870,14 @@ class FoKL:
                 else:
                     CatchOutliers = np.squeeze(CatchOutliers)
                     if CatchOutliers.ndim != 1:
-                        raise ValueError("CatchOutliers, if being applied to a user-selected inputs+data combo, must be a logical 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
+                        raise ValueError(
+                            "CatchOutliers, if being applied to a user-selected inputs+data combo, must be a logical "
+                            "1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
                     else:
                         CatchOutliers = CatchOutliers.to_list()  # should return 1D list
             elif not isinstance(CatchOutliers, list):
-                raise ValueError("CatchOutliers must be defined as 'Inputs', 'Data', 'All', or a logical 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
+                raise ValueError("CatchOutliers must be defined as 'Inputs', 'Data', 'All', or a logical 1D list "
+                                 "(e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
         # note at this point CatchOutliers might be 0, 1, [1, 0], [0, 1, 0, 0], etc.
 
         # Automatically handle some data formatting exceptions:
@@ -843,7 +886,8 @@ class FoKL:
             # Convert 'inputs' and 'datas' to numpy if pandas:
             if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
                 inputs = inputs.to_numpy()
-                warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+                warnings.warn(
+                    "'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
             if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
                 data = data.to_numpy()
                 warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
@@ -857,9 +901,10 @@ class FoKL:
                 inputs = inputs[:, np.newaxis]
             N = inputs.shape[0]
             M = inputs.shape[1]
-            if M > N: # if more "input variables" than "datapoints", assume user is using transpose of proper format above
+            if M > N: # if more "input variables" than "datapoints", assume user is using transpose of proper format
                 inputs = inputs.transpose()
-                warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables.", category=UserWarning)
+                warnings.warn(
+                    "'inputs' was transposed. Ignore if more datapoints than input variables.", category=UserWarning)
                 N_old = N
                 N = M # number of datapoints (i.e., timestamps)
                 M = N_old # number of input variables
@@ -870,7 +915,8 @@ class FoKL:
                 if inputs_max[ii] != 1 or inputs_min != 0:
                     if inputs_min == inputs_max[ii]:
                         inputs[:,ii] = np.ones(len(inputs[:,ii]))
-                        warnings.warn("'inputs' contains a column of constants which will not improve the model's fit.", category=UserWarning)
+                        warnings.warn("'inputs' contains a column of constants which will not improve the model's fit."
+                                      , category=UserWarning)
                     else: # normalize
                         inputs[:,ii] = (inputs[:,ii] - inputs_min) / (inputs_max[ii] - inputs_min)
                 inputs_scale.append(np.array([inputs_min, inputs_max[ii]]))  # store for post-processing convenience
@@ -881,7 +927,8 @@ class FoKL:
             data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
             if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
                 data = data[:, np.newaxis]
-                # warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting.",category=UserWarning)
+                warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting."
+                    , category=UserWarning)
             else: # check user provided only one output column/row, then transpose if needed
                 N_data = data.shape[0]
                 M_data = data.shape[1]
@@ -889,7 +936,7 @@ class FoKL:
                     raise ValueError("Error: 'data' must be a vector.")
                 elif M_data != 1 and N_data == 1:
                     data = data.transpose()
-                    # warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
+                    warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
 
             # Store properly formatted data and normalized inputs BEFORE removing outliers and BEFORE splitting train
             rawinputs = inputs
@@ -905,7 +952,9 @@ class FoKL:
             elif CatchOutliers == 0: # i.e., none
                 CatchOutliers = list(np.zeros(M+1)) # [0,0,...,0,0] as a list
             elif len(CatchOutliers) != M+1:
-                raise ValueError(r"CatchOutliers must be defined as 'Inputs', 'Data', 'All', or a logical 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
+                raise ValueError(
+                    "CatchOutliers must be defined as 'Inputs', 'Data', 'All', or a logical 1D list (e.g., "
+                    "'[0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
             def catch_outliers(inputs, data, CatchOutliers, OutliersMethod, OutliersMethodParams):
                 inputs_wo_outliers = inputs
                 data_wo_outliers = data
@@ -939,14 +988,16 @@ class FoKL:
                         outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
 
                     elif OutliersMethod != []:
-                        raise ValueError(r"Keyword argument 'OutliersMethod' is limited to 'Z-Score'. Other methods are in development.")
+                        raise ValueError("Keyword argument 'OutliersMethod' is limited to 'Z-Score'. Other methods are "
+                                         "in development.")
 
                     inputs_data_wo_outliers = inputs_data[~outliers_indices, :]
                     inputs_wo_outliers = inputs_data_wo_outliers[:, :-1]
                     data_wo_outliers = inputs_data_wo_outliers[:, -1]
 
                 return inputs_wo_outliers, data_wo_outliers, outliers_indices
-            inputs, data, outliers_indices = catch_outliers(inputs, data, CatchOutliers, OutliersMethod, OutliersMethodParams)
+            inputs, data, outliers_indices = \
+                catch_outliers(inputs, data, CatchOutliers, OutliersMethod, OutliersMethodParams)
 
             # Spit [inputs,data] into train and test sets (depending on TrainMethod):
             if p_train < 1: # split inputs+data into training and testing sets for validation of model
@@ -986,9 +1037,11 @@ class FoKL:
 
                 function_mapping = {'random': random_train,'other': other_train,'otherN': otherN_train}
                 if p_train_method in function_mapping:
-                    inputs_train, data_train, inputs_test, data_test, train_log, test_log = function_mapping[p_train_method](p_train, inputs, data)
+                    inputs_train, data_train, inputs_test, data_test, train_log, test_log = \
+                        function_mapping[p_train_method](p_train, inputs, data)
                 else:
-                    raise ValueError("Keyword argument 'TrainMethod' is limited to 'random' as of now. Additional methods of splitting are in development.")
+                    raise ValueError("Keyword argument 'TrainMethod' is limited to 'random' as of now. Additional "
+                        "methods of splitting are in development.")
 
             else:
                 inputs_train = inputs
@@ -998,9 +1051,12 @@ class FoKL:
                 train_log = []
                 test_log = []
 
-            return inputs, data, rawinputs, rawdata, inputs_train, data_train, inputs_test, data_test, inputs_scale, outliers_indices, train_log, test_log
+            return inputs, data, rawinputs, rawdata, inputs_train, data_train, inputs_test, data_test, inputs_scale, \
+                   outliers_indices, train_log, test_log
 
-        inputs, data, rawinputs, rawdata, traininputs, traindata, testinputs, testdata, inputs_scale, outliers_indices, train_log, test_log = auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod, OutliersMethodParams)
+        inputs, data, rawinputs, rawdata, traininputs, traindata, testinputs, testdata, inputs_scale, \
+            outliers_indices, train_log, test_log = auto_cleanData(inputs, data, p_train, CatchOutliers,
+                                                                   OutliersMethod, OutliersMethodParams)
 
         def inputslist_to_np(inputslist, do_transpose):
             was_auto_transposed = 0
@@ -1026,8 +1082,8 @@ class FoKL:
         setattr(self, 'testdata', testdata)
         setattr(self, 'normalize', inputs_scale) # [min,max] of each input before normalization
         setattr(self, 'outliers', outliers_indices) # indices removed from raw
-        setattr(self, 'trainlog', train_log) # indices AFTER OUTLIERS WERE REMOVED FROM RAW of datapoints used for training
-        setattr(self, 'testlog', test_log) # indices AFTER OUTLIERS WERE REMOVED FROM RAW of datapoints used for validation test
+        setattr(self, 'trainlog', train_log) # indices used for training AFTER OUTLIERS WERE REMOVED from raw
+        setattr(self, 'testlog', test_log) # indices used for validation testing AFTER OUTLIERS WERE REMOVED from raw
         inputs_np, do_transpose = inputslist_to_np(self.inputs, 'auto')
         setattr(self, 'inputs_np', inputs_np)
         setattr(self, 'rawinputs_np', inputslist_to_np(self.rawinputs, do_transpose)[0])
@@ -1065,14 +1121,13 @@ class FoKL:
             """Python equivalent of MATLAB perms."""
             # from https://stackoverflow.com/questions/38130008/python-equivalent-for-matlabs-perms
             a = np.vstack(list(itertools.permutations(x)))[::-1]
-
             return a
+
         def gibbs(inputs, data, phis, Xin, discmtx, a, b, atau, btau, draws):
             """
-
             'inputs' is the set of normalized inputs -- both parameters and model
             inputs -- with columns corresponding to inputs and rows the different
-            experimental designs
+            experimental designs. (numpy array)
 
             'data' are the experimental results: column vector, with entries
             corresponding to rows of 'inputs'
@@ -1093,8 +1148,7 @@ class FoKL:
 
             'draws' is the total number of draws
             """
-            # building the matrix by calculating the corresponding basis function
-            # outputs for each set of inputs
+            # building the matrix by calculating the corresponding basis function outputs for each set of inputs
             minp, ninp = np.shape(inputs)
             phi_vec = []
             if np.shape(discmtx) == ():  # part of fix for single input model
@@ -1113,21 +1167,29 @@ class FoKL:
             else:
                 X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
 
+            phind, xsm = self.inputs_to_phind(inputs=inputs, phis=phis)  # v3.1.0 update
+
             for i in range(minp):
 
-                phind = []
-                for j in range(len(inputs[i])):
-                    phind.append(math.ceil(inputs[i][j] * 498))
-                    # 499 changed to 498 for python indexing
-
-                phind_logic = []
-                for k in range(len(phind)):
-                    if phind[k] == 0:
-                        phind_logic.append(1)
-                    else:
-                        phind_logic.append(0)
-
-                phind = np.add(phind, phind_logic)
+                # # =================================================================
+                # # Outdated as of v3.1.0 because results differ from MATLAB results:
+                #
+                # phind = []
+                # for j in range(len(inputs[i])):
+                #     phind.append(math.ceil(inputs[i][j] * 498))
+                #     # 499 changed to 498 for python indexing
+                #
+                # phind_logic = []
+                # for k in range(len(phind)):
+                #     if phind[k] == 0:
+                #         phind_logic.append(1)
+                #     else:
+                #         phind_logic.append(0)
+                #
+                # phind = np.add(phind, phind_logic)
+                #
+                # # End
+                # # =================================================================
 
                 for j in range(nxin, mmtx + 1):
                     null, nxin2 = np.shape(X)
@@ -1144,15 +1206,14 @@ class FoKL:
                             num = discmtx[j - 1][k]
 
                         if num != 0:  # enter if loop if num is nonzero
-                            xsm = 498 * inputs[i][k] - phind[k]
-                            phi = phi * (phis[int(num) - 1][0][phind[k]] + phis[int(num) - 1][1][phind[k]] * xsm +
-                                         phis[int(num) - 1][2][phind[k]] * xsm ** 2 + phis[int(num) - 1][3][phind[k]] *
-                                         xsm ** 3)
+                            nid = int(num - 1)
+                            phi = phi * (phis[nid][0][phind[i, k]] + phis[nid][1][phind[i, k]] * xsm[i, k] + \
+                                phis[nid][2][phind[i, k]] * xsm[i, k] ** 2 + phis[nid][3][phind[i, k]] * xsm[i, k] ** 3)
 
                     X[i][j] = phi
 
-            # initialize tausqd at the mode of its prior: the inverse of the mode of
-            # sigma squared, such that the initial variance for the betas is 1
+            # initialize tausqd at the mode of its prior: the inverse of the mode of sigma squared, such that the
+            # initial variance for the betas is 1
             sigsqd = b / (1 + a)
             tausqd = btau / (1 + atau)
 
@@ -1160,8 +1221,10 @@ class FoKL:
 
             Xty = np.transpose(X).dot(data)
 
-            # See the link https://stackoverflow.com/questions/8765310/scipy-linalg-eig-return-complex-eigenvalues-for-covariance-matrix
-            Lamb, Q = eigh(XtX)  # using scipy eigh function to avoid generation of imaginary values due to numerical errors
+            # See the link:
+            #     - "https://stackoverflow.com/questions/8765310/scipy-linalg-eig-return-complex-eigenvalues-for-
+            #        covariance-matrix"
+            Lamb, Q = eigh(XtX)  # using scipy eigh function to avoid imaginary values due to numerical errors
             # Lamb, Q = LA.eig(XtX)
 
             Lamb_inv = np.diag(1 / Lamb)
@@ -1197,11 +1260,8 @@ class FoKL:
                 vecc = mun - np.reshape(betas[k][:], (len(betas[k][:]), 1))
 
 
-                bstar = b + 0.5 * (
-                            betas[k][:].dot(XtX.dot(np.transpose([betas[k][:]]))) - 2 * betas[k][:].dot(Xty) + dtd + betas[
-                                                                                                                         k][
-                                                                                                                     :].dot(
-                        np.transpose([betas[k][:]])) / tausqd)
+                bstar = b + 0.5 * (betas[k][:].dot(XtX.dot(np.transpose([betas[k][:]]))) - 2 * betas[k][:].dot(Xty) + \
+                                   dtd + betas[k][:].dot(np.transpose([betas[k][:]])) / tausqd)
                 # bstar = b + comp1.dot(comp2) + 0.5 * dtd - comp3;
 
                 # Returning a 'not a number' constant if bstar is negative, which would
@@ -1213,12 +1273,12 @@ class FoKL:
 
                 sigs[k] = sigsqd
 
-                btau_star = (1 / (2 * sigsqd)) * (betas[k][:].dot(np.reshape(betas[k][:], (len(betas[k][:]), 1)))) + btau
+                btau_star = (1/(2*sigsqd)) * (betas[k][:].dot(np.reshape(betas[k][:], (len(betas[k][:]), 1)))) + btau
 
                 tausqd = 1 / np.random.gamma(atau_star, 1 / btau_star)
                 taus[k] = tausqd
 
-                # Calculate the evidence
+            # Calculate the evidence
             siglik = np.var(data - np.matmul(X, betahat))
 
             lik = -(n / 2) * np.log(siglik) - (n - 1) / 2
@@ -1237,7 +1297,7 @@ class FoKL:
         evs = np.array([])
 
         # Conversion of Lines 79-100 of emulator_Xin.m
-        if np.logical_not(all([isinstance(index, int) for index in relats_in])):  # checks relats to see if it's an array
+        if np.logical_not(all([isinstance(index, int) for index in relats_in])):  # checks if relats is an array
             if np.any(relats_in):
                 relats = np.zeros((sum(np.logical_not(relats_in)), m))
                 ind = 1
@@ -1320,13 +1380,15 @@ class FoKL:
                     damtx = np.append(damtx, vecs, axis=0)
                 [dam,null] = np.shape(damtx)
 
-                [beters, null, null, null, xers, ev] = gibbs(inputs, data, phis, X, damtx, a, b, atau, btau, draws)
+                [beters, null, null, null, xers, ev] = gibbs(inputs_np, data, phis, X, damtx, a, b, atau, btau, draws)
 
                 if aic:
                     ev = ev + (2 - np.log(n)) * (dam + 1)
 
                 betavs = np.abs(np.mean(beters[int(np.ceil((draws / 2)+1)):draws, (dam - vm + 1):dam+1], axis=0))
-                betavs2 = np.divide(np.std(np.array(beters[int(np.ceil(draws/2)+1):draws, dam-vm+1:dam+1]), axis=0), np.abs(np.mean(beters[int(np.ceil(draws / 2)):draws, dam-vm+1:dam+2], axis=0))) # betavs2 error in std deviation formatting
+                betavs2 = np.divide(np.std(np.array(beters[int(np.ceil(draws/2)+1):draws, dam-vm+1:dam+1]), axis=0), \
+                    np.abs(np.mean(beters[int(np.ceil(draws / 2)):draws, dam-vm+1:dam+2], axis=0)))
+                    # betavs2 error in std deviation formatting
                 betavs3 = np.array(range(dam-vm+2, dam+2))
                 betavs = np.transpose(np.array([betavs,betavs2, betavs3]))
                 if np.shape(betavs)[1] > 0:
@@ -1341,17 +1403,22 @@ class FoKL:
                 for i in range(0, vm):
 
 
-                    if betavs[i, 1] > threshstdb or betavs[i, 1] > threshstda and betavs[i, 0] < threshav * np.mean(np.abs(np.mean(beters[int(np.ceil(draws/2 +1)):draws, 0]))):
+                    # if betavs[i, 1] > threshstdb or betavs[i, 1] > threshstda and betavs[i, 0] < threshav * \
+                    #     np.mean(np.abs(np.mean(beters[int(np.ceil(draws/2 +1)):draws, 0]))):
+                    if betavs[i, 1] > threshstdb or betavs[i, 1] > threshstda and betavs[i, 0] < threshav * \
+                        np.mean(np.abs(np.mean(beters[int(np.ceil(draws/2)):draws, 0]))):  # index to 'beters' \
+                        # adjusted for matlab to python [JPK DEV v3.1.0 20240129]
 
                         killtest = np.append(killset, (betavs[i, 2] - 1))
+                        if killtest.size > 1:
+                            killtest[::-1].sort()  # max to min so damtx_test rows get deleted in order of end to start
                         damtx_test = damtx
-                        count = 1
                         for k in range(0, np.size(killtest)):
-                            damtx_test = np.delete(damtx_test, (int(np.array(killtest[k]))-count), 0)
-                            count = count + 1
+                            damtx_test = np.delete(damtx_test, int(np.array(killtest[k])-1), 0)
                         damtest, null = np.shape(damtx_test)
 
-                        [betertest, null, null, null, Xtest, evtest] = gibbs(inputs, data, phis, X, damtx_test, a, b, atau, btau, draws)
+                        [betertest, null, null, null, Xtest, evtest] = gibbs(inputs_np, data, phis, X, damtx_test, a, b,
+                                                                             atau, btau, draws)
                         if aic:
                             evtest = evtest + (2 - np.log(n))*(damtest+1)
                         if evtest < evmin:
@@ -1359,10 +1426,8 @@ class FoKL:
                             evmin = evtest
                             xers = Xtest
                             beters = betertest
-                count = 1
                 for k in range(0, np.size(killset)):
-                    damtx = np.delete(damtx, (int(np.array(killset[k])) - count), 0)
-                    count = count + 1
+                    damtx = np.delete(damtx, int(np.array(killset[k]) - 1), 0)
 
                 ev = evmin
                 X = xers
@@ -1433,15 +1498,16 @@ class FoKL:
 
     def clear(self, **kwargs):
         """
-            Delete all attributes from the FoKL class except for hyperparameters and any specified by the user.
+        Delete all attributes from the FoKL class except for hyperparameters and any specified by the user.
 
-            Keyword Inputs:
-                Assign any value to a keyword representing the attribute that should be kept.
+        Keyword Inputs:
+            Assign any value to a keyword representing the attribute that should be kept.
 
-                For example, to keep only the hyperparameters, self.inputs_np, and self.normalize, use:
-                > self.clear(inputs_np=1, normalize=1)
+            For example, to keep only the hyperparameters, self.inputs_np, and self.normalize, use:
+            > self.clear(inputs_np=1, normalize=1)
         """
-        attrs_to_keep = ['phis','relats_in','a','b','atau','btau','tolerance','draws','gimmie','way3','threshav','threshstda','threshstdb','aic']
+        attrs_to_keep = ['phis', 'relats_in', 'a', 'b', 'atau', 'btau', 'tolerance', 'draws', 'gimmie', 'way3',
+                         'threshav', 'threshstda', 'threshstdb', 'aic']
         for kwarg in kwargs.keys():
             if isinstance(kwarg, str):
                 attrs_to_keep = attrs_to_keep + [kwarg] # append user-specified attribute to list of what not to delete
@@ -1453,5 +1519,7 @@ class FoKL:
                 try:
                     delattr(self, attr)
                 except:
-                    warnings.warn(f"The requested attribute, {attr}, is not defined and so was ignored when attempting to delete.", category=UserWarning)
+                    warnings.warn(
+                        "The requested attribute, {attr}, is not defined and so was ignored when attempting to delete.",
+                        category=UserWarning)
 
