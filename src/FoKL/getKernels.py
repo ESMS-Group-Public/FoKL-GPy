@@ -4,7 +4,7 @@ import copy
 import matplotlib.pyplot as plt
 import warnings
 from inspect import getsourcefile
-from os.path import abspath
+from os
 import time
 
 
@@ -224,29 +224,26 @@ def sp500(**kwargs):
     Return 'phis', a [500 x 4 x 499] Python tuple of lists, of double-precision basis functions' coefficients.
     '''
 
-    kwargs_upd = {'filename': 'splineCoefficient500_highPrecision_smoothed', 'Smooth': 0, 'Save': 0}
+    kwargs_upd = {'Smooth': 0, 'Save': 0}
     for kwarg in kwargs.keys():
         if kwarg not in kwargs_upd.keys():
             raise ValueError(f"Unexpected keyword argument: {kwarg}")
         else:
             kwargs_upd[kwarg] = kwargs.get(kwarg, kwargs_upd.get(kwarg))
-    filename = kwargs_upd.get('filename')
     Smooth = kwargs_upd.get('Smooth')
     Save = kwargs_upd.get('Save')
     if Save == 1 and Smooth == 0:
-        warnings.warn("The spline coefficients were not save because they were not requested to be smoothed.",category=UserWarning)
+        warnings.warn("The spline coefficients were not save because they were not requested to be smoothed.", 
+                      category=UserWarning)
 
     # Merge filename with path to filename:
-    path_to_py = abspath(getsourcefile(lambda: 0))
-    for i in range(1,len(path_to_py)):
-        if path_to_py[-i] == '\\':
-            path_to_txt = f'{path_to_py[0:-i]}\kernels\{filename}.txt'
-            if Save:
-                save_to_txt = f'{path_to_py[0:-i]}\kernels\{filename}_smoothed{round(time.time())}.txt'
-            break
+    path_to_here = os.path.dirname(os.path.realpath(__file__))
+    path_to_kernel = os.path.join(path_to_here, 'kernels', 'splineCoefficient500_highPrecision_smoothed.txt')
+    if Save:
+        path_to_save = os.path.join(path_to_here, 'kernels', f'smoothed{round(time.time())}.txt')
 
     # Read double-precision values from file to [249500 x 4] numpy array:
-    phis_raw = np.loadtxt(path_to_txt, delimiter=',', dtype=np.double)
+    phis_raw = np.loadtxt(path_to_kernel, delimiter=',', dtype=np.double)
 
     # Process [249500 x 4] numpy array to [500 x 4 x 499] list (with outer layer as tuple to match FoKL v2):
     phis = []
@@ -266,7 +263,7 @@ def sp500(**kwargs):
             for i in range(1,500):
                 phis_out_i = np.transpose(np.array([phis[i][0],phis[i][1],phis[i][2],phis[i][3]]))
                 phis_out = np.concatenate((phis_out,phis_out_i))
-            np.savetxt(save_to_txt, phis_out, delimiter=',')
+            np.savetxt(path_to_save, phis_out, delimiter=',')
 
     return phis
 
