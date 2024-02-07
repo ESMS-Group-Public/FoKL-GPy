@@ -220,9 +220,9 @@ def smooth_coefficients(phis):
 
 
 def sp500(**kwargs):
-    '''
+    """
     Return 'phis', a [500 x 4 x 499] Python tuple of lists, of double-precision basis functions' coefficients.
-    '''
+    """
 
     kwargs_upd = {'Smooth': 0, 'Save': 0}
     for kwarg in kwargs.keys():
@@ -233,7 +233,7 @@ def sp500(**kwargs):
     Smooth = kwargs_upd.get('Smooth')
     Save = kwargs_upd.get('Save')
     if Save == 1 and Smooth == 0:
-        warnings.warn("The spline coefficients were not save because they were not requested to be smoothed.", 
+        warnings.warn("The spline coefficients were not save because they were not requested to be smoothed.",
                       category=UserWarning)
 
     # Merge filename with path to filename:
