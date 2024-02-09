@@ -3,15 +3,14 @@ import numpy as np
 import copy
 import matplotlib.pyplot as plt
 import warnings
-from inspect import getsourcefile
 import os
 import time
 
 
 def smooth_coefficients(phis):
-    '''
+    """
     Smooth the endpoints of spline coefficients by holding nth-order derivative constant.
-    '''
+    """
 
     ReturnPlot = 0  # for development and demonstration of smoothing
 
@@ -218,7 +217,6 @@ def smooth_coefficients(phis):
 
     return phis
 
-
 def sp500(**kwargs):
     """
     Return 'phis', a [500 x 4 x 499] Python tuple of lists, of double-precision basis functions' coefficients.
@@ -266,4 +264,3 @@ def sp500(**kwargs):
             np.savetxt(path_to_save, phis_out, delimiter=',')
 
     return phis
-
