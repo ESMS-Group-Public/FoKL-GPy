@@ -4,7 +4,7 @@ import copy
 import matplotlib.pyplot as plt
 import warnings
 from inspect import getsourcefile
-from os
+import os
 import time
 
 
