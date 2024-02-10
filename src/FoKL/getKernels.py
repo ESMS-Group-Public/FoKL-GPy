@@ -217,6 +217,7 @@ def smooth_coefficients(phis):
 
     return phis
 
+
 def sp500(**kwargs):
     """
     Return 'phis', a [500 x 4 x 499] Python tuple of lists, of double-precision basis functions' coefficients.
@@ -262,5 +263,30 @@ def sp500(**kwargs):
                 phis_out_i = np.transpose(np.array([phis[i][0],phis[i][1],phis[i][2],phis[i][3]]))
                 phis_out = np.concatenate((phis_out,phis_out_i))
             np.savetxt(path_to_save, phis_out, delimiter=',')
+
+    return phis
+
+
+def bernoulli():
+    """Return coefficients for Bernoulli polynomials."""
+
+    # Load Bernoulli numbers (generated in MATLAB using 'bernoulli()'):
+    path_to_here = os.path.dirname(os.path.realpath(__file__))
+    path_to_kernel = os.path.join(path_to_here, 'kernels', 'bernoulliNumbers258.txt')
+
+    b = np.loadtxt(path_to_kernel, delimiter=',', dtype=np.double)
+    l = len(b)  # number of basis functions (note 'bernoulli(260)' returned '-Inf' in MATLAB)
+
+    # Generate [n choose k] terms (i.e., Pascal's triangle):
+    nk = [[1], [1, 1]]
+    nm1 = 1
+    for n in range(2, l):
+        nk.append([1] + list(nk[nm1][k] + nk[nm1][k - 1] for k in range(1, n)) + [1])
+        nm1 = n
+
+    # Calculate coefficients for Bernoulli polynomials:
+    phis = []
+    for n in range(1, l):  # ignore constant 0th Bernoulli polynomial (i.e., Bn = 1) since FoKL uses betas0 term
+        phis.append(list(nk[n][k] * b[n - k] for k in range(n + 1)))  # coefficients of x^k for nth polynomial
 
     return phis
