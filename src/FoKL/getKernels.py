@@ -217,7 +217,6 @@ def smooth_coefficients(phis):
 
     return phis
 
-
 def sp500(**kwargs):
     """
     Return 'phis', a [500 x 4 x 499] Python tuple of lists, of double-precision basis functions' coefficients.
@@ -244,14 +243,14 @@ def sp500(**kwargs):
     # Read double-precision values from file to [249500 x 4] numpy array:
     phis_raw = np.loadtxt(path_to_kernel, delimiter=',', dtype=np.double)
 
-    # Process [249500 x 4] numpy array to [500 x 4 x 499] list (with outer layer as tuple to match FoKL v2):
+    # Process [249500 x 4] numpy array to [500 x 4 x 499]:
     phis = []
-    for id_spline in range(500):
-        id_lo = id_spline*499
-        id_hi = id_lo+499
-        phis_ele = phis_raw[id_lo:id_hi,:]
-        phis.append([phis_ele[:,0].tolist(), phis_ele[:,1].tolist(), phis_ele[:,2].tolist(), phis_ele[:,3].tolist()])
-
+    for i in range(500):
+        a = phis_raw[i * 499:(i + 1) * 499, 0]
+        b = phis_raw[i * 499:(i + 1) * 499, 1]
+        c = phis_raw[i * 499:(i + 1) * 499, 2]
+        d = phis_raw[i * 499:(i + 1) * 499, 3]
+        phis.append([a, b, c, d])
     phis = tuple(phis)
 
     # Smooth and save coefficients to new text file:
@@ -286,7 +285,7 @@ def bernoulli():
 
     # Calculate coefficients for Bernoulli polynomials:
     phis = []
-    for n in range(1, l):  # ignore constant 0th Bernoulli polynomial (i.e., Bn = 1) since FoKL uses betas0 term
+    for n in range(1, l):  # ignore constant 0th Bernoulli polynomial (i.e., Bn = 1) since FoKL_20240212_maybeDifferent uses betas0 term
         phis.append(list(nk[n][k] * b[n - k] for k in range(n + 1)))  # coefficients of x^k for nth polynomial
 
     return phis

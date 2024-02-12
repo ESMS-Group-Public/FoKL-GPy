@@ -1,4 +1,4 @@
-# from FoKL import getKernels
+# from FoKL_20240212_maybeDifferent import getKernels
 import getKernels
 import pandas as pd
 import warnings
@@ -177,7 +177,7 @@ class FoKL:
             else:
                 raise ValueError(f"The user-provided kernel is not supported.")
 
-        # Turn on/off FoKL warnings:
+        # Turn on/off FoKL_20240212_maybeDifferent warnings:
         if current['UserWarnings']:
             warnings.filterwarnings("default", category=UserWarning)
         else:
@@ -187,27 +187,7 @@ class FoKL:
         for key, value in current.items():
             setattr(self, key, value)
 
-
-    def splineconvert500(self,A):
-        """
-        Same as splineconvert, but for a larger basis of 500
-        """
-
-        coef = np.loadtxt(A)
-
-        phi = []
-        for i in range(500):
-            a = coef[i * 499:(i + 1) * 499, 0]
-            b = coef[i * 499:(i + 1) * 499, 1]
-            c = coef[i * 499:(i + 1) * 499, 2]
-            d = coef[i * 499:(i + 1) * 499, 3]
-
-            phi.append([a, b, c, d])
-
-        return phi
-
-
-    def inputs_to_phind(self, inputs, phis, DefineAttributes=False):
+    def inputs_to_phind(self, inputs, phis, DefineAttributes=False, kernel=None):
         """
         Twice normalize the inputs to index the spline coefficients.
 
@@ -223,11 +203,15 @@ class FoKL:
             - inputs_2norm == twice normalized inputs
         """
 
-        if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
+        if kernel is None:
+            kernel = self.kernel
+
+        if kernel == self.kernels[0]:  # == 'Cubic Splines':
             l_phis = len(phis[0][0])  # = 499, length of cubic splines in basis functions
-        else:
-            warnings.warn("Twice normalization of inputs is only required for Cubic Splines", category=UserWarning)
-            return [], inputs
+        elif kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
+            warnings.warn("Twice normalization of inputs is not required for the 'Bernoulli Polynomials' kernel",
+                          category=UserWarning)
+            return inputs, [], []
 
         phind = np.array(np.ceil(inputs * l_phis), dtype=int)  # 0-1 normalization to 0-499 normalization
 
@@ -245,17 +229,11 @@ class FoKL:
         xsm = l_phis * inputs - phind
 
         if DefineAttributes:
+            self.inputs_2norm = X  # twice normalized inputs
             self.phind = phind  # adjust MATLAB indexing to Python indexing after twice normalization
             self.xsm = xsm
-            self.inputs_2norm = X  # twice normalized inputs
 
-        return phind, xsm, X
-
-
-
-
-    # ------------
-    # RTW
+        return X, phind, xsm
 
     def bss_derivatives(self, **kwargs):
         """
@@ -281,7 +259,7 @@ class FoKL:
         Notes:
             - To turn off all the first-derivatives, set d1=False instead of d1=0. 'd1' and 'd2', if set to an integer,
             will return the derivative with respect to the input variable indexed by that integer using Python indexing.
-            In other words, for a two-input FoKL model, setting d1=1 and d2=0 will return the first-derivative with
+            In other words, for a two-input FoKL_20240212_maybeDifferent model, setting d1=1 and d2=0 will return the first-derivative with
             respect to the second input (d1=1) and the second-derivative with respect to the first input (d2=0).
             Alternatively, d1=[False, True] and d2=[True, False] will function the same.
         """
@@ -312,9 +290,6 @@ class FoKL:
         phis = current['phis']
         mtx = current['mtx']
         span = current['span']
-        IndividualDraws = current['IndividualDraws']
-        ReturnFullArray = current['ReturnFullArray']
-        ReturnBasis = current['ReturnBasis']
 
         inputs = np.array(inputs)
         if inputs.ndim == 1:
@@ -408,20 +383,24 @@ class FoKL:
 
         # Initialization before loops:
         if kernel == self.kernels[0]:  # == 'Cubic Splines':
-            phind, _, X = self.inputs_to_phind(inputs, phis)  # phind needed for non-continuous kernel
+            X, phind, _ = self.inputs_to_phind(inputs, phis, kernel=kernel)  # phind needed for non-continuous kernel
             L_phis = len(phis[0][0])  # = 499
-            phis_func_if_d0_for_nm = np.zeros([N, M, B])  # constant term for (n,md,b) that avoids repeat calculations
+        elif kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
+            X = inputs  # twice-normalization not required
+            L_phis = 1  # because continuous
+        basis_nm = np.zeros([N, M, B])  # constant term for (n,md,b) that avoids repeat calculations
         dState = np.zeros([draws, N, M, 2])
         phi = np.zeros([N, M, 2])
 
         # Cycle through each timepoint, input variable, and perform 'bss_derivatives' like in MATLAB:
-        if ReturnBasis:  # mostly for development to confirm basis function for mtx=1 and betas=[0,1]
+        if current['ReturnBasis']:  # mostly for development to confirm basis function for mtx=1 and betas=[0,1]
             basis = np.zeros(N)
         for n in range(N):  # loop through experiments (i.e., each timepoint/datapoint)
             for m in range(M):  # loop through input variables (i.e., to differentiate wrt each one if requested)
                 for di in d1d2_log:  # for first and/or second derivatives (depending on d1d2_log)
                     if derv[di][m]:  # if integrating, then do so once or twice (depending on di) wrt to xm ONLY
                         span_L = span_m[m] / L_phis  # used multiple times in calculations below
+                        span_L = [1, span_L, span_L ** 2]  # such that span_L[derp] = span_L**derp
                         derv_nm = np.zeros(M)
                         derv_nm[m] = di + 1  # if d2 = [1, 1, 1, 1], then for m = 2, derv_nm = [0, 0, 2, 0] like MATLAB
 
@@ -431,267 +410,45 @@ class FoKL:
                             for md in range(M):  # for input variable PER single differentiation, m of d(xm)
                                 num = int(mtx[b, md])
                                 if num:  # if not 0
-                                    derp = derv_nm[md]
+                                    derp = int(derv_nm[md])
                                     num = int(num - 1)  # MATLAB to Python indexing
-                                    phind_md = int(phind[n, md])  # make integer for indexing syntax
-                                    if derp == 0:  # if not wrt x_md
-                                        if not phis_func_if_d0_for_nm[n,md,b]:  # constant per (n,b,md)
-                                            phis_func_if_d0_for_nm[n,md,b] = phis[num][0][phind_md] + \
-                                                phis[num][1][phind_md]*X[n,md] + \
-                                                phis[num][2][phind_md]*math.pow(X[n,md],2) + \
-                                                phis[num][3][phind_md]*math.pow(X[n,md],3)
-                                        phi[n,m,di] = phi[n,m,di] * phis_func_if_d0_for_nm[n,md,b]
-                                    elif derp == 1:  # if wrt x_md and first derivative
-                                        phi[n,m,di] = phi[n,m,di]*(phis[num][1][phind_md] + \
-                                            2*phis[num][2][phind_md]*X[n,md] + \
-                                            3*phis[num][3][phind_md]*math.pow(X[n,md],2))/span_L
-                                    elif derp == 2:  # if wrt x_md and second derivative
-                                        phi[n,m,di] = phi[n,m,di]*(2*phis[num][2][phind_md] + \
-                                            6*phis[num][3][phind_md]*X[n,md])/math.pow(span_L,2)
-                                    if ReturnBasis:  # mostly for development
-                                        basis[n] = phis[num][0][phind_md] + phis[num][1][phind_md] * X[n,md] + \
-                                            phis[num][2][phind_md] * math.pow(X[n,md],2) + \
-                                            phis[num][3][phind_md] * math.pow(X[n,md],3)
+                                    if kernel == self.kernels[0]:  # == 'Cubic Splines':
+                                        phind_md = int(phind[n, md])  # make integer for indexing syntax
+                                        c = list(phis[num][k][phind_md] for k in range(4))
+                                    elif kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
+                                        c = phis[num]
+                                    if derp == 0:  # if not w.r.t. x_md
+                                        if basis_nm[n, md, b] == 0:  # constant per (n,b,md)
+                                            basis_nm[n, md, b] = self.evaluate_basis(c, X[n, md], kernel=kernel)
+                                        phi[n, m, di] *= basis_nm[n, md, b]
+                                    else:  # derp > 0
+                                        phi[n, m, di] *= self.evaluate_basis(c, X[n, md], kernel=kernel, d=derp) \
+                                                         / span_L[derp]
+                                    if current['ReturnBasis']:  # mostly for development
+                                        basis[n] = self.evaluate_basis(c, X[n, md], kernel=kernel)
                                 elif derv_nm[md]:  # for terms that do not contain the variable being differentiated by
-                                    phi[n,m,di] = 0
+                                    phi[n, m, di] = 0
                                     break
 
                             dState[:,n,m,di] = dState[:,n,m,di] + betas[-draws:,b+1]*phi[n,m,di]  # update after md loop
 
         dState = np.transpose(dState, (1, 2, 3, 0))  # move draws dimension so dState has form (N,M,di,draws)
 
-        if not IndividualDraws and draws > 1:  # then average draws
+        if not current['IndividualDraws'] and draws > 1:  # then average draws
             dState = np.mean(dState, axis=3)  # note 3rd axis index (i.e., 4th) automatically removed (i.e., 'squeezed')
             dState = dState[:, :, :, np.newaxis]  # add new axis to avoid error in concatenate below
 
-        if not ReturnFullArray:  # then return only columns with values and stack d1 and d2 next to each other
+        if not current['ReturnFullArray']:  # then return only columns with values and stack d1 and d2 next to each other
             dState = np.concatenate([dState[:, :, 0, :], dState[:, :, 1, :]], axis=1)  # (N,M,2,draws) to (N,2M,draws)
             dState = dState[:, ~np.all(dState == 0, axis=0)]  # remove columns ('N') with all zeros
         dState = np.squeeze(dState)  # remove unnecessary axes
 
-        if ReturnBasis:  # mostly for development
+        if current['ReturnBasis']:  # mostly for development
             return dState, basis
         else:  # standard
             return dState
 
-    def bss_derivatives_BERNOULLI_DEV(self, **kwargs):
-        """
-        For returning gradient of modeled function with respect to each, or specified, input variable.
-        If user overrides default settings, then 1st and 2nd partial derivatives can be returned for any variables.
-
-        Keyword Inputs:
-            inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM)    == self.inputs_np (default)
-            kernel == function to use for differentiation (i.e., cubic or Bernoulli)  == self.kernel (default)
-            d1     == index of input variable(s) to use for first partial derivative  == True (default)
-            d2     == index of input variable(s) to use for second partial derivative == False (default)
-            draws  == number of beta terms used                                       == self.draws (default)
-            betas  == draw from the posterior distribution of coefficients            == self.betas (default)
-            phis   == spline coefficients for the basis functions                     == self.phis (default)
-            mtx    == basis function interaction matrix from the best model           == self.mtx (default)
-            span   == list of [min, max]'s of input data used in the normalization    == self.normalize (default)
-            IndividualDraws == boolean for returning derivative(s) at each draw       == 0 (default)
-            ReturnFullArray == boolean for returning NxMx2 array instead of Nx2M      == 0 (default)
-
-        Return Outputs:
-            dState == derivative of input variables (i.e., states)
-
-        Notes:
-            - To turn off all the first-derivatives, set d1=False instead of d1=0. 'd1' and 'd2', if set to an integer,
-            will return the derivative with respect to the input variable indexed by that integer using Python indexing.
-            In other words, for a two-input FoKL model, setting d1=1 and d2=0 will return the first-derivative with
-            respect to the second input (d1=1) and the second-derivative with respect to the first input (d2=0).
-            Alternatively, d1=[False, True] and d2=[True, False] will function the same.
-        """
-
-        # Process keywords:
-        default = {'inputs': None, 'kernel': self.kernel, 'd1': None, 'd2': None, 'draws': self.draws, 'betas': None,
-                   'phis': None, 'mtx': self.mtx, 'span': self.normalize, 'IndividualDraws': False,
-                   'ReturnFullArray': False, 'ReturnBasis': False}
-        current = process_kwargs(default, kwargs)
-        for boolean in ['IndividualDraws', 'ReturnFullArray', 'ReturnBasis']:
-            current[boolean] = str_to_bool(current[boolean])
-
-        # Load defaults:
-        if current['inputs'] is None:
-            current['inputs'] = self.inputs_np
-        if current['betas'] is None:
-            current['betas'] = self.betas
-        if current['phis'] is None:
-            current['phis'] = self.phis
-
-        # Define local variables from keywords:
-        inputs = current['inputs']
-        kernel = current['kernel']
-        d1 = current['d1']
-        d2 = current['d2']
-        draws = current['draws']
-        betas = current['betas']
-        phis = current['phis']
-        mtx = current['mtx']
-        span = current['span']
-        IndividualDraws = current['IndividualDraws']
-        ReturnFullArray = current['ReturnFullArray']
-        ReturnBasis = current['ReturnBasis']
-
-        inputs = np.array(inputs)
-        if inputs.ndim == 1:
-            inputs = inputs[:, np.newaxis]
-        if isinstance(betas, list):  # then most likely user-input, e.g., [0,1]
-            betas = np.array(betas)
-            if betas.ndim == 1:
-                betas = betas[:, np.newaxis]
-        if isinstance(mtx, int):  # then most likely user-input, e.g., 1
-            mtx = np.array(mtx)
-            mtx = mtx[np.newaxis, np.newaxis]
-        else:
-            mtx = np.array(mtx)
-            if mtx.ndim == 1:
-                mtx = mtx[:, np.newaxis]
-        if len(span) == 2:  # if span=[0,1], span=[[0,1],[0,1]], or span=[array([0,1]),array([0,1])]
-            if not (isinstance(span[0], list) or isinstance(span[0], np.ndarray)):
-                span = [span]  # make list of list to handle indexing errors for one input variable case, i.e., [0,1]
-
-        if np.max(np.max(inputs)) > 1 or np.min(np.min(inputs)) < 0:
-            warnings.warn("Input 'inputs' should be normalized (0-1). Auto-normalization is in-development.",
-                          category=UserWarning)
-
-        N = np.shape(inputs)[0]  # number of datapoints (i.e., experiments/timepoints)
-        B, M = np.shape(mtx) # B == beta terms in function (not including betas0), M == number of input variables
-
-        if B != np.shape(betas)[1]-1: # second axis is beta terms (first is draws)
-            betas = np.transpose(betas)
-            if B != np.shape(betas)[1]-1:
-                raise ValueError(
-                    "The shape of 'betas' does not align with the shape of 'mtx'. Transposing did not fix this.")
-
-        derv = []
-        i = 0
-        for di in [d1, d2]:
-            i = i + 1
-            error_di = True
-            if di is None and i == 1:
-                di = np.ones(M, dtype=bool)  # default is all first derivatives (i.e., gradient)
-                error_di = False
-            elif di is None and i == 2:
-                di = np.zeros(M, dtype=bool)  # default is no second derivatives (i.e., gradient)
-                error_di = False
-            elif isinstance(di, str):
-                if str_to_bool(di):
-                    di = np.ones(M, dtype=bool)
-                else:
-                    di = np.zeros(M, dtype=bool)
-                error_di = False
-            elif isinstance(di, list):  # e.g., d1 = [0, 0, 1, 0] for M = 4
-                if len(di) == 1:  # e.g., d1 = [3] instead of d1 = 3
-                    di = di[0]  # list to integer (note, 'error_di=False' defined later)
-                elif len(di) == M:
-                    di = np.array(di) != 0  # assume non-zero entries are True
-                    error_di = False
-                else:
-                    raise ValueError("Keyword input 'd1' and/or 'd2', if entered as a list, must be of equal length to "
-                                     "the number of input variables.")
-            if isinstance(di, bool):  # not elif because maybe list to int in above elif
-                di = np.ones(M, dtype=bool) * di  # single True/False to row of True/False
-                error_di = False
-            elif isinstance(di, int):
-                di_id = di
-                di = np.zeros(M, dtype=bool)
-                di[di_id] = True
-                error_di = False
-            if error_di:
-                raise ValueError(
-                    "Keyword input 'd1' and/or 'd2' is limited to an integer indexing an input variable, or to a list "
-                    "of booleans corresponding to the input variables.")
-            derv.append(di)  # = [d1, d2], after properly formatted
-
-        # Determine if only one or both derivatives should be run through in for loop:
-        d1_log = any(derv[0])
-        d2_log = any(derv[1])
-        if d1_log and d2_log:
-            d1d2_log = [0, 1]  # index for both first and second derivatives
-        elif d1_log:
-            d1d2_log = [0]  # index for only first derivative
-        elif d2_log:
-            d1d2_log = [1]  # index for only second derivative
-        else:
-            warnings.warn("Function 'bss_derivatives' was called but no derivatives were requested.",
-                          category=UserWarning)
-            return
-
-        span_m = []
-        for m in range(M):
-            span_mi = span[m][1] - span[m][0]  # max minus min, = range of normalization per input variable
-            span_m.append(span_mi)
-
-        # Initialization before loops:
-        if kernel == self.kernels[0]:  # == 'Cubic Splines':
-            phind, _, X = self.inputs_to_phind(inputs, phis)  # phind needed for non-continuous kernel
-            L_phis = len(phis[0][0])  # = 499
-            phis_func_if_d0_for_nm = np.zeros([N, M, B])  # constant term for (n,md,b) that avoids repeat calculations
-        dState = np.zeros([draws, N, M, 2])
-        phi = np.zeros([N, M, 2])
-
-        # Cycle through each timepoint, input variable, and perform 'bss_derivatives' like in MATLAB:
-        if ReturnBasis:  # mostly for development to confirm basis function for mtx=1 and betas=[0,1]
-            basis = np.zeros(N)
-        for n in range(N):  # loop through experiments (i.e., each timepoint/datapoint)
-            for m in range(M):  # loop through input variables (i.e., to differentiate wrt each one if requested)
-                for di in d1d2_log:  # for first and/or second derivatives (depending on d1d2_log)
-                    if derv[di][m]:  # if integrating, then do so once or twice (depending on di) wrt to xm ONLY
-                        span_L = span_m[m] / L_phis  # used multiple times in calculations below
-                        derv_nm = np.zeros(M)
-                        derv_nm[m] = di + 1  # if d2 = [1, 1, 1, 1], then for m = 2, derv_nm = [0, 0, 2, 0] like MATLAB
-
-                        # The following is like the MATLAB function, with indexing for looping through n and m:
-                        for b in range(B):  # loop through betas
-                            phi[n, m, di] = 1  # reset after looping through non-wrt input variables (i.e., md)
-                            for md in range(M):  # for input variable PER single differentiation, m of d(xm)
-                                num = int(mtx[b, md])
-                                if num:  # if not 0
-                                    derp = derv_nm[md]
-                                    num = int(num - 1)  # MATLAB to Python indexing
-                                    phind_md = int(phind[n, md])  # make integer for indexing syntax
-                                    if derp == 0:  # if not wrt x_md
-                                        if not phis_func_if_d0_for_nm[n,md,b]:  # constant per (n,b,md)
-                                            phis_func_if_d0_for_nm[n,md,b] = phis[num][0][phind_md] + \
-                                                phis[num][1][phind_md]*X[n,md] + \
-                                                phis[num][2][phind_md]*math.pow(X[n,md],2) + \
-                                                phis[num][3][phind_md]*math.pow(X[n,md],3)
-                                        phi[n,m,di] = phi[n,m,di] * phis_func_if_d0_for_nm[n,md,b]
-                                    elif derp == 1:  # if wrt x_md and first derivative
-                                        phi[n,m,di] = phi[n,m,di]*(phis[num][1][phind_md] + \
-                                            2*phis[num][2][phind_md]*X[n,md] + \
-                                            3*phis[num][3][phind_md]*math.pow(X[n,md],2))/span_L
-                                    elif derp == 2:  # if wrt x_md and second derivative
-                                        phi[n,m,di] = phi[n,m,di]*(2*phis[num][2][phind_md] + \
-                                            6*phis[num][3][phind_md]*X[n,md])/math.pow(span_L,2)
-                                    if ReturnBasis:  # mostly for development
-                                        basis[n] = phis[num][0][phind_md] + phis[num][1][phind_md] * X[n,md] + \
-                                            phis[num][2][phind_md] * math.pow(X[n,md],2) + \
-                                            phis[num][3][phind_md] * math.pow(X[n,md],3)
-                                elif derv_nm[md]:  # for terms that do not contain the variable being differentiated by
-                                    phi[n,m,di] = 0
-                                    break
-
-                            dState[:,n,m,di] = dState[:,n,m,di] + betas[-draws:,b+1]*phi[n,m,di]  # update after md loop
-
-        dState = np.transpose(dState, (1, 2, 3, 0))  # move draws dimension so dState has form (N,M,di,draws)
-
-        if not IndividualDraws and draws > 1:  # then average draws
-            dState = np.mean(dState, axis=3)  # note 3rd axis index (i.e., 4th) automatically removed (i.e., 'squeezed')
-            dState = dState[:, :, :, np.newaxis]  # add new axis to avoid error in concatenate below
-
-        if not ReturnFullArray:  # then return only columns with values and stack d1 and d2 next to each other
-            dState = np.concatenate([dState[:, :, 0, :], dState[:, :, 1, :]], axis=1)  # (N,M,2,draws) to (N,2M,draws)
-            dState = dState[:, ~np.all(dState == 0, axis=0)]  # remove columns ('N') with all zeros
-        dState = np.squeeze(dState)  # remove unnecessary axes
-
-        if ReturnBasis:  # mostly for development
-            return dState, basis
-        else:  # standard
-            return dState
-
-    def evaluate_basis(self, c, x, kernel=None):
+    def evaluate_basis(self, c, x, kernel=None, d=0):
         """
         Evaluate a basis function at a single point by providing coefficients, x value(s), and (optionally) the kernel.
 
@@ -701,8 +458,9 @@ class FoKL:
 
         Optional Input:
             > kernel == 'Cubic Splines' or 'Bernoulli Polynomials' == self.kernel (default)
+            > d      == integer representing order of derivative   == 0 (default)
 
-        Output (in Python syntax):
+        Output (in Python syntax, for d=0):
             > if kernel == 'Cubic Splines':
                 > basis = c[0] + c[1]*x + c[2]*(x**2) + c[3]*(x**3)
             > if kernel == 'Bernoulli Polynomials':
@@ -715,20 +473,30 @@ class FoKL:
                              f"{self.kernels}.")
 
         if kernel == self.kernels[0]:  # == 'Cubic Splines':
-            basis = c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)
+            if d == 0:  # basis function
+                basis = c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)
+            elif d == 1:  # first derivative
+                basis = c[1] + 2 * c[2] * x + 3 * c[3] * (x ** 2)
+            elif d == 2:  # second derivative
+                basis = 2 * c[2] + 6 * c[3] * x
         elif kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
-            basis = sum(c[k] * (x ** k) for k in range(len(c)))
+            if d == 0:  # basis function
+                basis = c[0] + sum(c[k] * (x ** k) for k in range(1, len(c)))
+            elif d == 1:  # first derivative
+                basis = c[1] + sum(k * c[k] * (x ** (k - 1)) for k in range(2, len(c)))
+            elif d == 2:  # second derivative
+                basis = sum((k - 1) * k * c[k] * (x ** (k - 2)) for k in range(2, len(c)))
 
         return basis
 
     def evaluate(self, inputs, **kwargs):
         """
-        Evaluate the FoKL model for provided inputs and (optionally) calculate bounds. Note 'evaluate_fokl' may be a
+        Evaluate the FoKL_20240212_maybeDifferent model for provided inputs and (optionally) calculate bounds. Note 'evaluate_fokl' may be a
         more accurate name so as not to confuse this function with 'evaluate_basis', but it is unexpected for a user to
         call 'evaluate_basis' so this function is simply named 'evaluate'.
 
         Input:
-            inputs == input variable(s) at which to evaluate the FoKL model
+            inputs == input variable(s) at which to evaluate the FoKL_20240212_maybeDifferent model
 
         Keyword Inputs:
             draws        == number of beta terms used                              == self.draws (default)
@@ -751,12 +519,12 @@ class FoKL:
                 inputs = inputs.to_numpy()
                 warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
 
-            # Normalize 'inputs' and convert to proper format for FoKL:
+            # Normalize 'inputs' and convert to proper format for FoKL_20240212_maybeDifferent:
             inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
             # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
             # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
             inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
-            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
+            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL_20240212_maybeDifferent format
                 inputs = inputs[:, np.newaxis]
             N = inputs.shape[0]
             M = inputs.shape[1]
@@ -771,7 +539,7 @@ class FoKL:
             inputs_max = np.array([minmax[ii][1] for ii in range(len(minmax))])
             inputs = (inputs - inputs_min) / (inputs_max - inputs_min)
 
-            nformputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
+            nformputs = inputs.tolist() # convert to list, which is proper format for FoKL_20240212_maybeDifferent, like:
             # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
 
             return nformputs
@@ -802,7 +570,7 @@ class FoKL:
         normputs = np.asarray(normputs)
 
         if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
-            phind, xsm, _ = self.inputs_to_phind(normputs, phis)
+            _, phind, xsm = self.inputs_to_phind(normputs, phis)
         elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             phind = None
             xsm = normputs
@@ -841,7 +609,7 @@ class FoKL:
 
     def coverage3(self, **kwargs):
         """
-        For validation testing of FoKL model. Default functionality is to evaluate all inputs (i.e., train+test sets).
+        For validation testing of FoKL_20240212_maybeDifferent model. Default functionality is to evaluate all inputs (i.e., train+test sets).
         Returned is the predicted output 'meen', confidence bounds 'bounds', and root mean square error 'rmse'. A plot
         may be returned by calling 'coverage3(plot=1)'; or, for a potentially more meaningful plot in terms of judging
         accuracy, 'coverage3(plot='sorted')' plots the data in increasing value.
@@ -858,15 +626,15 @@ class FoKL:
             labels            == binary for adding labels to plot                                 == True (default)
             xlabel            == string for x-axis label                                          == 'Index' (default)
             ylabel            == string for y-axis label                                          == 'Data' (default)
-            title             == string for plot title                                            == 'FoKL' (default)
+            title             == string for plot title                                            == 'FoKL_20240212_maybeDifferent' (default)
             legend            == binary for adding legend to plot                                 == True (default)
-            LegendLabelFoKL   == string for FoKL's label in legend                                == 'FoKL' (default)
+            LegendLabelFoKL   == string for FoKL_20240212_maybeDifferent's label in legend                                == 'FoKL_20240212_maybeDifferent' (default)
             LegendLabelData   == string for Data's label in legend                                == 'Data' (default)
             LegendLabelBounds == string for Bounds's label in legend                              == 'Bounds' (default)
 
         Optional inputs for detailed plot controls:
-            PlotTypeFoKL   == string for FoKL's color and line type  == 'b' (default)
-            PlotSizeFoKL   == scalar for FoKL's line size            == 2 (default)
+            PlotTypeFoKL   == string for FoKL_20240212_maybeDifferent's color and line type  == 'b' (default)
+            PlotSizeFoKL   == scalar for FoKL_20240212_maybeDifferent's line size            == 2 (default)
             PlotTypeBounds == string for Bounds' color and line type == 'k--' (default)
             PlotSizeBounds == scalar for Bounds' line size           == 2 (default)
             PlotTypeData   == string for Data's color and line type  == 'ro' (default)
@@ -885,7 +653,7 @@ class FoKL:
 
             # For basic plot controls:
             'plot': False, 'bounds': True, 'xaxis': False, 'labels': True, 'xlabel': 'Index', 'ylabel': 'Data',
-            'title': 'FoKL', 'legend': True, 'LegendLabelFoKL': 'FoKL', 'LegendLabelData': 'Data',
+            'title': 'FoKL_20240212_maybeDifferent', 'legend': True, 'LegendLabelFoKL': 'FoKL_20240212_maybeDifferent', 'LegendLabelData': 'Data',
             'LegendLabelBounds': 'Bounds',
 
             # For detailed plot controls:
@@ -1025,7 +793,7 @@ class FoKL:
 
     def clean(self, inputs, data, kwargs_from_fit=None, **kwargs):
         """
-        For cleaning and formatting inputs and data prior to training a FoKL model.
+        For cleaning and formatting inputs and data prior to training a FoKL_20240212_maybeDifferent model.
 
         Inputs:
             inputs == NxM matrix of independent (or non-linearly dependent) 'x' variables for fitting f(x1, ..., xM)
@@ -1116,12 +884,12 @@ class FoKL:
                 data = data.to_numpy()
                 warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
 
-            # Normalize 'inputs' and convert to proper format for FoKL:
+            # Normalize 'inputs' and convert to proper format for FoKL_20240212_maybeDifferent:
             inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
             # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
             # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
             inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
-            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
+            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL_20240212_maybeDifferent format
                 inputs = inputs[:, np.newaxis]
             N = inputs.shape[0]
             M = inputs.shape[1]
@@ -1144,14 +912,14 @@ class FoKL:
                     else: # normalize
                         inputs[:,ii] = (inputs[:,ii] - inputs_min) / (inputs_max[ii] - inputs_min)
                 inputs_scale.append(np.array([inputs_min, inputs_max[ii]]))  # store for post-processing convenience
-            inputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
+            inputs = inputs.tolist() # convert to list, which is proper format for FoKL_20240212_maybeDifferent, like:
             # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
 
             # Transpose 'data' if needed:
             data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
-            if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
+            if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL_20240212_maybeDifferent format
                 data = data[:, np.newaxis]
-                warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting."
+                warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL_20240212_maybeDifferent formatting."
                     , category=UserWarning)
             else: # check user provided only one output column/row, then transpose if needed
                 N_data = data.shape[0]
@@ -1160,7 +928,7 @@ class FoKL:
                     raise ValueError("Error: 'data' must be a vector.")
                 elif M_data != 1 and N_data == 1:
                     data = data.transpose()
-                    warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
+                    warnings.warn("'data' was transposed to match FoKL_20240212_maybeDifferent formatting.",category=UserWarning)
 
             # Store properly formatted data and normalized inputs BEFORE removing outliers and BEFORE splitting train
             rawinputs = inputs
@@ -1341,7 +1109,7 @@ class FoKL:
 
         Keyword Inputs (for fit):
             clean         == boolean to perform automatic cleaning and formatting               == True (default)
-            ConsoleOutput == boolean to print [ind, ev] to console during FoKL model generation == True (default)
+            ConsoleOutput == boolean to print [ind, ev] to console during FoKL_20240212_maybeDifferent model generation == True (default)
 
         Keyword Inputs (for clean):
             train                == percentage (0-1) of N datapoints to use for training  == True (default)
@@ -1438,7 +1206,7 @@ class FoKL:
 
         # Prepare phind and xsm if using cubic splines, else match variable names required for gibbs argument
         if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
-            phind, xsm, _ = self.inputs_to_phind(inputs_np, phis)
+            _, phind, xsm = self.inputs_to_phind(inputs_np, phis)
         elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             phind = None
             xsm = inputs_np
@@ -1452,9 +1220,8 @@ class FoKL:
             'data' are the experimental results: column vector, with entries
             corresponding to rows of 'inputs'
 
-            'phis' are a data structure with the spline coefficients for the basis
-            functions, built with 'BasisSpline.txt' and 'splineloader' or
-            'splineconvert'
+            'phis' are a data structure with the coefficients for the basis
+            functions
 
             'discmtx' is the interaction matrix for the bss-anova function -- rows
             are terms in the function and columns are inputs (cols should line up
@@ -1796,7 +1563,7 @@ class FoKL:
 
     def clear(self, keep=None, clear=None, all=False):
         """
-        Delete all attributes from the FoKL class except for hyperparameters by default, but user may specify otherwise.
+        Delete all attributes from the FoKL_20240212_maybeDifferent class except for hyperparameters by default, but user may specify otherwise.
         If an attribute is listed in both 'clear' and 'keep', then the attribute is cleared.
 
         Optional Inputs:
@@ -1824,6 +1591,6 @@ class FoKL:
         attrs = list(vars(self).keys())  # list of all currently defined attributes
         for attr in attrs:
             if attr not in attrs_to_keep:
-                delattr(self, attr)  # delete attribute from FoKL class if not keeping
+                delattr(self, attr)  # delete attribute from FoKL_20240212_maybeDifferent class if not keeping
 
         return
