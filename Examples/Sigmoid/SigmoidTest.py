@@ -1,4 +1,4 @@
-from FoKL import FoKLRoutines
+from src.FoKL import FoKLRoutines  # DEV PRIOR2PULL
 import numpy as np
 
 
@@ -40,7 +40,7 @@ def main():
 
         # Evaluating and visualizing predicted values of data as a function of all inputs (train set plus test set):
         title = 'FoKL Model Trained on ' + str(train * 100) + '% of Data'
-        meen, bounds, rmse = model.coverage3(plot='bounds',title=title,legend=1)
+        meen, bounds, rmse = model.coverage3(plot=1, title=title, legend=1)
 
         # Store any values from iteration if performing additional post-processing or analysis:
         betas_all.append(betas)
