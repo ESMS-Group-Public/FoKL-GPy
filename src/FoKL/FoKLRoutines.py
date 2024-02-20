@@ -1,5 +1,4 @@
-# from FoKL_20240212_maybeDifferent import getKernels
-import getKernels
+from src.FoKL import getKernels  # PRIOR2PULL
 import pandas as pd
 import warnings
 import itertools
@@ -177,7 +176,7 @@ class FoKL:
             else:
                 raise ValueError(f"The user-provided kernel is not supported.")
 
-        # Turn on/off FoKL_20240212_maybeDifferent warnings:
+        # Turn on/off FoKL warnings:
         if current['UserWarnings']:
             warnings.filterwarnings("default", category=UserWarning)
         else:
@@ -259,7 +258,7 @@ class FoKL:
         Notes:
             - To turn off all the first-derivatives, set d1=False instead of d1=0. 'd1' and 'd2', if set to an integer,
             will return the derivative with respect to the input variable indexed by that integer using Python indexing.
-            In other words, for a two-input FoKL_20240212_maybeDifferent model, setting d1=1 and d2=0 will return the first-derivative with
+            In other words, for a two-input FoKL model, setting d1=1 and d2=0 will return the first-derivative with
             respect to the second input (d1=1) and the second-derivative with respect to the first input (d2=0).
             Alternatively, d1=[False, True] and d2=[True, False] will function the same.
         """
@@ -489,16 +488,59 @@ class FoKL:
 
         return basis
 
-    def evaluate(self, inputs, **kwargs):
+    def auto_nform(self, inputs, lb=None, ub=None):
         """
-        Evaluate the FoKL_20240212_maybeDifferent model for provided inputs and (optionally) calculate bounds. Note 'evaluate_fokl' may be a
+        Automatically normalize and format inputs for use in FoKL methods.
+
+        Optional Inputs:
+            - lb == lower bound (i.e., minimum) of inputs
+            - up == upper bound (i.e., maximum) of inputs
+        """
+
+        # Convert 'inputs' to numpy if pandas:
+        if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
+            inputs = inputs.to_numpy()
+            warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.",
+                          UserWarning)
+
+        # Normalize 'inputs' and convert to proper format:
+        inputs = np.array(inputs)  # attempts to handle lists or any other format (i.e., not pandas)
+        # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
+        # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
+        inputs = np.squeeze(inputs)  # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
+        if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis
+            inputs = inputs[:, np.newaxis]
+        N = inputs.shape[0]
+        M = inputs.shape[1]
+        if M > N:  # if more "input variables" than "datapoints", assume user is using transpose of proper format above
+            inputs = inputs.transpose()
+            warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables.",
+                          category=UserWarning)
+            N_old = N
+            N = M  # number of datapoints (i.e., timestamps)
+            M = N_old  # number of input variables
+        minmax = self.normalize
+        inputs_min = np.array([minmax[ii][0] for ii in range(len(minmax))])
+        inputs_max = np.array([minmax[ii][1] for ii in range(len(minmax))])
+        inputs = (inputs - inputs_min) / (inputs_max - inputs_min)
+
+        nformputs = inputs.tolist()  # convert to list, which is proper format for FoKL, like:
+        # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
+
+        return nformputs
+
+    def evaluate(self, inputs, betas=None, mtx=None, **kwargs):
+        """
+        Evaluate the FoKL model for provided inputs and (optionally) calculate bounds. Note 'evaluate_fokl' may be a
         more accurate name so as not to confuse this function with 'evaluate_basis', but it is unexpected for a user to
         call 'evaluate_basis' so this function is simply named 'evaluate'.
 
         Input:
-            inputs == input variable(s) at which to evaluate the FoKL_20240212_maybeDifferent model
+            inputs == input variable(s) at which to evaluate the FoKL model
 
-        Keyword Inputs:
+        Optional Inputs:
+            betas        == coefficients defining FoKL model                       == self.betas (default)
+            mtx          == interaction matrix defining FoKL model                 == self.mtx (default)
             draws        == number of beta terms used                              == self.draws (default)
             nform        == boolean to automatically normalize and format 'inputs' == False (default)
             ReturnBounds == boolean to return confidence bounds as second output   == False (default)
@@ -511,6 +553,20 @@ class FoKL:
             current[boolean] = str_to_bool(current[boolean])
         draws = current['draws']  # define local variable
 
+        if betas is None:  # default
+            betas = self.betas
+        else:  # user-defined betas may need to be formatted
+            betas = np.array(betas)
+            if betas.ndim == 1:
+                betas = betas[:, np.newaxis]
+        if mtx is None:  # default
+            mtx = self.mtx
+        else:  # user-defined mtx may need to be formatted
+            mtx = np.array(mtx)
+            if mtx.ndim == 1:
+                mtx = mtx[:, np.newaxis]
+        phis = self.phis
+
         # Automatically normalize and format inputs:
         def auto_nform(inputs):
 
@@ -519,12 +575,12 @@ class FoKL:
                 inputs = inputs.to_numpy()
                 warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
 
-            # Normalize 'inputs' and convert to proper format for FoKL_20240212_maybeDifferent:
+            # Normalize 'inputs' and convert to proper format for FoKL:
             inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
             # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
             # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
             inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
-            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL_20240212_maybeDifferent format
+            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
                 inputs = inputs[:, np.newaxis]
             N = inputs.shape[0]
             M = inputs.shape[1]
@@ -539,7 +595,7 @@ class FoKL:
             inputs_max = np.array([minmax[ii][1] for ii in range(len(minmax))])
             inputs = (inputs - inputs_min) / (inputs_max - inputs_min)
 
-            nformputs = inputs.tolist() # convert to list, which is proper format for FoKL_20240212_maybeDifferent, like:
+            nformputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
             # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
 
             return nformputs
@@ -548,10 +604,6 @@ class FoKL:
             normputs = auto_nform(inputs)
         else:  # assume provided inputs are already normalized and formatted
             normputs = inputs
-
-        betas = self.betas
-        mtx = self.mtx
-        phis = self.phis
 
         m, mbets = np.shape(betas)  # Size of betas
         n, mputs = np.shape(normputs)  # Size of normalized inputs
@@ -609,7 +661,7 @@ class FoKL:
 
     def coverage3(self, **kwargs):
         """
-        For validation testing of FoKL_20240212_maybeDifferent model. Default functionality is to evaluate all inputs (i.e., train+test sets).
+        For validation testing of FoKL model. Default functionality is to evaluate all inputs (i.e., train+test sets).
         Returned is the predicted output 'meen', confidence bounds 'bounds', and root mean square error 'rmse'. A plot
         may be returned by calling 'coverage3(plot=1)'; or, for a potentially more meaningful plot in terms of judging
         accuracy, 'coverage3(plot='sorted')' plots the data in increasing value.
@@ -626,15 +678,15 @@ class FoKL:
             labels            == binary for adding labels to plot                                 == True (default)
             xlabel            == string for x-axis label                                          == 'Index' (default)
             ylabel            == string for y-axis label                                          == 'Data' (default)
-            title             == string for plot title                                            == 'FoKL_20240212_maybeDifferent' (default)
+            title             == string for plot title                                            == 'FoKL' (default)
             legend            == binary for adding legend to plot                                 == True (default)
-            LegendLabelFoKL   == string for FoKL_20240212_maybeDifferent's label in legend                                == 'FoKL_20240212_maybeDifferent' (default)
+            LegendLabelFoKL   == string for FoKL's label in legend                                == 'FoKL' (default)
             LegendLabelData   == string for Data's label in legend                                == 'Data' (default)
             LegendLabelBounds == string for Bounds's label in legend                              == 'Bounds' (default)
 
         Optional inputs for detailed plot controls:
-            PlotTypeFoKL   == string for FoKL_20240212_maybeDifferent's color and line type  == 'b' (default)
-            PlotSizeFoKL   == scalar for FoKL_20240212_maybeDifferent's line size            == 2 (default)
+            PlotTypeFoKL   == string for FoKL's color and line type  == 'b' (default)
+            PlotSizeFoKL   == scalar for FoKL's line size            == 2 (default)
             PlotTypeBounds == string for Bounds' color and line type == 'k--' (default)
             PlotSizeBounds == scalar for Bounds' line size           == 2 (default)
             PlotTypeData   == string for Data's color and line type  == 'ro' (default)
@@ -653,7 +705,7 @@ class FoKL:
 
             # For basic plot controls:
             'plot': False, 'bounds': True, 'xaxis': False, 'labels': True, 'xlabel': 'Index', 'ylabel': 'Data',
-            'title': 'FoKL_20240212_maybeDifferent', 'legend': True, 'LegendLabelFoKL': 'FoKL_20240212_maybeDifferent', 'LegendLabelData': 'Data',
+            'title': 'FoKL', 'legend': True, 'LegendLabelFoKL': 'FoKL', 'LegendLabelData': 'Data',
             'LegendLabelBounds': 'Bounds',
 
             # For detailed plot controls:
@@ -791,9 +843,9 @@ class FoKL:
 
         return meen, bounds, rmse
 
-    def clean(self, inputs, data, kwargs_from_fit=None, **kwargs):
+    def clean(self, inputs, data=None, kwargs_from_fit=None, **kwargs):
         """
-        For cleaning and formatting inputs and data prior to training a FoKL_20240212_maybeDifferent model.
+        For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required.
 
         Inputs:
             inputs == NxM matrix of independent (or non-linearly dependent) 'x' variables for fitting f(x1, ..., xM)
@@ -873,23 +925,24 @@ class FoKL:
         # Note at this point CatchOutliers might be 0, 1, [1, 0], [0, 1, 0, 0], etc.
 
         # Automatically handle some data formatting exceptions:
-        def auto_cleanData(inputs, data, p_train, CatchOutliers, OutliersMethod, OutliersMethodParams):
+        def auto_cleanData(inputs, p_train, CatchOutliers, OutliersMethod, OutliersMethodParams, data=data):
 
             # Convert 'inputs' and 'datas' to numpy if pandas:
             if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
                 inputs = inputs.to_numpy()
                 warnings.warn(
                     "'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
-                data = data.to_numpy()
-                warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
+            if data is not None:
+                if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
+                    data = data.to_numpy()
+                    warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
 
-            # Normalize 'inputs' and convert to proper format for FoKL_20240212_maybeDifferent:
+            # Normalize 'inputs' and convert to proper format for FoKL:
             inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
             # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
             # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
             inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
-            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL_20240212_maybeDifferent format
+            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
                 inputs = inputs[:, np.newaxis]
             N = inputs.shape[0]
             M = inputs.shape[1]
@@ -912,23 +965,24 @@ class FoKL:
                     else: # normalize
                         inputs[:,ii] = (inputs[:,ii] - inputs_min) / (inputs_max[ii] - inputs_min)
                 inputs_scale.append(np.array([inputs_min, inputs_max[ii]]))  # store for post-processing convenience
-            inputs = inputs.tolist() # convert to list, which is proper format for FoKL_20240212_maybeDifferent, like:
+            inputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
             # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
 
-            # Transpose 'data' if needed:
-            data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
-            if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL_20240212_maybeDifferent format
-                data = data[:, np.newaxis]
-                warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL_20240212_maybeDifferent formatting."
-                    , category=UserWarning)
-            else: # check user provided only one output column/row, then transpose if needed
-                N_data = data.shape[0]
-                M_data = data.shape[1]
-                if (M_data != 1 and N_data != 1) or (M_data == 1 and N_data == 1):
-                    raise ValueError("Error: 'data' must be a vector.")
-                elif M_data != 1 and N_data == 1:
-                    data = data.transpose()
-                    warnings.warn("'data' was transposed to match FoKL_20240212_maybeDifferent formatting.",category=UserWarning)
+            if data is not None:
+                # Transpose 'data' if needed:
+                data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
+                if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
+                    data = data[:, np.newaxis]
+                    warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting."
+                        , category=UserWarning)
+                else: # check user provided only one output column/row, then transpose if needed
+                    N_data = data.shape[0]
+                    M_data = data.shape[1]
+                    if (M_data != 1 and N_data != 1) or (M_data == 1 and N_data == 1):
+                        raise ValueError("Error: 'data' must be a vector.")
+                    elif M_data != 1 and N_data == 1:
+                        data = data.transpose()
+                        warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
 
             # Store properly formatted data and normalized inputs BEFORE removing outliers and BEFORE splitting train
             rawinputs = inputs
@@ -990,7 +1044,7 @@ class FoKL:
 
                 return inputs_wo_outliers, data_wo_outliers, outliers_indices
 
-            if OutliersMethod is not None:
+            if OutliersMethod is not None and data is not None:
                 inputs, data, outliers_indices = catch_outliers(inputs, data, CatchOutliers, OutliersMethod,
                                                                 OutliersMethodParams)
             else:
@@ -998,8 +1052,8 @@ class FoKL:
 
             # Spit [inputs,data] into train and test sets (depending on TrainMethod):
             if p_train < 1: # split inputs+data into training and testing sets for validation of model
-                def random_train(p_train, inputs, data): # random split, if TrainMethod = 'random'
-                    Ldata = len(data)
+                def random_train(p_train, inputs, data=data): # random split, if TrainMethod = 'random'
+                    Ldata = inputs.shape[0]
                     l_log = int(Ldata * p_train)  # required length of indices for training
                     train_log_i = np.array([])  # random indices used for training data
                     while len(train_log_i) < l_log:
@@ -1014,9 +1068,13 @@ class FoKL:
                     test_log = ~train_log
 
                     inputs_train = [inputs[ii] for ii, ele in enumerate(train_log) if ele]
-                    data_train = data[train_log]
                     inputs_test = [inputs[ii] for ii, ele in enumerate(test_log) if ele]
-                    data_test = data[test_log]
+                    if data is not None:
+                        data_train = data[train_log]
+                        data_test = data[test_log]
+                    else:
+                        data_train = None
+                        data_test = None
 
                     return inputs_train, data_train, inputs_test, data_test, train_log, test_log
 
@@ -1045,7 +1103,7 @@ class FoKL:
                 function_mapping = {'random': random_train,'other': other_train,'otherN': otherN_train}
                 if p_train_method in function_mapping:
                     inputs_train, data_train, inputs_test, data_test, train_log, test_log = \
-                        function_mapping[p_train_method](p_train, inputs, data)
+                        function_mapping[p_train_method](p_train, inputs, data=data)
                 else:
                     raise ValueError("Keyword argument 'TrainMethod' is limited to 'random' as of now. Additional "
                         "methods of splitting are in development.")
@@ -1062,8 +1120,8 @@ class FoKL:
                    outliers_indices, train_log, test_log
 
         inputs, data, rawinputs, rawdata, traininputs, traindata, testinputs, testdata, inputs_scale, \
-            outliers_indices, train_log, test_log = auto_cleanData(inputs, data, p_train, CatchOutliers,
-                                                                   OutliersMethod, OutliersMethodParams)
+            outliers_indices, train_log, test_log = auto_cleanData(inputs, p_train, CatchOutliers, OutliersMethod,
+                                                                   OutliersMethodParams, data=data)
 
         def inputslist_to_np(inputslist, do_transpose):
             was_auto_transposed = 0
@@ -1109,7 +1167,7 @@ class FoKL:
 
         Keyword Inputs (for fit):
             clean         == boolean to perform automatic cleaning and formatting               == True (default)
-            ConsoleOutput == boolean to print [ind, ev] to console during FoKL_20240212_maybeDifferent model generation == True (default)
+            ConsoleOutput == boolean to print [ind, ev] to console during FoKL model generation == True (default)
 
         Keyword Inputs (for clean):
             train                == percentage (0-1) of N datapoints to use for training  == True (default)
@@ -1563,7 +1621,7 @@ class FoKL:
 
     def clear(self, keep=None, clear=None, all=False):
         """
-        Delete all attributes from the FoKL_20240212_maybeDifferent class except for hyperparameters by default, but user may specify otherwise.
+        Delete all attributes from the FoKL class except for hyperparameters by default, but user may specify otherwise.
         If an attribute is listed in both 'clear' and 'keep', then the attribute is cleared.
 
         Optional Inputs:
@@ -1591,6 +1649,6 @@ class FoKL:
         attrs = list(vars(self).keys())  # list of all currently defined attributes
         for attr in attrs:
             if attr not in attrs_to_keep:
-                delattr(self, attr)  # delete attribute from FoKL_20240212_maybeDifferent class if not keeping
+                delattr(self, attr)  # delete attribute from FoKL class if not keeping
 
         return
