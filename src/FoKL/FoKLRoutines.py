@@ -7,7 +7,30 @@ import numpy as np
 from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
-import copy
+import time
+import os
+import pickle
+
+
+def load(filename, filepath=None):
+    """
+    Load a FoKL class from a file. By default, the 'filepath' is the current working directory that contains the
+    file calling this method. The 'filepath' should be named relative to the directory if not default.
+
+    Enter the returned output from 'self.save()' as the argument here to later reload a model, and leave 'filepath'
+    blank. In this way files can be loaded from any directory.
+    """
+    if filename[-5::] != ".fokl":
+        filename = filename + ".fokl"
+
+    if filepath is not None:
+        filename = os.path.join(filepath, filename)
+
+    file = open(filename, "rb")
+    model = pickle.load(file)
+    file.close()
+
+    return model
 
 
 def str_to_bool(s):
@@ -235,31 +258,22 @@ class FoKL:
         for key, value in current.items():
             setattr(self, key, value)
 
-    def load(self, filename, filepath=None):
-        """
-        [IN DEVELOPMENT, see PyTorch.load]
-
-        Load a FoKL class from a file. By default, the 'filepath' is the current working directory that contains the
-        file calling this method. The 'filepath' should be named relative to the directory if not default.
-        """
-
-        return
-
     def clean(self, inputs, data=None, kwargs_from_fit=None, **kwargs):
         """
-        For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required.
+        For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required but should be
+        entered if available; otherwise, leave blank.
 
         Inputs:
             inputs == NxM matrix of independent (or non-linearly dependent) 'x' variables for fitting f(x1, ..., xM)
             data   == Nx1 vector of dependent variable to create model for predicting the value of f(x1, ..., xM)
 
         Keyword Inputs:
-            kwargs_from_fit      == used internally by fit function (not for user)
             train                == percentage (0-1) of N datapoints to use for training           == 1 (default)
             TrainMethod          == method for splitting test/train set for train < 1              == 'random' (default)
             CatchOutliers        == logical for removing outliers from inputs and/or data          == False (default)
             OutliersMethod       == the method for removing outliers (e.g., 'Z-Score)              == None (default)
             OutliersMethodParams == parameters to modify OutliersMethod (format varies per method) == None (default)
+            kwargs_from_fit      == used internally by fit function (not for user)
 
         Added Attributes:
             > 'inputs' and 'data' get automatically formatted, cleaned, reduced to a train set, and stored as:
@@ -377,6 +391,12 @@ class FoKL:
             if data is not None:
                 # Transpose 'data' if needed:
                 data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
+                data = np.squeeze(data)
+                if data.dtype != np.float:
+                    data = np.array(data, dtype=np.float)
+                    warnings.warn(
+                        "'data' was converted to float64. May require user-confirmation that values did not get"
+                        "corrupted.", category=UserWarning)
                 if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
                     data = data[:, np.newaxis]
                     warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting."
@@ -816,28 +836,28 @@ class FoKL:
 
         return basis
 
-    def evaluate(self, inputs, betas=None, mtx=None, **kwargs):
+    def evaluate(self, inputs=None, betas=None, mtx=None, **kwargs):
         """
         Evaluate the FoKL model for provided inputs and (optionally) calculate bounds. Note 'evaluate_fokl' may be a
         more accurate name so as not to confuse this function with 'evaluate_basis', but it is unexpected for a user to
         call 'evaluate_basis' so this function is simply named 'evaluate'.
 
         Input:
-            inputs == input variable(s) at which to evaluate the FoKL model
+            inputs == input variable(s) at which to evaluate the FoKL model == self.inputs_np (default)
 
         Optional Inputs:
             betas        == coefficients defining FoKL model                       == self.betas (default)
             mtx          == interaction matrix defining FoKL model                 == self.mtx (default)
             normalize    == [min, max] of inputs used for normalization            == self.normalize (default)
             draws        == number of beta terms used                              == self.draws (default)
-            nform        == boolean to automatically normalize and format 'inputs' == False (default)
+            clean        == boolean to automatically normalize and format 'inputs' == False (default)
             ReturnBounds == boolean to return confidence bounds as second output   == False (default)
         """
 
         # Process keywords:
-        default = {'normalize': None, 'draws': self.draws, 'nform': False, 'ReturnBounds': False}
+        default = {'normalize': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False}
         current = process_kwargs(default, kwargs)
-        for boolean in ['nform', 'ReturnBounds']:
+        for boolean in ['clean', 'ReturnBounds']:
             current[boolean] = str_to_bool(current[boolean])
         draws = current['draws']  # define local variable
         if betas is None:  # default
@@ -862,47 +882,25 @@ class FoKL:
         phis = self.phis
 
         # Automatically normalize and format inputs:
-        def auto_nform(inputs, minmax=None):
-
-            # Convert 'inputs' to numpy if pandas:
-            if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
-                inputs = inputs.to_numpy()
-                warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-
-            # Normalize 'inputs' and convert to proper format for FoKL:
-            inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
-            # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
-            # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
-            inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
-            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
-                inputs = inputs[:, np.newaxis]
-            N = inputs.shape[0]
-            M = inputs.shape[1]
-            if M > N: # if more "input variables" than "datapoints", assume user is using transpose of proper format above
-                inputs = inputs.transpose()
-                warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables.", category=UserWarning)
-                N_old = N
-                N = M # number of datapoints (i.e., timestamps)
-                M = N_old # number of input variables
-            if minmax is None:
-                try:
-                    minmax = self.normalize
-                except:
-                    warnings.warn("Call 'clean' method prior to 'evaluate' so that the 'normalize' attribute gets "
-                                  "defined.", category=UserWarning)
-            inputs_min = np.array([minmax[ii][0] for ii in range(len(minmax))])
-            inputs_max = np.array([minmax[ii][1] for ii in range(len(minmax))])
-            inputs = (inputs - inputs_min) / (inputs_max - inputs_min)
-
-            nformputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
-            # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
-
-            return nformputs
-
-        if current['nform']:
-            normputs = auto_nform(inputs, minmax=current['normalize'])
-        else:  # assume provided inputs are already normalized and formatted
-            normputs = inputs
+        if inputs is None:  # default
+            inputs = self.inputs_np
+            if current['clean']:
+                warnings.warn("Cleaning was already performed on default 'inputs', so overriding 'clean' to False.",
+                              category=UserWarning)
+                current['clean'] = False
+        else:  # user-defined 'inputs'
+            if not current['clean']:  # assume provided inputs are already normalized and formatted, but check
+                normputs = inputs
+                if not isinstance(normputs, np.ndarray):
+                    warnings.warn("Provided inputs were converted to numpy array as float64. May want to manually "
+                                  "check that values were preserved.", category=UserWarning)
+                    normputs = np.array(normputs, dtype=np.float)
+                if np.max(normputs) > 1 or np.min(normputs) < 0:
+                    warnings.warn("Provided inputs were not normalized, so overriding 'clean' to True.")
+                    current['clean'] = True
+        if current['clean']:
+            self.clean(inputs)
+            normputs = self.inputs_np
 
         m, mbets = np.shape(betas)  # Size of betas
         n, mputs = np.shape(normputs)  # Size of normalized inputs
@@ -1210,6 +1208,14 @@ class FoKL:
         # Perform automatic cleaning of 'inputs' and 'data' (unless user already called 'fit' and now specifies not to):
         if default_for_fit['clean']:
             self.clean(inputs, data, kwargs_from_fit=kwargs_to_clean)
+        else:  # user input implies that they already called clean but are fitting again (e.g., to check stochasticity)
+            try:
+                inputs = self.traininputs
+            except:
+                warnings.warn("Keyword 'clean' was set to False but is required when first running fit. Assuming "
+                              "'clean' is True so that attributes (i.e., 'traininputs', etc.) get defined.",
+                              category=UserWarning)
+                self.clean(inputs, data, kwargs_from_fit=kwargs_to_clean)
 
         # Define attributes as local variables:
         inputs = self.traininputs
@@ -1640,10 +1646,36 @@ class FoKL:
 
     def save(self, filename=None, filepath=None):
         """
-        [IN DEVELOPMENT, see PyTorch.save]
+        Save a FoKL class as a file. By default, the 'filename' is 'model_yyyymmddhhmmss.fokl' and is saved to the
+        directory of the Python script calling this method. Use 'filepath' to change the directory saved to.
 
-        Save a FoKL class as a file. By default, the filename is 'fokl_yyyymmddhhmmss.DEV'. The 'filepath' should be
-        named relative to the current working directory that contains the file calling this method.
+        Returned is the path to the file including the name of the file itself. Enter this path as the argument of
+        'FoKLRoutines.load()' to later reload the model.
         """
+        if filename is None:
+            t = time.gmtime()
 
-        return
+            def two_digits(a):
+                if a < 10:
+                    a = "0" + str(a)
+                else:
+                    a = str(a)
+                return a
+            ymd = [str(t[0])]
+            for i in range(1, 6):
+                ymd.append(two_digits(t[i]))
+            t_str = ymd[0] + ymd[1] + ymd[2] + ymd[3] + ymd[4] + ymd[5]
+            filename = "model_" + t_str + ".fokl"
+        elif filename[-5::] != ".fokl":
+            filename = filename + ".fokl"
+
+        if filepath is not None:
+            filename = os.path.join(filepath, filename)
+
+        file = open(filename, "wb")
+        pickle.dump(self, file)
+        file.close()
+
+        time.sleep(1)  # so that next saved model is guaranteed a different filename
+
+        return filename
