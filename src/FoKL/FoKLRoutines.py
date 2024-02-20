@@ -12,21 +12,23 @@ import os
 import pickle
 
 
-def load(filename, filepath=None):
+def load(filename, directory=None):
     """
-    Load a FoKL class from a file. By default, the 'filepath' is the current working directory that contains the
-    file calling this method. The 'filepath' should be named relative to the directory if not default.
+    Load a FoKL class from a file. By default, the 'directory' is the current working directory that contains the
+    file calling this method. The 'directory' may be named relative to the directory if not default.
 
-    Enter the returned output from 'self.save()' as the argument here to later reload a model, and leave 'filepath'
-    blank. In this way files can be loaded from any directory.
+    Enter the returned output from 'self.save()' as the argument here, leaving 'directory' blank, to later reload a
+    model. This is possible because 'filename' can simply be defined as the 'filepath' for 'directory=None'.
     """
     if filename[-5::] != ".fokl":
         filename = filename + ".fokl"
 
-    if filepath is not None:
-        filename = os.path.join(filepath, filename)
+    if directory is not None:
+        filepath = os.path.join(directory, filename)
+    else:
+        filepath = filename
 
-    file = open(filename, "rb")
+    file = open(filepath, "rb")
     model = pickle.load(file)
     file.close()
 
@@ -1604,6 +1606,8 @@ class FoKL:
             betas = beters
             mtx = damtx
 
+        self.betas_avg = np.mean(betas, axis=0)
+
         self.betas = betas
         self.mtx = mtx
         self.evs = evs
@@ -1644,13 +1648,16 @@ class FoKL:
 
         return
 
-    def save(self, filename=None, filepath=None):
+    def save(self, filename=None, directory=None):
         """
         Save a FoKL class as a file. By default, the 'filename' is 'model_yyyymmddhhmmss.fokl' and is saved to the
-        directory of the Python script calling this method. Use 'filepath' to change the directory saved to.
+        directory of the Python script calling this method. Use 'directory' to change the directory saved to, or simply
+        embed the directory manually within 'filename'.
 
-        Returned is the path to the file including the name of the file itself. Enter this path as the argument of
-        'FoKLRoutines.load()' to later reload the model.
+        Returned is the 'filepath'. Enter this as the argument of 'load' to later reload the model. Explicitly, that is
+        'FoKLRoutines.load(filepath)' or 'FoKLRoutines.load(filename, directory)'.
+
+        Note the directory must exist prior to calling this method.
         """
         if filename is None:
             t = time.gmtime()
@@ -1669,13 +1676,15 @@ class FoKL:
         elif filename[-5::] != ".fokl":
             filename = filename + ".fokl"
 
-        if filepath is not None:
-            filename = os.path.join(filepath, filename)
+        if directory is not None:
+            filepath = os.path.join(directory, filename)
+        else:
+            filepath = filename
 
-        file = open(filename, "wb")
+        file = open(filepath, "wb")
         pickle.dump(self, file)
         file.close()
 
         time.sleep(1)  # so that next saved model is guaranteed a different filename
 
-        return filename
+        return filepath
