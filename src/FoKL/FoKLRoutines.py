@@ -260,7 +260,7 @@ class FoKL:
         for key, value in current.items():
             setattr(self, key, value)
 
-    def clean(self, inputs, data=None, kwargs_from_fit=None, **kwargs):
+    def clean(self, inputs, data=None, kwargs_from_other=None, **kwargs):
         """
         For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required but should be
         entered if available; otherwise, leave blank.
@@ -275,7 +275,7 @@ class FoKL:
             CatchOutliers        == logical for removing outliers from inputs and/or data          == False (default)
             OutliersMethod       == the method for removing outliers (e.g., 'Z-Score)              == None (default)
             OutliersMethodParams == parameters to modify OutliersMethod (format varies per method) == None (default)
-            kwargs_from_fit      == used internally by fit function (not for user)
+            kwargs_from_other    == used internally by fit or evaluate function (not for user)
 
         Added Attributes:
             > 'inputs' and 'data' get automatically formatted, cleaned, reduced to a train set, and stored as:
@@ -305,8 +305,8 @@ class FoKL:
         """
 
         # Process keywords:
-        if kwargs_from_fit is not None:  # then clean is being called from fit function
-            kwargs = kwargs | kwargs_from_fit  # merge dictionaries (kwargs={} is expected from fit but just in case)
+        if kwargs_from_other is not None:  # then clean is being called from fit or evaluate function
+            kwargs = kwargs | kwargs_from_other  # merge dictionaries (kwargs={} is expected but just in case)
         default = {'train': 1, 'TrainMethod': 'random', 'CatchOutliers': False, 'OutliersMethod': None,
                    'OutliersMethodParams': None}
         current = process_kwargs(default, kwargs)
@@ -387,8 +387,6 @@ class FoKL:
                     else: # normalize
                         inputs[:,ii] = (inputs[:,ii] - inputs_min) / (inputs_max[ii] - inputs_min)
                 inputs_scale.append(np.array([inputs_min, inputs_max[ii]]))  # store for post-processing convenience
-            inputs = inputs.tolist() # convert to list, which is proper format for FoKL, like:
-            # . . . {list: N} = [[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]]
 
             if data is not None:
                 # Transpose 'data' if needed:
@@ -413,7 +411,7 @@ class FoKL:
                         warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
 
             # Store properly formatted data and normalized inputs BEFORE removing outliers and BEFORE splitting train
-            rawinputs = inputs
+            rawinputs = inputs.tolist()  # convert to list, which was proper format for FoKL v2
             rawdata = data
 
             # Catch and remove outliers:
@@ -571,7 +569,7 @@ class FoKL:
         testinputs_np = inputslist_to_np(testinputs, do_transpose)[0]
 
         # Define/update attributes with cleaned data and other relevant variables:
-        attrs = {'inputs': inputs, 'data': data, 'rawinputs': rawinputs, 'traininputs': traininputs,
+        attrs = {'inputs': inputs.tolist(), 'data': data, 'rawinputs': rawinputs, 'traininputs': traininputs,
                  'traindata': traindata, 'testinputs': testinputs, 'testdata': testdata, 'normalize': inputs_scale,
                  'outliers': outliers_indices, 'trainlog': train_log, 'testlog': test_log, 'inputs_np': inputs_np,
                  'rawinputs_np': rawinputs_np, 'traininputs_np': traininputs_np, 'testinputs_np': testinputs_np}
@@ -858,9 +856,15 @@ class FoKL:
 
         # Process keywords:
         default = {'normalize': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False}
-        current = process_kwargs(default, kwargs)
-        for boolean in ['clean', 'ReturnBounds']:
+        default_for_clean = {'train': 1, 'TrainMethod': 'random', 'CatchOutliers': False, 'OutliersMethod': None,
+                             'OutliersMethodParams': None}
+        current = process_kwargs(default | default_for_clean, kwargs)
+        for boolean in ['clean', 'ReturnBounds', 'CatchOutliers']:
             current[boolean] = str_to_bool(current[boolean])
+        kwargs_to_clean = {}
+        for kwarg in default_for_clean.keys():
+            kwargs_to_clean.update({kwarg: current[kwarg]})  # store kwarg for clean here
+            del current[kwarg]  # delete kwarg for clean from current
         draws = current['draws']  # define local variable
         if betas is None:  # default
             betas = self.betas
@@ -901,8 +905,12 @@ class FoKL:
                     warnings.warn("Provided inputs were not normalized, so overriding 'clean' to True.")
                     current['clean'] = True
         if current['clean']:
-            self.clean(inputs)
+            self.clean(inputs, kwargs_from_other=kwargs_to_clean)
             normputs = self.inputs_np
+        elif inputs is None:
+            normputs = self.inputs_np
+        else:
+            normputs = np.array(inputs)
 
         m, mbets = np.shape(betas)  # Size of betas
         n, mputs = np.shape(normputs)  # Size of normalized inputs
@@ -993,8 +1001,8 @@ class FoKL:
 
         Return Outputs:
             meen   == predicted output values for each indexed input
-            rmse   == root mean squared deviation (RMSE) of prediction versus known data
             bounds == confidence interval for each predicted output value
+            rmse   == root mean squared deviation (RMSE) of prediction versus known data
         """
 
         # Process keywords:
@@ -1209,7 +1217,7 @@ class FoKL:
 
         # Perform automatic cleaning of 'inputs' and 'data' (unless user already called 'fit' and now specifies not to):
         if default_for_fit['clean']:
-            self.clean(inputs, data, kwargs_from_fit=kwargs_to_clean)
+            self.clean(inputs, data, kwargs_from_other=kwargs_to_clean)
         else:  # user input implies that they already called clean but are fitting again (e.g., to check stochasticity)
             try:
                 inputs = self.traininputs
@@ -1217,7 +1225,7 @@ class FoKL:
                 warnings.warn("Keyword 'clean' was set to False but is required when first running fit. Assuming "
                               "'clean' is True so that attributes (i.e., 'traininputs', etc.) get defined.",
                               category=UserWarning)
-                self.clean(inputs, data, kwargs_from_fit=kwargs_to_clean)
+                self.clean(inputs, data, kwargs_from_other=kwargs_to_clean)
 
         # Define attributes as local variables:
         inputs = self.traininputs
