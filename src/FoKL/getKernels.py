@@ -217,6 +217,7 @@ def smooth_coefficients(phis):
 
     return phis
 
+
 def sp500(**kwargs):
     """
     Return 'phis', a [500 x 4 x 499] Python tuple of lists, of double-precision basis functions' coefficients.
@@ -266,26 +267,61 @@ def sp500(**kwargs):
     return phis
 
 
-def bernoulli():
-    """Return coefficients for Bernoulli polynomials."""
+def bss_anova(n=500):
+    """Generate BSS-ANOVA kernel (Eq. 8 of https://arxiv.org/pdf/2205.13676v2.pdf) to scale Bernoulli polynomials. Note
+    this function was only required in development but the process is saved here for later reference if needed."""
 
-    # Load Bernoulli numbers (generated in MATLAB using 'bernoulli()'):
+    # Normalized domain and combinations for covariance (i.e., kernel) matrix:
+    x = np.linspace(0, 1, n)  # kernel matrix will be size (n x n) producing n eigenvalues
+    xi, xj = np.meshgrid(x, x)
+
+    # Bernoulli polynomials:
+
+    def b1(x):
+        return x - 0.5
+
+    def b2(x):
+        return x ** 2 - x + 1 / 6
+
+    def b4(x):
+        return x ** 4 - 2 * x ** 3 + x ** 2 - 1 / 30
+
+    # BSS-ANOVA kernel (i.e., covariance/kernel matrix):
+    k = b1(xi) * b1(xj) + b2(xi) * b2(xj) - b4(np.abs(xi - xj)) / 24
+
+    # Eigen-decomposition:
+    eigenvalues, eigenvectors = np.linalg.eigh(k)
+    # eigenvalues_sqrt = np.sqrt(eigenvalues)
+    # eigenvectors_scaled = np.zeros_like(eigenvectors)
+    # for i in range(n):
+    #     eigenvectors_scaled[:, i] = eigenvalues_sqrt[i] * eigenvectors[:, i]
+
+    # # Cubic basis functions (which should be same as sp500 after smoothing):
+    # splines = scipy.interpolate.CubicSpline(x, eigenvectors_scaled)
+
+    # Save root of eigenvalues to use for scaling orthogonal normalized Bernoulli polynomials in MATLAB:
+    np.savetxt("BSS-ANOVA__sqrt-eigvals__K-500x500.txt", np.flip(np.sqrt(eigenvalues)), delimiter=",")
+
+    return
+
+
+def bernoulli(file='BernoulliPolynomials_20_orthonormal_scaled.txt'):
+    """
+    Return coefficients for orthonormal Bernoulli polynomials.
+
+    Orthonormal Bernoulli polynomials were generated in MATLAB following the Gram-Schmidt process with reference to:
+         - https://arxiv.org/pdf/2007.10814.pdf
+         - https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process
+     """
+    # Load coefficients of scaled orthonormal Bernoulli polynomials (generated in MATLAB):
     path_to_here = os.path.dirname(os.path.realpath(__file__))
-    path_to_kernel = os.path.join(path_to_here, 'kernels', 'bernoulliNumbers258.txt')
+    path_to_kernel = os.path.join(path_to_here, 'kernels', file)
+    coeffs = np.loadtxt(path_to_kernel, delimiter=',', dtype=np.double)
 
-    b = np.loadtxt(path_to_kernel, delimiter=',', dtype=np.double)
-    l = len(b)  # number of basis functions (note 'bernoulli(260)' returned '-Inf' in MATLAB)
-
-    # Generate [n choose k] terms (i.e., Pascal's triangle):
-    nk = [[1], [1, 1]]
-    nm1 = 1
-    for n in range(2, l):
-        nk.append([1] + list(nk[nm1][k] + nk[nm1][k - 1] for k in range(1, n)) + [1])
-        nm1 = n
-
-    # Calculate coefficients for Bernoulli polynomials:
+    # Covert 2D numpy matrix to Python tuple of lists of increasing length (i.e., triangular matrix)
     phis = []
-    for n in range(1, l):  # ignore constant 0th Bernoulli polynomial (i.e., Bn = 1) since FoKL_20240212_maybeDifferent uses betas0 term
-        phis.append(list(nk[n][k] * b[n - k] for k in range(n + 1)))  # coefficients of x^k for nth polynomial
+    for n in range(coeffs.shape[0]):
+        phis.append(list(coeffs[n, :(n + 2)]))  # scaled x^k coeff's for orthonormal Bn
 
-    return phis
+    return tuple(phis)
+

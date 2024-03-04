@@ -1,179 +1,216 @@
-# FoKL
-Karhunen Loève decomposed Gaussian processes with forward variable
-selection. Use this package for scalable GP regression and fast
-inference on static and dynamic datasets.
+![FoKL-GPy Logo](https://github.com/ESMS-Group-Public/FoKL-GPy/docs/_static/esms_logo.png)
 
-## Setup
-To install, use 'pip install FoKL' or clone this repo. Once installed, import into your environment with:
+--------------------------------------------------------------------------------
+
+## Contents
+<!-- toc -->
+
+- [About FoKL](#about-fokl)
+- [Getting Started]()
+  - [Installation](#)
+  - [Setup]()
+- [Use Cases]()
+  - [Saving and loading a model]()
+  - [Evaluating a model]()
+  - [Taking partial derivatives of a model]()
+  - [Integration]()
+  - [Training a new model]()
+  - [Training several new models]()
+  - [Sweeping over hyperparameters]()
+  - [Coverting to Pyomo]()
+- [Documentation]()
+  - [FoKLRoutines.load]()
+  - [FoKLRoutines.FoKL]()
+    - [self.clean]()
+    - [self.bss_derivatives]()
+    - [self.evaluate_basis]()
+    - [self.evaluate]()
+    - [self.coverage3]()
+    - [self.fit]()
+    - [self.clear]()
+    - [self.to_pyomo]()
+    - [self.save]()
+  - [GP_integrate]()
+- [Comparisons and Benchmarks]()
+- [Future Development]()
+- [Citations]()
+- [License]()
+
+<!-- tocstop -->
+
+## About FoKL
+
+FoKL-GPy, or FoKL, is a Python package intended for use in machine learning. The name comes from a unique implementation 
+of **Fo**rward variable selection using **K**arhunen-**L**oève decomposed **G**aussian **P**rocesses (GP's) in 
+**Py**thon. 
+
+Advantages of FoKL are:
+- Fast inference on static and dynamic datasets using scalable GP regression
+- Accurate modeling of non-linear dynamics
+- Get model as a symbolic equation
+- Multiple kernels available
+- User-friendliness allows for automatic normalization, test/train splits, etc.
+- Easy adjusting of hyperparameters for sweeping during optimization
+- Ability to save, share, and load models
+- Ability to evaluate a user-proposed model without requiring training data
+
+### Pyomo and Symbolic Models
+
+For applications where it is useful to deal analytically with a model, FoKL may return a model as an algebraic equation 
+through the use of Pyomo. Further, additional Pyomo constraints may be added and a nonlinear optimizer such as IPOPT may
+be used to solve for variables in the FoKL model expression.
+
+## Getting Started
+
+## Installation
+
+FoKL is available through PyPI.
+
+```cmd
+pip install FoKL
+```
+
+Alternatively, the GitHub repository may be cloned to create a local copy in which the examples and documentation will 
+be included.
+
+```cmd
+git clone https://github.com/ESMS-Group-Public/FoKL-GPy
+```
+
+### Setup
+
+Once installed, import the FoKL module into your environment with:
+
 ```
 from FoKL import FoKLRoutines
 ```
-If integrating, then include:
+
+If loading a pre-existing FoKL class object:
+
 ```
-from FoKL import GP_Integrate
+model = FoKLRoutines.load('filename_of_model')
+
+# Or, if your pre-existing model is in a different folder than your Python script:
+model = FoKLRoutines.load('filename_of_model', 'directory_of_model')
 ```
-Now you are ready to begin creating your model, which can be initialized with:
+
+Else if creating a new FoKL class object:
 ```
 model = FoKLRoutines.FoKL()
 ```
-If intending to override the default hyperparameters, then you can include keywords in the model's initialization. For example:
-```
-model = FoKLRoutines.FoKL(btau=1000, draws=2000, way3=1)
-```
-Alternatively, hyperparameters can be redefined or updated with:
-```
-model.btau  = 1000
-model.draws = 2000
-model.way3  = 1
-```
-The above is useful for performing sweeps through hyperparameters without needing to initialize a new model (i.e., a new Python class) for each new combination of hyperparameters.
 
-The default hyperparameters and their keywords are as follows:
-```
-phis       = getKernels.sp500()
-relats_in  = []
-a          = 4
-b          = f(a, data)
-atau       = 4
-btau       = f(atau, data)
-tolerance  = 3
-draws      = 1000
-gimmie     = False
-way3       = False
-threshav   = 0.05
-threshstda = 0.5
-threshstdb = 2
-aic        = False
-```
-A description of each hyperparameter is listed in the function documentation.
+Now you may call methods on the class and reference its attributes! Please see [Use Cases]() for examples.
 
-## Training
-Call the 'fit' function to train the FoKL model on all of 'data':
-```
-betas, mtx, evs = model.fit(inputs, data)
-```
-Optionally, include the keyword 'train' as the percentage of 'data' to use for training (e.g., 80%):
-```
-betas, mtx, evs = model.fit(inputs, data, train=0.8)
-```
-The console will display the index and bic of the model being built in real time. Once completed, the model can be validated with the 'coverage3' function:
-```
-meens, bounds, rmse = model.coverage3()
-```
-By default, 'coverage3' predicts output values for 'model.inputs', which is just the normalized and properly formatted 'inputs' provided in 'fit'. If validating visually, then a sorted plot of the test set (for 'train' < 1) tends to be most insightful:
-```
-model.coverage3(inputs=model.testinputs, data=model.testdata, plot='sorted', bounds=1, legend=1)
-```
-Note 'data' must correspond to the set used for 'inputs' to calculate the model's RMSE, which is the third positional output of 'coverage3'.
+## Use Cases
 
-If not requiring the RMSE (or a plot), then the 'evaluate' function can be used to bypass 'coverage3' so that any inputs can be evaluated. In other words, 'coverage3' takes 'evaluate' one step farther by returning the RMSE but is limited to validation testing only since the corresponding data must also be provided with the inputs. To evaluate the inputs 'userinputs' for which the output data is not known, use the following to predict the data ('meen') and confidence bounds ('bounds'):
-```
-meen, bounds = model.evaluate(userinputs)
-```
-Note 'userinputs' will be automatically normalized to the same scale as the training inputs that the model was fitted to, as well as automatically formatted. In the rare case that 'userinputs' is already normalized and formatted properly, then this automatic treatment of 'userinputs' can be turned off with the following keyword:
-```
-meen, bounds = model.evaluate(userinputs, nform=0)
-```
-As an appended side note, the following attributes were added to your FoKL class 'model' after calling 'fit' which may be useful during user post-processing:
-```
-model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus model.testinputs)
-model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
+Please refer to within the below examples for more detailed documentation:
+- [Saving and loading a model]()
+- [Evaluating a model]()
+- [Taking partial derivatives of a model]()
+- [Integration]()
+- [Training a new model]()
+- [Training several new models]()
+- [Sweeping over hyperparameters]()
+- [Coverting to Pyomo]()
 
-model.betas          == betas
-model.mtx            == mtx
-model.evs            == evs
+## Documentation
 
-model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and formatted
-model.rawdata        == all data w/ outliers              == user's 'data' but formatted
-model.traininputs    == train set of model.inputs
-model.traindata      == train set of model.data
-model.testinputs     == test set of model.inputs
-model.testdata       == test set of model.data
-model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of model.rawinputs
-model.outliers       == indices removed from model.rawinputs and model.rawdata as outliers
-model.trainlog       == indices of model.inputs used for model.traininputs
-model.testlog        == indices of model.data used for model.traindata
+### FoKLRoutines.load(filename, directory=None)
 
-model.inputs_np      == model.inputs as a numpy array of timestamps x input variables
-model.rawinputs_np   == model.rawinputs as a numpy array of timestamps x input variables
-model.traininputs_np == model.traininputs as a numpy array of timestamps x input variables
-model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
-```
-To remove all of the above attributes so that only the hyperparameters remain, most importantly so that 'betas' does not influence the training of a new model, use:
-```
-model.clear()
-```
+### FoKLRoutines.FoKL(**kwargs)
 
-## Differentiation
-FoKL can be used to calculate the partial derivatives of the model's function with respect to any input variable. By default, the gradient of 'inputs' from 'model.fit()' is calculated (i.e., all partial first derivatives):
-```
-dState = model.bss_derivatives()
-```
-The keywords 'd1' and 'd2' can be used to specify the input variable(s) with which to differentiate the model, where 'd1' dictates the first-order and 'd2' dictates the second-order derivatives.
+This creates a class object that contains all information relevant to and defining a FoKL model.
 
-For example, in a materials science application where pressure and temperature are inputs, perhaps the modeled function only needs to be differentiated once with respect to the second input variable, temperature:
-```
-dState = model.bss_derivatives(d1=2)
-```
-If pressure (P), temperature (T), and volume (V) are inputs and the requested derivatives are d(f(P,T,V))/dP and d(f(P,T,V))/dV, then boolean indexing can be used:
-```
-dState = model.bss_derivatives(d1=[1,0,1])
-```
-The output will be an Nx2 numpy array since 2 derivatives were requested, where N is the number of experimental datapoints. To preserve the same indexing as the input variables, a full array can be returned with 0's occupying the columns of input variables not requested:
-```
-dState = model.bss_derivatives(d1=[1,0,1], ReturnFullArray=1)
-```
-Note with 'ReturnFullArray' equal to 1, the df/dP and df/dV derivatives will map to dState[:, 0, 0] and dState[:, 2, 0], respectively.
+Upon initialization, hyperparameters and some other settings are defined with default values as attributes of the FoKL 
+class. These attributes are as follows, and any or all may be specified as a keyword or later updated by redefining the 
+class's attribute(s).
 
-Furthermore, to also return the second derivatives with respect to pressure and volume:
-```
-dState = model.bss_derivatives(d1=[1,0,1], d2=[2,0,2], ReturnFullArray=1)
-```
-Similarly, d2f/dP2 and d2f/dV2 will map to dState[:, 0, 1] and dState[:, 2, 1]. Note the third dimension of dState indexes the order of the derivative.
+| Type             | Keyword Argument | Default Value   | Description                                                                                                               |
+|------------------|------------------|-----------------|---------------------------------------------------------------------------------------------------------------------------|
+| Hyperparameter   | kernel           | 'Cubic Splines' | Basis functions (i.e., kernel) to use for training a model                                                                |
+| Hyperparameter   | phis             | f(kernel)       | Data structure with coefficients for basis functions                                                                      |
+| Hyperparameter   | relats_in        | []              | Boolean matrix indicating which input variables and/or interactions should be excluded from the model                     |
+| Hyperparameter   | a                | 4               | Shape parameter of the initial-guess distribution for the observation error variance of the data                          |
+| Hyperparameter   | b                | f(a, data)      | Scale parameter of the initial-guess distribution for the observation error variance of the data                          |
+| Hyperparameter   | atau             | 4               | Parameter of the initial-guess distribution for the $tau^2$ parameter                                                     |
+| Hyperparameter   | btau             | f(atau, data)   | Parameter of the initial-guess distribution for the $tau^2$ parameter                                                     |
+| Hyperparameter   | tolerance        | 3               | Influences how long to continue training after additional terms yield diminishing returns                                 |
+| Hyperparameter   | draws            | 1000            | Total number of draws from the posterior for each tested model                                                            |
+| Hyperparameter   | gimmie           | False           | Boolean to return the most complex model tried instead of the model with the optimum Bayesian information criterion (BIC) |
+| Hyperparameter   | way3             | False           | Boolean to include three-way interactions                                                                                 |
+| Hyperparameter   | threshav         | 0.05            | Threshold to propose terms for elimination. Increase to propose and eliminate more terms                                  |
+| Hyperparameter   | threshstda       | 0.5             | Threshold to eliminate terms based on standard deviation relative to mean                                                 |
+| Hyperparameter   | threshstdb       | 2               | Threshold to eliminate terms based on standard deviation independent of mean                                              |
+| Hyperparameter   | aic              | False           | Boolean to use Aikaike information criterion (AIC)                                                                        |
+| User-Setting     | UserWarnings     | True            | Boolean to print user-warnings (i.e., FoKL warnings) to command terminal                                                  |
+| User-Setting     | ConsoleOutput    | True            | Boolean to print progress of model training to command terminal                                                           |
 
-Other useful features are the ability to return the derivative at each draw, rather than averaging across draws. To do this, set keyword 'IndividualDraws' equal to 1 and note an additional dimension indexing the draws will be appended to your returned output. While the default functionality outlined above is most recommended, also useful is the ability to pass your own inputs into the function with keyword 'inputs'. Other potentially useful keywords are 'draws', 'betas', 'phis', 'mtx', and 'span', which is the range of normalization per input variable.
+The following methods are embedded within the class object:
 
-## Integration
-As discussed in the previous section, FoKL can be used to model state derivatives and thus contains an integration method of these states using an RK4. Due to each state being modeled independently, the same functionality cannot be used. For the case of two states, 'State1' and 'State2', with the same inputs:
-```
-model = FoKLRoutines.FoKL()
+| Method                                                                | Description                                                                                    |
+|-----------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| [**clean**](https://pytorch.org/docs/stable/torch.html)               | Automatically format, normalize, and create test/train sets from user's provided dataset.      |
+| [**bss_derivatives**](https://pytorch.org/docs/stable/autograd.html)  | Algebraically calculate partial derivatives of model with respect to input variables.          |
+| [**evaluate_basis**](https://pytorch.org/docs/stable/jit.html)        | Calculate value of specified basis function at single point along normalized domain.           |
+| [**evaluate**](https://pytorch.org/docs/stable/nn.html)               | Calculate values of FoKL model for all requested sets of datapoints.                           |
+| [**coverage3**](https://pytorch.org/docs/stable/multiprocessing.html) | Evaluate FoKL model, calculate confidence bounds, calculate RMSE, and produce plot.            |
+| [**fit**](https://pytorch.org/docs/stable/data.html)                  | Train new FoKL model to best-fit training dataset according to hyperparameters.                |
+| [**clear**]()                                                         | Delete attributes from FoKL class so that new models may be trained without new class objects. |
+| [**to_pyomo**]()                                                      | Convert a FoKL model to an expression in a Pyomo model.                                        |
+| [**save**]()                                                          | Save FoKL class with all its attributes to retain model and avoid re-training.                 |
 
-dStates = [dState1, dState2]
-betas = []
-mtx = []
-for i in range(2):
-    betas_i, mtx_i, _ = model.fit(inputs, dStates[i])
-    betas.append(betas_i)
-    mtx.append(mtx_i)
-    model.clear()
-```
-After fitting the above state derivatives, call the 'GP_Integrate' function to integrate:
-```
-T, Y = GP_Integrate([np.mean(betas[0],axis=0),np.mean(betas[1],axis=0)], [mtx[0],mtx[1]], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
-```
-Alternatively, multiple separate FoKL classes can be created to achieve the same result:
-```
-model1 = FoKLRoutines.FoKL()
-model2 = FoKLRoutines.FoKL()
+Each method has optional inputs that allow for flexibility in how FoKL is used so that you may leverage these methods 
+for your specific requirements. Please refer to the [Use Cases]() first, then explore the following documentation of 
+each method as needed.
 
-betas1, mtx1, _ = model1.fit(inputs, dState1)
-betas2, mtx2, _ = model2.fit(inputs, dState2)
+#### self.clean
 
-T, Y = GP_Integrate([np.mean(betas1,axis=0),np.mean(betas2,axis=0)], [mtx1,mtx2], utest, norms, phis, start, stop, ic, stepsize, used_inputs)
-```
-See 'GP_intergrate_example.py' for an example.
+#### self.bss_derivatives
 
-## Development
+#### self.evaluate_basis
 
-More sophisticated outlier removal methods are currently in development, but for demonstration purposes the following will search through 'data' and remove any points with a z-score greater than 4:
+#### self.evaluate
+
+#### self.coverage3
+
+#### self.fit
+
+#### self.clear
+
+#### self.to_pyomo
+
+#### self.save
+
+### Further Documentation: GP_integrate
+
+## Comparisons and Benchmarks
+
+FoKL outperforms neural nets on dynamic datasets which is expected for a GP, but also tends to train faster than other 
+GP's by orders of magnitude. FoKL also tends to fit more accurately than other GP's.
+
+Some papers on FoKL include:
+- [link to paper]()
+- [link to paper]()
+
+NOTES TO SELF:
+- https://arxiv.org/pdf/2205.13676v2.pdf
+  - ‘Susceptible, Infected, Recovered’ (SIR) toy problem 
+  - experimental ‘Cascaded Tanks’ benchmark dataset
+
+## Future Development
+
+More sophisticated outlier removal methods are currently in development, but for demonstration purposes the following 
+will search through 'data' and remove any points with a z-score greater than 4:
+
 ```
 model.fit(inputs, data, CatchOutliers='Data', OutliersMethod='Z-Score', OutliersMethodParams=4)
 ```
-Also in development are additional methods for splitting 'data' into test/train sets, beyond the current method which is limited to a random split.
 
-It is also intended for the 'evaluate' function to be capable of providing derivatives, sampling through 'betas' of the model, and evaluating at user-defined 'betas'.
+Also in development are additional methods for splitting 'data' into test/train sets, beyond the current method which is 
+limited to a random split.
 
 ## Citations
+
 Please cite: K. Hayes, M.W. Fouts, A. Baheri and
 D.S. Mebane, "Forward variable selection enables fast and accurate
 dynamic system identification with Karhunen-Loève decomposed Gaussian
@@ -183,4 +220,7 @@ Credits: David Mebane (ideas and original code), Kyle Hayes
 (integrator), Derek Slack (Python porting), Jacob Krell (Python v3 dev.)
 
 Funding provided by National Science Foundation, Award No. 2119688
+
+## License
+
 

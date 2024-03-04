@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import time
 import os
 import pickle
+import copy
+import pyomo.environ as pyo
 
 
 def load(filename, directory=None):
@@ -210,7 +212,7 @@ class FoKL:
             - aic        = False
 
         Other Optional Inputs:
-            - UserWarnings  == boolean to print user-warnings to the command terminal          == False (default)
+            - UserWarnings  == boolean to print user-warnings to the command terminal          == True (default)
             - ConsoleOutput == boolean to print [ind, ev] during 'fit' to the command terminal == True (default)
         """
 
@@ -229,7 +231,7 @@ class FoKL:
                    'threshstda': 0.5, 'threshstdb': 2, 'aic': False,
 
                    # Other:
-                   'UserWarnings': False, 'ConsoleOutput': True
+                   'UserWarnings': True, 'ConsoleOutput': True
                    }
         current = process_kwargs(default, kwargs)  # = default, but updated by any user kwargs
         for boolean in ['gimmie', 'way3', 'aic', 'UserWarnings']:
@@ -1696,3 +1698,116 @@ class FoKL:
         time.sleep(1)  # so that next saved model is guaranteed a different filename
 
         return filepath
+
+    def to_pyomo(self, m=None, y=None, x=None, ReturnObjective=False, TruncateBasis=None):
+        """
+        Automatically convert a pre-trained FoKL model to expressions and constraints for a symbolic Pyomo model. Note
+        that by default, the Pyomo model's objective does not get defined here but can be overridden with
+        ReturnObjective=True.
+
+        Optional Inputs:
+            - m               == Pyomo model (if already defined)
+            - y               == FoKL output to include in Pyomo model (if known)
+            - x               == FoKL input variables to include in Pyomo model (if known), e.g., x=[0.7, None, 0.4]
+            - ReturnObjective == boolean to set the FoKL model as the Pyomo model's objective      == 0 (default)
+            - TruncateBasis   == integer (3, lp-1) to decrease the resolution of the cubic splines == 0 (default)
+
+        Output:
+            - m == Pyomo model with FoKL model included
+                - m.y    == evaluated output corresponding to FoKL model
+                - m.x[j] == input variable corresponding to FoKL model
+
+        Note:
+            - It is highly recomme nded to use a FoKL model trained on the 'Bernoulli Polynomials' kernel. Otherwise, with
+            'Cubic Splines', the solution time is extremely impractical even for the simplest of models.
+        """
+
+        if ReturnObjective is not False:
+            ReturnObjective = str_to_bool(ReturnObjective)
+
+        try:
+            b = copy.deepcopy(self.betas_avg)
+        except:
+            b = np.mean(self.betas, axis=0)
+            self.betas_avg = b
+
+        t = self.mtx - 1  # indices of splines (where -1 means none)
+        lt = t.shape[0]  # length of terms (not including beta0)
+        lv = t.shape[1]  # length of input variables
+        s_ids = np.sort(np.unique(t[t != -1]))  # basis functions used for FoKL model
+
+        if self.kernel == self.kernels[0]:
+            lp = len(self.phis[0][0])  # length of cubics per spline (499)
+            if TruncateBasis is not None:  # assume TruncateBasis < lp
+                phinds64 = np.round(np.linspace(0, TruncateBasis - 1, TruncateBasis) * (lp - 1) / (TruncateBasis - 1))
+                phinds = []  # list of Python integers indexing the spline coefficients
+                for phind64 in phinds64:
+                    phinds.append(int(phind64))
+                p = []
+                for s in range(int(s_ids[-1] + 1)):  # for spline id in length of maximum spline id
+                    if s in s_ids:
+                        p4 = []
+                        for c in range(4):  # for x^power coefficient of powers 0 to 3
+                            p4.append(list(f.phis[s][c][phind] for phind in phinds))  # update splines needed for model
+                        p.append(p4)
+                    else:
+                        p.append([])  # spline not used, but still need to maintain indexing
+                p = tuple(p)  # to align with 'self.phis' format
+                lp = TruncateBasis  # = len(p[0][0])
+
+                raise ValueError("The method for the 'Cubic Splines' kernel has not yet been ported from development.")
+
+            return
+
+        elif self.kernel == self.kernels[1]:
+            p = []
+            for s in range(int(s_ids[-1] + 1)):  # for spline id in length of maximum spline id
+                if s in s_ids:
+                    p.append(self.phis[s])
+                else:
+                    p.append([])  # spline not used, but still need to maintain indexing
+            p = tuple(p)  # to align with 'self.phis' format
+
+        if m is None:
+            m = pyo.ConcreteModel()
+
+        m.j = pyo.Set(initialize=range(lv))  # index for FoKL input variable
+        m.y = pyo.Var(within=pyo.Reals)  # FoKL output
+        m.x = pyo.Var(m.j, within=pyo.Reals, bounds=[0, 1])  # FoKL input variables (per domain)
+
+        def fokl_as_pyomo(m):
+            """Convert FoKL model to Pyomo format assuming 'Bernoulli Polynomials' kernel."""
+            fokl = b[0]  # initialize expression with beta0 term
+            for k in range(lt):  # for term in terms
+                tk = t[k, :]
+                tk_mask = tk != -1  # recall -1 means ignore (i.e., input var with '-1 spline id' does not appear in term)
+                if any(tk_mask):
+                    term_k = b[k + 1]
+                    for j in range(lv):  # for variables that might be in term
+                        if tk_mask[j]:  # for variable in term
+                            n = int(tk[j])  # spline id, = sjs[j][k] if already referenced
+                            phix_sj = p[n][0] + sum(p[n][k] * (m.x[j] ** k) for k in range(1, len(p[n])))
+                            term_k *= phix_sj
+                else:
+                    term_k = 0
+                fokl += term_k  # append term to expression
+            return fokl
+
+        m.fokl = pyo.Expression(rule=fokl_as_pyomo)
+        if ReturnObjective:
+            m.obj = pyo.Objective(expr=abs(m.fokl - m.y), sense=pyo.minimize)
+        else:  # returning constraint (default)
+            m.con = pyo.Constraint(expr=abs(m.fokl - m.y) == 0)
+
+        if y is not None:
+            # m.y_con = pyo.Constraint(expr=m.y == y)
+            m.y.value = y
+        # m.x_con = pyo.Constraint(m.j)
+        for j in m.j:
+            if x is not None:
+                if x[j] is not None:
+                    # m.x_con.add(j, expr=m.x[j] == x[j])
+                    m.x[j].value = x[j]
+
+        return m
+
