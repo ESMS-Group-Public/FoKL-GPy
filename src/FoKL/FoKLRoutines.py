@@ -1152,7 +1152,7 @@ class FoKL:
 
         return meen, bounds, rmse
 
-    def fit(self, inputs, data, **kwargs):
+    def fit(self, inputs=None, data=None, **kwargs):
         """
         For fitting model to known inputs and data (i.e., training of model).
 
@@ -1161,11 +1161,11 @@ class FoKL:
             data   == Nx1 vector of dependent variable to create model for predicting the value of f(x1, ..., xM)
 
         Keyword Inputs (for fit):
-            clean         == boolean to perform automatic cleaning and formatting               == True (default)
+            clean         == boolean to perform automatic cleaning and formatting               == False (default)
             ConsoleOutput == boolean to print [ind, ev] to console during FoKL model generation == True (default)
 
         Keyword Inputs (for clean):
-            train                == percentage (0-1) of N datapoints to use for training  == True (default)
+            train                == percentage (0-1) of N datapoints to use for training  == 1 (default)
             TrainMethod          == method for splitting test/train set for train < 1     == 'random' (default)
             CatchOutliers        == boolean for removing outliers from inputs and/or data == False (default)
             OutliersMethod       == string defining the method to use for removing outliers (e.g., 'Z-Score)
@@ -1192,7 +1192,7 @@ class FoKL:
         # Check for unexpected keyword arguments:
         default_for_fit = {}
         default_for_fit['ConsoleOutput'] = str_to_bool(kwargs.get('ConsoleOutput', self.ConsoleOutput))
-        default_for_fit['clean'] = str_to_bool(kwargs.get('clean', True))
+        default_for_fit['clean'] = str_to_bool(kwargs.get('clean', False))
         default_for_clean = {'train': 1, 'TrainMethod': 'random', 'CatchOutliers': False, 'OutliersMethod': None,
                              'OutliersMethodParams': None}
         expected = self.hypers + list(default_for_fit.keys()) + list(default_for_clean.keys())
@@ -1218,21 +1218,44 @@ class FoKL:
         self.ConsoleOutput = default_for_fit['ConsoleOutput']
 
         # Perform automatic cleaning of 'inputs' and 'data' (unless user already called 'fit' and now specifies not to):
-        if default_for_fit['clean']:
-            self.clean(inputs, data, kwargs_from_other=kwargs_to_clean)
-        else:  # user input implies that they already called clean but are fitting again (e.g., to check stochasticity)
+        error_clean_failed = False
+        if default_for_fit['clean'] is True:
             try:
-                inputs = self.traininputs
-            except:
-                warnings.warn("Keyword 'clean' was set to False but is required when first running fit. Assuming "
-                              "'clean' is True so that attributes (i.e., 'traininputs', etc.) get defined.",
+                if inputs is None:  # assume clean already called and len(data) same as traindata if data not None
+                    inputs = self.traininputs
+                if data is None:  # assume clean already called and len(inputs) same as traininputs if inputs not None
+                    data = self.traindata
+            except Exception as exception:
+                error_clean_failed = True
+            self.clean(inputs, data, kwargs_from_other=kwargs_to_clean)
+        else:  # user input implies that they already called clean prior to calling fit
+            try:
+                if inputs is None:  # assume clean already called and len(data) same as traindata if data not None
+                    inputs = self.traininputs
+                if data is None:  # assume clean already called and len(inputs) same as traininputs if inputs not None
+                    data = self.traindata
+            except Exception as exception:
+                warnings.warn("Keyword 'clean' was set to False but is required prior to or during 'fit'. Assuming "
+                              "'clean' is True so that attributes 'traininputs' and 'traindata' get defined.",
                               category=UserWarning)
-                self.clean(inputs, data, kwargs_from_other=kwargs_to_clean)
+                if inputs is None or data is None:
+                    error_clean_failed = True
+                else:
+                    default_for_fit['clean'] = True
+                    self.clean(inputs, data, kwargs_from_other=kwargs_to_clean)
+        if error_clean_failed is True:
+            raise ValueError("'inputs' and/or 'data' were not provided so 'clean' could not be performed.")
 
         # Define attributes as local variables:
-        inputs = self.traininputs
-        data = self.traindata
-        inputs_np = self.traininputs_np
+        try:
+            inputs = self.traininputs
+            data = self.traindata
+            inputs_np = self.traininputs_np
+        except Exception as exception:
+            warnings.warn("If not calling 'clean' prior to 'fit' or within the argument of 'fit', then this is the "
+                          "likely source of any subsequent errors. To troubleshoot, simply include 'clean=True' within "
+                          "the argument of 'fit'.", category=UserWarning)
+            inputs_np = np.array(inputs)
         phis = self.phis
         relats_in = self.relats_in
         a = self.a

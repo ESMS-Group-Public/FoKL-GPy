@@ -1,63 +1,118 @@
 """
-Development Information:
+[TUTORIAL]: self.to_pyomo(self, m=None, y=None, x=None, ReturnObjective=False)
 
-Description:
-    - Developed by the Energy Systems and Materials Simulations of West Virginia University.
-    - Example of automatic conversion from arbitrary FoKL model to Pyomo model.
+This is a tutorial for the 'to_pyomo' method, an auxiliary tool for automatically converting a FoKL model to a Pyomo
+expression. In the following script, it will be shown how 'to_pyomo' may be used to generate a new Pyomo model or used
+to append to an already existing Pyomo model. Variations will show how the FoKL model may be set as a Pyomo objective in
+order to minimize the model's error, or set as a Pyomo constraint in order to focus on a different relationship.
 
-Citations:
-    - K. Hayes, M.W. Fouts, A. Baheri and D.S. Mebane, "Forward variable selection enables fast and accurate dynamic
-        system identification with Karhunen-Loève decomposed Gaussian processes", arXiv:2205.13676.
+In this tutorial, the following will be demonstrated:
 
-Primary Developer(s) Contact Information:
-    - Jacob P. Krell (JPK)
-        - Aerospace Engineering Undergraduate Student
-        - Statler College of Engineering & Mineral Resources
-        - Dept. Mechanical and Aerospace Engineering
-        - West Virginia University (WVU)
-        - jpk0024@mix.wvu.edu
+    1) Train a FoKL model using the 'Bernoulli Polynomials' kernel.
 
-Development History:
-Date              Developer        Comments
----------------   -------------    -------------------------------------------------------------------------------------
-Feb. 12, 2024     JPK              'to_pyomo' modified for 'Bernoulli Polynomials' kernel and moved to FoKLRoutines;
+    2) Convert the FoKL model to a constraint of a new Pyomo model with...
+
+        a) all unknown inputs and data.
+        b) some known inputs and data.
+
+    3) Convert the FoKL model to the objective of a new Pyomo model with...
+
+        a) all unknown inputs and data.
+        b) some known inputs and data.
+
+    4) Demonstrate how a pre-existing Pyomo model could have been for (2) and (3), with only (2b) for example.
+
+    5) Define objective for the Pyomo models of (2).
+
+    6) Define constraint(s) for the Pyomo models of (3).
+
+    7) Solve the Pyomo models.
+
+    8) Retrieve the solution.
 """
-from FoKL_Bernoulli import FoKLRoutines
+from src.FoKL import FoKLRoutines
 import pyomo.environ as pyo
 import numpy as np
-import copy
-import warnings
 
 
-def main(x, y):
+def main():
+    print("\nThe following is a FoKL Tutorial for the 'to_pyomo' method, assuming both Pyomo and IPOPT are installed.")
 
-    fokl = FoKLRoutines.FoKL(kernel=1)
-    fokl.fit(x, y)
-    fokl.coverage3(plot=1, bounds=0)
+    # Known dataset:
 
-    if 1:
-        m = fokl.to_pyomo(x=[None, 0.7, 0], y=178, ReturnObjective=True)
-    else:
-        m = fokl.to_pyomo(x=[None, 0.7, 0])
-        m.obj = pyo.Objective(expr=x[0] - x[1], sense=pyo.minimize)
-
-    solver = pyo.SolverFactory('ipopt')
-    solver.options['tol'] = 1e-1  # Absolute tolerance for optimality
-    solver.options['dual_inf_tol'] = 1e-1  # Dual infeasibility tolerance
-    solver.options['constr_viol_tol'] = 1e-1  # Constraint violation tolerance
-    solver.solve(m, tee=True)
-
-    print(m.x[0]())
-
-    breakpoint()
-
-if __name__ == '__main__':
     res = int(1e4)
     t = np.linspace(0, 1, res)
-    x0 = 100 * np.exp(t)
-    x1 = 50 * np.sin(4 * np.pi * x0)
-    x2 = 5 * np.random.rand(res) - 10
-    y = x0 + x1 + x2
+    x0 = 100 * np.exp(t)                                                    # first input
+    x1 = 50 * np.sin(4 * np.pi * x0)                                        # second input
+    x2 = 5 * np.random.rand(res) - 10                                       # third input
+    y = x0 + x1 + x2                                                        # data
 
-    main([x0, x1, x2], y)
+    # (1) Train a FoKL model using the 'Bernoulli Polynomials' kernel.
+
+    print("\nCurrently training...\n")
+
+    f = FoKLRoutines.FoKL(kernel=1)
+    f.fit([x0, x1, x2], y, clean=True)
+
+    # (2) Convert the FoKL model to a constraint of a new Pyomo model with...
+
+    print("\nCurrently converting to Pyomo...")
+
+    m_2a = f.to_pyomo()                                                     # (a) all unknown inputs and data.
+    m_2b = f.to_pyomo(x=[None, 0.7, None], y=213)                           # (b) some known inputs and data.
+
+    # (3) Convert the FoKL model to an objective of a new Pyomo model with...
+
+    m_3a = f.to_pyomo(ReturnObjective=True)                                 # (a) all unknown inputs and data.
+    m_3b = f.to_pyomo(x=[None, 0.7, None], y=213, ReturnObjective=True)     # (b) some known inputs and data.
+
+    # (4) Demonstrate how a pre-existing Pyomo model could have been used for (2) and (3), with only (2b) for example.
+
+    m_2b_preexisting = pyo.ConcreteModel()
+    f.to_pyomo(x=[None, 0.7, None], y=213, m=m_2b_preexisting)
+
+    # Note how the Pyomo model object 'm_2b_preexisting' still gets updated despite not being an output to 'f.to_pyomo'.
+
+    # (5) Define objective for the Pyomo models of (2).
+
+    m_2a.obj = pyo.Objective(expr=abs(m_2a.x[0] - m_2a.x[2]), sense=pyo.minimize)
+    m_2b.obj = pyo.Objective(expr=abs(m_2b.x[0] - m_2b.x[2]), sense=pyo.minimize)
+
+    # Note setting 'ReturnObjective=True' in (2) would be equivalent to defining here in (5) the following objective:
+    #     - m_2b.obj = pyo.Objective(expr=abs(m_2b.fokl - m_2b.y), sense=pyo.minimize)
+
+    # (6) Define constraint(s) for the Pyomo models of (3).
+
+    m_3a.con1 = pyo.Constraint(expr=abs(m_3a.x[0] - m_3a.x[2]) == 0)
+    m_3b.con1 = pyo.Constraint(expr=abs(m_3b.x[0] - m_3b.x[2]) == 0)
+
+    # (7) Solve the Pyomo models, using (2b) for example.
+
+    print("\nCurrently solving...\n")
+
+    solver = pyo.SolverFactory('ipopt')
+    # solver.options['tol'] = 1e-1
+
+    # solver.solve(m_2a, tee=True)
+    solver.solve(m_2b, tee=True)
+    # solver.solve(m_3a, tee=True)
+    # solver.solve(m_3b, tee=True)
+
+    # (8) Retrieve the solution, using (2b) for example.
+
+    print("\nCurrently retrieving solution...\n")
+
+    sol = []
+    for i in range(f.inputs_np.shape[1]):  # for input variable index in number of input variables
+        sol.append(m_2b.x[i]())  # == sol.append(pyo.value(m_3b.x[i]))
+    print("x = ", sol)  # [0.5825, 0.7, 0.5825] is expected
+
+    # (9) Print the symbolic FoKL model, using (2b) for example.
+
+    print("\ny = ", m_2b.fokl.expr)
+    print("\nTutorial done!")
+
+
+if __name__ == '__main__':
+    main()
 
