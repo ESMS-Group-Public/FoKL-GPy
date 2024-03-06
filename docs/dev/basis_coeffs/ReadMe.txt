@@ -1,0 +1,1 @@
+This folder is a loose collection of methods used by ESMS developers to generate the coefficients for the basis functions stored as text files under '\src\FoKL\kernels'. These methods are stored here to reference as needed in future development.

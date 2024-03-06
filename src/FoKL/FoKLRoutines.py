@@ -16,11 +16,13 @@ import pyomo.environ as pyo
 
 def load(filename, directory=None):
     """
-    Load a FoKL class from a file. By default, the 'directory' is the current working directory that contains the
-    file calling this method. The 'directory' may be named relative to the directory if not default.
+    Load a FoKL class from a file.
 
-    Enter the returned output from 'self.save()' as the argument here, leaving 'directory' blank, to later reload a
-    model. This is possible because 'filename' can simply be defined as the 'filepath' for 'directory=None'.
+    By default, 'directory' is the current working directory that contains the script calling this method. An absolute
+    or relative directory may be defined if the model to load is located elsewhere.
+
+    For simplicity, enter the returned output from 'self.save()' as the argument here, i.e., for 'filename'. Do this
+    while leaving 'directory' blank since 'filename' can simply include the directory itself.
     """
     if filename[-5::] != ".fokl":
         filename = filename + ".fokl"
@@ -220,8 +222,14 @@ class FoKL:
         self.hypers = ['kernel', 'phis', 'relats_in', 'a', 'b', 'atau', 'btau', 'tolerance', 'draws', 'gimmie', 'way3',
                        'threshav', 'threshstda', 'threshstdb', 'aic']
 
+        # Store list of settings for easy reference later (namely, in 'clear'):
+        self.settings = ['UserWarnings', 'ConsoleOutput']
+
         # Store supported kernels for later logical checks against 'kernel':
         self.kernels = ['Cubic Splines', 'Bernoulli Polynomials']
+
+        # List of attributes to keep in event of clearing model (i.e., 'self.clear'):
+        self.keep = ['keep', 'hypers', 'settings', 'kernels'] + self.hypers + self.settings + self.kernels
 
         # Process user's keyword arguments:
         default = {
@@ -1190,7 +1198,7 @@ class FoKL:
         """
 
         # Check for unexpected keyword arguments:
-        default_for_fit = {}
+        default_for_fit = {'ConsoleOutput': True}
         default_for_fit['ConsoleOutput'] = str_to_bool(kwargs.get('ConsoleOutput', self.ConsoleOutput))
         default_for_fit['clean'] = str_to_bool(kwargs.get('clean', False))
         default_for_clean = {'train': 1, 'TrainMethod': 'random', 'CatchOutliers': False, 'OutliersMethod': None,
@@ -1664,7 +1672,7 @@ class FoKL:
             all = str_to_bool(all)  # convert to boolean if all='on', etc.
 
         if all is False:
-            attrs_to_keep = self.hypers  # default
+            attrs_to_keep = self.keep  # default
             if isinstance(keep, list) or isinstance(keep, str):  # str in case of single entry, e.g., keep='mtx' != ['mtx']
                 attrs_to_keep += keep  # add user-specified attributes to list of ones to keep
                 attrs_to_keep = list(np.unique(attrs_to_keep))  # remove duplicates
@@ -1680,47 +1688,6 @@ class FoKL:
                 delattr(self, attr)  # delete attribute from FoKL class if not keeping
 
         return
-
-    def save(self, filename=None, directory=None):
-        """
-        Save a FoKL class as a file. By default, the 'filename' is 'model_yyyymmddhhmmss.fokl' and is saved to the
-        directory of the Python script calling this method. Use 'directory' to change the directory saved to, or simply
-        embed the directory manually within 'filename'.
-
-        Returned is the 'filepath'. Enter this as the argument of 'load' to later reload the model. Explicitly, that is
-        'FoKLRoutines.load(filepath)' or 'FoKLRoutines.load(filename, directory)'.
-
-        Note the directory must exist prior to calling this method.
-        """
-        if filename is None:
-            t = time.gmtime()
-
-            def two_digits(a):
-                if a < 10:
-                    a = "0" + str(a)
-                else:
-                    a = str(a)
-                return a
-            ymd = [str(t[0])]
-            for i in range(1, 6):
-                ymd.append(two_digits(t[i]))
-            t_str = ymd[0] + ymd[1] + ymd[2] + ymd[3] + ymd[4] + ymd[5]
-            filename = "model_" + t_str + ".fokl"
-        elif filename[-5::] != ".fokl":
-            filename = filename + ".fokl"
-
-        if directory is not None:
-            filepath = os.path.join(directory, filename)
-        else:
-            filepath = filename
-
-        file = open(filepath, "wb")
-        pickle.dump(self, file)
-        file.close()
-
-        time.sleep(1)  # so that next saved model is guaranteed a different filename
-
-        return filepath
 
     def to_pyomo(self, m=None, y=None, x=None, ReturnObjective=False, TruncateBasis=None):
         """
@@ -1833,4 +1800,45 @@ class FoKL:
                     m.x[j].value = x[j]
 
         return m
+
+    def save(self, filename=None, directory=None):
+        """
+        Save a FoKL class as a file. By default, the 'filename' is 'model_yyyymmddhhmmss.fokl' and is saved to the
+        directory of the Python script calling this method. Use 'directory' to change the directory saved to, or simply
+        embed the directory manually within 'filename'.
+
+        Returned is the 'filepath'. Enter this as the argument of 'load' to later reload the model. Explicitly, that is
+        'FoKLRoutines.load(filepath)' or 'FoKLRoutines.load(filename, directory)'.
+
+        Note the directory must exist prior to calling this method.
+        """
+        if filename is None:
+            t = time.gmtime()
+
+            def two_digits(a):
+                if a < 10:
+                    a = "0" + str(a)
+                else:
+                    a = str(a)
+                return a
+            ymd = [str(t[0])]
+            for i in range(1, 6):
+                ymd.append(two_digits(t[i]))
+            t_str = ymd[0] + ymd[1] + ymd[2] + ymd[3] + ymd[4] + ymd[5]
+            filename = "model_" + t_str + ".fokl"
+        elif filename[-5::] != ".fokl":
+            filename = filename + ".fokl"
+
+        if directory is not None:
+            filepath = os.path.join(directory, filename)
+        else:
+            filepath = filename
+
+        file = open(filepath, "wb")
+        pickle.dump(self, file)
+        file.close()
+
+        time.sleep(1)  # so that next saved model is guaranteed a different filename
+
+        return filepath
 
