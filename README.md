@@ -576,8 +576,8 @@ Please reach out via the information in the [Contact Us](#contact-us) section wi
 
 | Topic                                            | Point of Contact | Email                                                  |
 |--------------------------------------------------|------------------|--------------------------------------------------------|
-| Installation<br/>Troubleshooting<br/>Development | Jacob Krell      | [jpk0024@mix.wvu.edu](jpk0024@mix.wvu.edu)             |
-| Research<br/>Theory<br/>Other                    | David Mebane     | [david.mebane@mail.wvu.edu](david.mebane@mail.wvu.edu) |
+| Installation<br/>Troubleshooting<br/>Development | Jacob Krell      | [jpk0024@mix.wvu.edu](mailto:jpk0024@mix.wvu.edu)             |
+| Research<br/>Theory<br/>Other                    | David Mebane     | [david.mebane@mail.wvu.edu](mailto:david.mebane@mail.wvu.edu) |
 
 ## License
 
