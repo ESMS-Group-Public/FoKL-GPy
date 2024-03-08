@@ -370,8 +370,8 @@ class FoKL:
             # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
             # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
             inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
-            if inputs.dtype != np.float:
-                inputs = np.array(inputs, dtype=np.float)
+            if inputs.dtype != float:
+                inputs = np.array(inputs, dtype=float)
                 warnings.warn("'inputs' was converted to float64. May require user-confirmation that values did not get"
                               "corrupted.", category=UserWarning)
             if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
@@ -402,8 +402,8 @@ class FoKL:
                 # Transpose 'data' if needed:
                 data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
                 data = np.squeeze(data)
-                if data.dtype != np.float:
-                    data = np.array(data, dtype=np.float)
+                if data.dtype != float:
+                    data = np.array(data, dtype=float)
                     warnings.warn(
                         "'data' was converted to float64. May require user-confirmation that values did not get"
                         "corrupted.", category=UserWarning)
@@ -912,7 +912,7 @@ class FoKL:
                 if not isinstance(inputs, np.ndarray):
                     warnings.warn("Provided inputs were converted to numpy array as float64. May want to manually "
                                   "check that values were preserved.", category=UserWarning)
-                    inputs = np.array(inputs, dtype=np.float)
+                    inputs = np.array(inputs, dtype=float)
                 if current['normalize'] is None:  # assume already normalized
                     normputs = inputs
                 else:  # assume not normalized
