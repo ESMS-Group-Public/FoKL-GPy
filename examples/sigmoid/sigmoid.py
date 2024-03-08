@@ -27,7 +27,7 @@ def main():
 
     # Running emulator routine (i.e., 'fit') to train model:
     print("\nCurrently training model...\n")
-    model.fit([x, y], z, clean=True)
+    a, b, ev = model.fit([x, y], z, clean=True)
 
     # Evaluating and visualizing predicted values of data as a function of all inputs (train set plus test set):
     print("\nDone! Please close the figure to continue.")
@@ -35,9 +35,9 @@ def main():
 
     # Post-processing:
     print(f"\nThe 'coverage3' method returned:\n    RMSE = {rmse}")
-    print("\nEnd of sigmoid example.")
 
 
 if __name__ == '__main__':
     main()
+    print("\nEnd of Sigmoid example.")
 

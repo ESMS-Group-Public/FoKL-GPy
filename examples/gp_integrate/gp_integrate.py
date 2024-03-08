@@ -35,7 +35,7 @@ def main():
 
         # Running emulator routine for current dataset:
         betas_i, mtx_i, _ = model.fit(traininputs, traindata[i], clean=True)
-        print("Done!")
+        print("\nDone!")
 
         # Store coefficients and interaction matrix of model equation for post-processing (i.e., for 'GP_Integrate'):
         betas.append(betas_i[1000:])  # store only last 1000 such that draws minus 1000 serves as burn-in
@@ -70,4 +70,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    print("\nEnd of GP Integrate example.")
 

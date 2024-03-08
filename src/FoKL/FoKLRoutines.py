@@ -611,7 +611,7 @@ class FoKL:
             ReturnFullArray == boolean for returning NxMx2 array instead of Nx2M      == 0 (default)
 
         Return Outputs:
-            dState == derivative of input variables (i.e., states)
+            dy == derivative of input variables (i.e., states)
 
         Notes:
             - To turn off all the first-derivatives, set d1=False instead of d1=0. 'd1' and 'd2', if set to an integer,
@@ -746,7 +746,7 @@ class FoKL:
             X = inputs  # twice-normalization not required
             L_phis = 1  # because continuous
         basis_nm = np.zeros([N, M, B])  # constant term for (n,md,b) that avoids repeat calculations
-        dState = np.zeros([draws, N, M, 2])
+        dy = np.zeros([draws, N, M, 2])
         phi = np.zeros([N, M, 2])
 
         # Cycle through each timepoint, input variable, and perform 'bss_derivatives' like in MATLAB:
@@ -787,23 +787,23 @@ class FoKL:
                                     phi[n, m, di] = 0
                                     break
 
-                            dState[:,n,m,di] = dState[:,n,m,di] + betas[-draws:,b+1]*phi[n,m,di]  # update after md loop
+                            dy[:,n,m,di] = dy[:,n,m,di] + betas[-draws:,b+1]*phi[n,m,di]  # update after md loop
 
-        dState = np.transpose(dState, (1, 2, 3, 0))  # move draws dimension so dState has form (N,M,di,draws)
+        dy = np.transpose(dy, (1, 2, 3, 0))  # move draws dimension so dy has form (N,M,di,draws)
 
         if not current['IndividualDraws'] and draws > 1:  # then average draws
-            dState = np.mean(dState, axis=3)  # note 3rd axis index (i.e., 4th) automatically removed (i.e., 'squeezed')
-            dState = dState[:, :, :, np.newaxis]  # add new axis to avoid error in concatenate below
+            dy = np.mean(dy, axis=3)  # note 3rd axis index (i.e., 4th) automatically removed (i.e., 'squeezed')
+            dy = dy[:, :, :, np.newaxis]  # add new axis to avoid error in concatenate below
 
         if not current['ReturnFullArray']:  # then return only columns with values and stack d1 and d2 next to each other
-            dState = np.concatenate([dState[:, :, 0, :], dState[:, :, 1, :]], axis=1)  # (N,M,2,draws) to (N,2M,draws)
-            dState = dState[:, ~np.all(dState == 0, axis=0)]  # remove columns ('N') with all zeros
-        dState = np.squeeze(dState)  # remove unnecessary axes
+            dy = np.concatenate([dy[:, :, 0, :], dy[:, :, 1, :]], axis=1)  # (N,M,2,draws) to (N,2M,draws)
+            dy = dy[:, ~np.all(dy == 0, axis=0)]  # remove columns ('N') with all zeros
+        dy = np.squeeze(dy)  # remove unnecessary axes
 
         if current['ReturnBasis']:  # mostly for development
-            return dState, basis
+            return dy, basis
         else:  # standard
-            return dState
+            return dy
 
     def evaluate_basis(self, c, x, kernel=None, d=0):
         """
@@ -811,7 +811,7 @@ class FoKL:
 
         Inputs:
             > c == coefficients of a single basis functions
-            > x == value(s) of independent variable at which to evaluate the basis function
+            > x == value of independent variable at which to evaluate the basis function
 
         Optional Input:
             > kernel == 'Cubic Splines' or 'Bernoulli Polynomials' == self.kernel (default)
@@ -824,8 +824,11 @@ class FoKL:
                 > basis = sum(c[k]*(x**k) for k in range(len(c)))
         """
         if kernel is None:
-            kernel = self.kernel  # assume supported
-        elif kernel not in self.kernels:  # check user's provided kernel is supported
+            kernel = self.kernel
+        elif isinstance(kernel, int):
+            kernel = self.kernels[kernel]
+
+        if kernel not in self.kernels:  # check user's provided kernel is supported
             raise ValueError(f"The kernel {kernel} is not currently supported. Please select from the following: "
                              f"{self.kernels}.")
 
@@ -858,7 +861,7 @@ class FoKL:
         Optional Inputs:
             betas        == coefficients defining FoKL model                       == self.betas (default)
             mtx          == interaction matrix defining FoKL model                 == self.mtx (default)
-            normalize    == [min, max] of inputs used for normalization            == self.normalize (default)
+            normalize    == [min, max] of inputs used for normalization            == None (default)
             draws        == number of beta terms used                              == self.draws (default)
             clean        == boolean to automatically normalize and format 'inputs' == False (default)
             ReturnBounds == boolean to return confidence bounds as second output   == False (default)
@@ -905,12 +908,15 @@ class FoKL:
                               category=UserWarning)
                 current['clean'] = False
         else:  # user-defined 'inputs'
-            if not current['clean']:  # assume provided inputs are already normalized and formatted, but check
-                normputs = inputs
-                if not isinstance(normputs, np.ndarray):
+            if not current['clean']:  # assume provided inputs are already formatted and maybe normalized
+                if not isinstance(inputs, np.ndarray):
                     warnings.warn("Provided inputs were converted to numpy array as float64. May want to manually "
                                   "check that values were preserved.", category=UserWarning)
-                    normputs = np.array(normputs, dtype=np.float)
+                    inputs = np.array(inputs, dtype=np.float)
+                if current['normalize'] is None:  # assume already normalized
+                    normputs = inputs
+                else:  # assume not normalized
+                    normputs = (inputs - current['normalize'][0]) / (current['normalize'][1] - current['normalize'][0])
                 if np.max(normputs) > 1 or np.min(normputs) < 0:
                     warnings.warn("Provided inputs were not normalized, so overriding 'clean' to True.")
                     current['clean'] = True
@@ -1657,11 +1663,11 @@ class FoKL:
 
     def clear(self, keep=None, clear=None, all=False):
         """
-        Delete all attributes from the FoKL class except for hyperparameters by default, but user may specify otherwise.
-        If an attribute is listed in both 'clear' and 'keep', then the attribute is cleared.
+        Delete all attributes from the FoKL class except for hyperparameters and settings by default, but user may
+        specify otherwise. If an attribute is listed in both 'clear' and 'keep', then the attribute is cleared.
 
         Optional Inputs:
-            keep (list of strings)  == attributes to keep in addition to hyperparameters, e.g., ['inputs_np', 'mtx']
+            keep (list of strings)  == additional attributes to keep, e.g., ['inputs_np', 'mtx']
             clear (list of strings) == hyperparameters to delete, e.g., ['kernel', 'phis']
             all (boolean)           == if True then all attributes (including hyperparameters) get deleted regardless
 

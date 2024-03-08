@@ -111,9 +111,8 @@ def main():
 
     print("\ny = ", m_2b.fokl.expr)
 
-    print("\nTutorial done!")
-
 
 if __name__ == '__main__':
     main()
+    print("\nEnd of FoKL to Pyomo tutorial.")
 

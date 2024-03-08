@@ -15,8 +15,7 @@ import warnings
 
 
 def main():
-    print("The following is an example of generating, saving, and loading a FoKL model.")
-    print("----------------------------------------------------------------------------")
+    print("\nThe following is an example of generating, saving, and loading a FoKL model.")
 
     # Define filename of model to save/load, and its directory:
 
@@ -25,7 +24,7 @@ def main():
 
     # (1) Train a new FoKL model:
 
-    print("Training model...")
+    print("\nTraining model...\n")
     f = FoKLRoutines.FoKL()
     x = [1, 2, 3, 4, 5]
     y = [1, 4, 9, 16, 25]
@@ -33,17 +32,17 @@ def main():
 
     # (2) Save the model:
 
-    print("Saving model...")
+    print("\nSaving model...")
     filepath = f.save(filename, directory)
 
     # (3) Load the model:
 
-    print('Loading model...')
+    print('\nLoading model...')
     f_loaded = FoKLRoutines.load(filepath)  # = FoKLRoutines.load(filename, directory)
 
     # Compare saved and loaded models to confirm functionality:
 
-    print("Confirming functionality...")
+    print("\nConfirming functionality...\n")
     if f.kernel == f_loaded.kernel and all(f.betas_avg == f_loaded.betas_avg) and all(f.mtx == f_loaded.mtx):
         print("Success! The saving and loading functions are working properly.")
     else:
@@ -52,4 +51,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    print("\nEnd of save and load tutorial.")
 
