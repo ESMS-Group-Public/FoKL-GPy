@@ -1,4 +1,4 @@
-from src.FoKL import getKernels  # DEV PRIOR2PULL
+from FoKL import getKernels
 import pandas as pd
 import warnings
 import itertools

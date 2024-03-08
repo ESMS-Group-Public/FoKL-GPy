@@ -3,8 +3,8 @@
 
 This is an example using the 'GP_Integrate' function with a FoKL model.
 """
-from src.FoKL import FoKLRoutines
-from src.FoKL.GP_Integrate import GP_Integrate
+from FoKL import FoKLRoutines
+from FoKL.GP_Integrate import GP_Integrate
 import numpy as np
 import matplotlib.pyplot as plt
 

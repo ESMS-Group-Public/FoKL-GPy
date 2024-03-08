@@ -10,7 +10,7 @@ In this tutorial, the following will be demonstrated:
     2) Save the model.
     3) Load a model.
 """
-from src.FoKL import FoKLRoutines
+from FoKL import FoKLRoutines
 import warnings
 
 

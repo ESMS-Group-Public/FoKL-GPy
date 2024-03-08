@@ -30,7 +30,7 @@ In this tutorial, the following will be demonstrated:
 
     8) Retrieve the solution.
 """
-from src.FoKL import FoKLRoutines
+from FoKL import FoKLRoutines
 import pyomo.environ as pyo
 import numpy as np
 

@@ -5,7 +5,7 @@ This is an example of FoKL modeling a dataset based on an arbitrary sigmoid func
 how to initialize the FoKL class (i.e., model), how to train the model on the dataset by calling 'fit', and how to
 perform some very basic post-processing with a 'coverage3' plot and included RMSE calculation.
 """
-from src.FoKL import FoKLRoutines
+from FoKL import FoKLRoutines
 import numpy as np
 
 

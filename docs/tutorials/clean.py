@@ -33,7 +33,7 @@ In this tutorial, the following will be demonstrated:
         formatting issues so please ensure both 'betas' and 'mtx' are 2D numpy arrays, where columns of 'betas' index
         the 0th-Nth terms in the model and rows of 'mtx' index the 1st-Nth terms.
 """
-from src.FoKL import FoKLRoutines
+from FoKL import FoKLRoutines
 import numpy as np
 
 
