@@ -1,1 +1,0 @@
-Sigmoid Example Run Script
