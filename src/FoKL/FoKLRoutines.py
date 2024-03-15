@@ -878,6 +878,9 @@ class FoKL:
         for kwarg in default_for_clean.keys():
             kwargs_to_clean.update({kwarg: current[kwarg]})  # store kwarg for clean here
             del current[kwarg]  # delete kwarg for clean from current
+        if current['draws'] < 40 and current['ReturnBounds']:
+            current['draws'] = 40
+            warnings.warn("'draws' must be greater than or equal to 40 if calculating bounds. Setting 'draws=40'.")
         draws = current['draws']  # define local variable
         if betas is None:  # default
             betas = self.betas[-draws::, :]  # use samples from last models
@@ -1751,7 +1754,7 @@ class FoKL:
         m.fokl_y = pyo.Var(m.fokl_i, within=pyo.Reals)  # FoKL output
 
         m.fokl_j = pyo.Set(initialize=range(lv))  # index for FoKL input variable
-        m.fokl_x = pyo.Var(m.fokl_j, within=pyo.Reals, bounds=[0, 1], initialize=0.5)  # FoKL input variables (per domain)
+        m.fokl_x = pyo.Var(m.fokl_j, within=pyo.Reals, bounds=[0, 1])  # FoKL input variables (per domain)
 
         basis_nj = []
         for j in m.fokl_j:
