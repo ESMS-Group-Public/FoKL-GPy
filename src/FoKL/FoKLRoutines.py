@@ -1722,15 +1722,6 @@ class FoKL:
             - It is highly recommended to use a FoKL model trained on the 'Bernoulli Polynomials' kernel. Otherwise, with
             'Cubic Splines', the solution time is extremely impractical even for the simplest of models.
         """
-
-        # NEED TO ADD:
-        #   - ADD MULTIPLE DRAWS AS SCENARIOS
-        #   - Y INDEXED BY SCENARIO (AND LIKE DEFAULT, AS CONSTRAINT)
-        #   - TEST OBJECTIVE (LIKELY OUTSIDE METHOD) TO MAXIMIZE AVERAGE OF Y'S
-        #   - MAKE 95% OR SO OF SCENARIOS FEASIBLE, BUT THIS MAY BE WITHIN SOLVER SETTINGS OUTSIDE METHOD
-
-        # b = copy.deepcopy(self.betas)  # copy required since 'fokl = b[0]' followed by 'fokl += ...'
-
         t = np.array(self.mtx - 1, dtype=int)  # indices of polynomial (where 0 is B1 and -1 means none)
         lt = t.shape[0] + 1  # length of terms (including beta0)
         lv = t.shape[1]  # length of input variables
