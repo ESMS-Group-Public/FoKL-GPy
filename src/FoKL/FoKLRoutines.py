@@ -880,11 +880,14 @@ class FoKL:
             del current[kwarg]  # delete kwarg for clean from current
         draws = current['draws']  # define local variable
         if betas is None:  # default
-            betas = self.betas
+            betas = self.betas[-draws::, :]  # use samples from last models
         else:  # user-defined betas may need to be formatted
             betas = np.array(betas)
             if betas.ndim == 1:
                 betas = betas[np.newaxis, :]  # note transpose would be column of beta0 terms, so not expected
+            if draws > betas.shape[0]:
+                draws = betas.shape[0]  # more draws than models results in inf time, so threshold
+            betas = betas[-draws::, :]  # use samples from last models
         if mtx is None:  # default
             mtx = self.mtx
         else:  # user-defined mtx may need to be formatted
@@ -896,8 +899,6 @@ class FoKL:
                 warnings.warn("Assuming 'mtx' represents a single model. If meant to represent several models, then "
                               "explicitly enter a 2D numpy array where rows correspond to models.")
 
-        if draws > betas.shape[0]:
-            draws = betas.shape[0]  # more draws than models results in inf time, so threshold
         phis = self.phis
 
         # Automatically normalize and format inputs:
@@ -973,7 +974,7 @@ class FoKL:
 
         if current['ReturnBounds']:
             bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
-            cut = int(np.floor(draws * .025))
+            cut = int(np.floor(draws * 0.025) + 1)
             for i in range(n):  # note n == np.shape(data)[0] if data != 'ignore'
                 drawset = np.sort(modells[i, :])
                 bounds[i, 0] = drawset[cut]
@@ -1083,12 +1084,12 @@ class FoKL:
                 warn_xaxis = []
                 l_xaxis = len(current['xaxis'])
                 try:  # because shape any type of inputs is unknown, try lengths of different orientations
-                    if l_xaxis != len(current['inputs'][:, 0]) and l_xaxis != len(current['inputs'][0, :]):
+                    if l_xaxis != np.shape(current['inputs'])[0] and l_xaxis != np.shape(current['inputs'])[1]:
                         warn_xaxis.append(True)
                 except:
                     warn_xaxis = warn_xaxis  # do nothing
                 try:
-                    if l_xaxis != len(current['inputs'][0]):
+                    if l_xaxis != np.shape(current['inputs'])[0]:
                         warn_xaxis.append(True)
                 except:
                     warn_xaxis = warn_xaxis  # do nothing
@@ -1126,6 +1127,8 @@ class FoKL:
                     warnings.warn(f"Keyword argument 'xaxis'={current['xaxis']} failed to index 'inputs'. Plotting indices instead.",
                                   category=UserWarning)
                     plt_x = np.linspace(0, n - 1, n)  # indices
+            else:
+                plt_x = current['xaxis']  # user provided vector for xaxis
 
             if current['plot'] == 'sorted':  # if user requested a sorted plot
                 sort_id = np.argsort(np.squeeze(data))
@@ -1695,18 +1698,17 @@ class FoKL:
 
         return
 
-    def to_pyomo(self, m=None, y=None, x=None, ReturnObjective=False, TruncateBasis=None):
+    def to_pyomo(self, draws, m=None, y=None, x=None, ReturnObjective=False, TruncateBasis=None):
         """
-        Automatically convert a pre-trained FoKL model to expressions and constraints for a symbolic Pyomo model. Note
-        that by default, the Pyomo model's objective does not get defined here but can be overridden with
-        ReturnObjective=True.
+        Automatically convert a pre-trained FoKL model to constraints for a symbolic Pyomo model.
+
+        Input:
+            - draws == number of scenarios to include as Pyomo constraints
 
         Optional Inputs:
             - m               == Pyomo model (if already defined)
             - y               == FoKL output to include in Pyomo model (if known)
             - x               == FoKL input variables to include in Pyomo model (if known), e.g., x=[0.7, None, 0.4]
-            - ReturnObjective == boolean to set the FoKL model as the Pyomo model's objective      == 0 (default)
-            - TruncateBasis   == integer (3, lp-1) to decrease the resolution of the cubic splines == 0 (default)
 
         Output:
             - m == Pyomo model with FoKL model included
@@ -1714,96 +1716,102 @@ class FoKL:
                 - m.x[j] == input variable corresponding to FoKL model
 
         Note:
-            - It is highly recomme nded to use a FoKL model trained on the 'Bernoulli Polynomials' kernel. Otherwise, with
+            - It is highly recommended to use a FoKL model trained on the 'Bernoulli Polynomials' kernel. Otherwise, with
             'Cubic Splines', the solution time is extremely impractical even for the simplest of models.
         """
 
-        if ReturnObjective is not False:
-            ReturnObjective = str_to_bool(ReturnObjective)
+        # NEED TO ADD:
+        #   - ADD MULTIPLE DRAWS AS SCENARIOS
+        #   - Y INDEXED BY SCENARIO (AND LIKE DEFAULT, AS CONSTRAINT)
+        #   - TEST OBJECTIVE (LIKELY OUTSIDE METHOD) TO MAXIMIZE AVERAGE OF Y'S
+        #   - MAKE 95% OR SO OF SCENARIOS FEASIBLE, BUT THIS MAY BE WITHIN SOLVER SETTINGS OUTSIDE METHOD
 
-        try:
-            b = copy.deepcopy(self.betas_avg)
-        except:
-            b = np.mean(self.betas, axis=0)
-            self.betas_avg = b
+        # b = copy.deepcopy(self.betas)  # copy required since 'fokl = b[0]' followed by 'fokl += ...'
 
-        t = self.mtx - 1  # indices of splines (where -1 means none)
-        lt = t.shape[0]  # length of terms (not including beta0)
+        t = np.array(self.mtx - 1, dtype=int)  # indices of polynomial (where 0 is B1 and -1 means none)
+        lt = t.shape[0] + 1  # length of terms (including beta0)
         lv = t.shape[1]  # length of input variables
-        s_ids = np.sort(np.unique(t[t != -1]))  # basis functions used for FoKL model
 
-        if self.kernel == self.kernels[0]:
-            lp = len(self.phis[0][0])  # length of cubics per spline (499)
-            if TruncateBasis is not None:  # assume TruncateBasis < lp
-                phinds64 = np.round(np.linspace(0, TruncateBasis - 1, TruncateBasis) * (lp - 1) / (TruncateBasis - 1))
-                phinds = []  # list of Python integers indexing the spline coefficients
-                for phind64 in phinds64:
-                    phinds.append(int(phind64))
-                p = []
-                for s in range(int(s_ids[-1] + 1)):  # for spline id in length of maximum spline id
-                    if s in s_ids:
-                        p4 = []
-                        for c in range(4):  # for x^power coefficient of powers 0 to 3
-                            p4.append(list(f.phis[s][c][phind] for phind in phinds))  # update splines needed for model
-                        p.append(p4)
-                    else:
-                        p.append([])  # spline not used, but still need to maintain indexing
-                p = tuple(p)  # to align with 'self.phis' format
-                lp = TruncateBasis  # = len(p[0][0])
+        ni_ids = []  # orders of basis functions used (where 0 is B1), per term
+        basis_n = []  # for future use when indexing 'm.fokl_basis'
+        for j in range(lv):  # for input variable in input variables
+            ni_ids.append(np.sort(np.unique(t[:, j][t[:, j] != -1])).tolist())
+            basis_n += ni_ids[j]
+        n_ids = np.sort(np.unique(basis_n))
 
-                raise ValueError("The method for the 'Cubic Splines' kernel has not yet been ported from development.")
-
-            return
-
-        elif self.kernel == self.kernels[1]:
-            p = []
-            for s in range(int(s_ids[-1] + 1)):  # for spline id in length of maximum spline id
-                if s in s_ids:
-                    p.append(self.phis[s])
-                else:
-                    p.append([])  # spline not used, but still need to maintain indexing
-            p = tuple(p)  # to align with 'self.phis' format
+        if self.kernel != self.kernels[1]:
+            raise ValueError("The method for the 'Cubic Splines' kernel has not yet been ported from development, nor "
+                             "is expected to be as the resulting symbolic expressions are too infeasible to solve. Use "
+                             "the 'to_pyomo' method with a FoKL model trained on the 'Bernoulli Polynomials' kernel.")
 
         if m is None:
             m = pyo.ConcreteModel()
 
-        m.j = pyo.Set(initialize=range(lv))  # index for FoKL input variable
-        m.y = pyo.Var(within=pyo.Reals)  # FoKL output
-        m.x = pyo.Var(m.j, within=pyo.Reals, bounds=[0, 1])  # FoKL input variables (per domain)
+        m.fokl_i = pyo.Set(initialize=range(draws))  # index for scenario (i.e., FoKL draw)
+        m.fokl_y = pyo.Var(m.fokl_i, within=pyo.Reals)  # FoKL output
 
-        def fokl_as_pyomo(m):
-            """Convert FoKL model to Pyomo format assuming 'Bernoulli Polynomials' kernel."""
-            fokl = b[0]  # initialize expression with beta0 term
-            for k in range(lt):  # for term in terms
-                tk = t[k, :]
-                tk_mask = tk != -1  # recall -1 means ignore (i.e., input var with '-1 spline id' does not appear in term)
-                if any(tk_mask):
-                    term_k = b[k + 1]
-                    for j in range(lv):  # for variables that might be in term
-                        if tk_mask[j]:  # for variable in term
-                            n = int(tk[j])  # spline id, = sjs[j][k] if already referenced
-                            phix_sj = p[n][0] + sum(p[n][k] * (m.x[j] ** k) for k in range(1, len(p[n])))
-                            term_k *= phix_sj
-                else:
-                    term_k = 0
-                fokl += term_k  # append term to expression
-            return fokl
+        m.fokl_j = pyo.Set(initialize=range(lv))  # index for FoKL input variable
+        m.fokl_x = pyo.Var(m.fokl_j, within=pyo.Reals, bounds=[0, 1], initialize=0.5)  # FoKL input variables (per domain)
 
-        m.fokl = pyo.Expression(rule=fokl_as_pyomo)
-        if ReturnObjective:
-            m.obj = pyo.Objective(expr=abs(m.fokl - m.y), sense=pyo.minimize)
-        else:  # returning constraint (default)
-            m.con = pyo.Constraint(expr=abs(m.fokl - m.y) == 0)
+        basis_nj = []
+        for j in m.fokl_j:
+            for n in ni_ids[j]:  # for order of basis function in unique orders, per current input variable 'm.x[j]'
+                basis_nj.append([n, j])
+
+        def symbolic_basis(m):
+            """Basis functions as symbolic. See 'evaluate_basis' for source of equation."""
+            for [n, j] in basis_nj:
+                m.fokl_basis[n, j] = self.phis[n][0] + sum(self.phis[n][k] * (m.fokl_x[j] ** k)
+                                                           for k in range(1, len(self.phis[n])))
+            return
+
+        m.fokl_basis = pyo.Expression(basis_nj)  # create indices ONLY for used basis functions
+        symbolic_basis(m)  # may be better to write as rule, but 'pyo.Expression(basis_nj, rule=basis)' failed
+
+        m.fokl_k = pyo.Set(initialize=range(lt))  # index for FoKL term (where 0 is beta0)
+        m.fokl_b = pyo.Var(m.fokl_i, m.fokl_k)  # FoKL coefficients (i.e., betas)
+        for i in m.fokl_i:  # for scenario (i.e., draw) in scenarios (i.e., draws)
+            for k in m.fokl_k:  # for term in terms
+                m.fokl_b[i, k].fix(self.betas[-(i + 1), k])  # define values of betas, with y[0] as last FoKL draws
+
+        def symbolic_fokl(m):
+            """FoKL models (i.e., scenarios) as symbolic, assuming 'Bernoulli Polynomials."""
+            for i in m.fokl_i:  # for scenario (i.e., draw) in scenarios (i.e., draws)
+                m.fokl_expr[i] = m.fokl_b[i, 0]  # initialize with beta0
+                for k in range(1, lt):  # for term in non-zeros terms (i.e., exclude beta0)
+                    tk = t[k - 1, :]  # interaction matrix of current term
+                    tk_mask = tk != -1  # ignore if -1 (recall -1 basis function means none)
+                    if any(tk_mask):  # should always be true because FoKL 'fit' removes rows from 'mtx' without basis
+                        term_k = m.fokl_b[i, k]
+                        for j in m.fokl_j:  # for input variable in input variables
+                            if tk_mask[j]:  # for variable in term
+                                term_k *= m.fokl_basis[tk[j], j]  # multiply basis function(s) with beta to form term
+                    else:
+                        term_k = 0
+                    m.fokl_expr[i] += term_k  # add term to expression
+            return
+
+        m.fokl_expr = pyo.Expression(m.fokl_i)  # FoKL models (i.e., scenarios, draws)
+        symbolic_fokl(m)  # may be better to write as rule
+
+        def symbolic_scenario(m):
+            """Define constraints."""
+            for i in m.fokl_i:
+                m.fokl_constr[i] = m.fokl_y[i] == m.fokl_expr[i]
+            return
+
+        m.fokl_constr = pyo.Constraint(m.fokl_i)  # set of constraints, one per scenario
+        symbolic_scenario(m)  # may be better to write as rule
+
+        m.fokl_y_avg = pyo.Expression(expr=sum(m.fokl_y[i] for i in m.fokl_i) / draws)  # average of scenarios
 
         if y is not None:
-            # m.y_con = pyo.Constraint(expr=m.y == y)
-            m.y.value = y
-        # m.x_con = pyo.Constraint(m.j)
-        for j in m.j:
+            for i in m.fokl_i:
+                m.fokl_y[i].fix(y)
+        for j in m.fokl_j:
             if x is not None:
                 if x[j] is not None:
-                    # m.x_con.add(j, expr=m.x[j] == x[j])
-                    m.x[j].value = x[j]
+                    m.fokl_x[j].fix(x[j])
 
         return m
 
