@@ -1741,8 +1741,8 @@ class FoKL:
         if m is None:
             m = pyo.ConcreteModel()
 
-        m.fokl_i = pyo.Set(initialize=range(draws))  # index for scenario (i.e., FoKL draw)
-        m.fokl_y = pyo.Var(m.fokl_i, within=pyo.Reals)  # FoKL output
+        m.fokl_scenarios = pyo.Set(initialize=range(draws))  # index for scenario (i.e., FoKL draw)
+        m.fokl_y = pyo.Var(m.fokl_scenarios, within=pyo.Reals)  # FoKL output
 
         m.fokl_j = pyo.Set(initialize=range(lv))  # index for FoKL input variable
         m.fokl_x = pyo.Var(m.fokl_j, within=pyo.Reals, bounds=[0, 1])  # FoKL input variables (per domain)
@@ -1763,14 +1763,14 @@ class FoKL:
         symbolic_basis(m)  # may be better to write as rule, but 'pyo.Expression(basis_nj, rule=basis)' failed
 
         m.fokl_k = pyo.Set(initialize=range(lt))  # index for FoKL term (where 0 is beta0)
-        m.fokl_b = pyo.Var(m.fokl_i, m.fokl_k)  # FoKL coefficients (i.e., betas)
-        for i in m.fokl_i:  # for scenario (i.e., draw) in scenarios (i.e., draws)
+        m.fokl_b = pyo.Var(m.fokl_scenarios, m.fokl_k)  # FoKL coefficients (i.e., betas)
+        for i in m.fokl_scenarios:  # for scenario (i.e., draw) in scenarios (i.e., draws)
             for k in m.fokl_k:  # for term in terms
                 m.fokl_b[i, k].fix(self.betas[-(i + 1), k])  # define values of betas, with y[0] as last FoKL draws
 
         def symbolic_fokl(m):
             """FoKL models (i.e., scenarios) as symbolic, assuming 'Bernoulli Polynomials."""
-            for i in m.fokl_i:  # for scenario (i.e., draw) in scenarios (i.e., draws)
+            for i in m.fokl_scenarios:  # for scenario (i.e., draw) in scenarios (i.e., draws)
                 m.fokl_expr[i] = m.fokl_b[i, 0]  # initialize with beta0
                 for k in range(1, lt):  # for term in non-zeros terms (i.e., exclude beta0)
                     tk = t[k - 1, :]  # interaction matrix of current term
@@ -1785,22 +1785,20 @@ class FoKL:
                     m.fokl_expr[i] += term_k  # add term to expression
             return
 
-        m.fokl_expr = pyo.Expression(m.fokl_i)  # FoKL models (i.e., scenarios, draws)
+        m.fokl_expr = pyo.Expression(m.fokl_scenarios)  # FoKL models (i.e., scenarios, draws)
         symbolic_fokl(m)  # may be better to write as rule
 
         def symbolic_scenario(m):
-            """Define constraints."""
-            for i in m.fokl_i:
+            """Define each scenario, meaning a different draw of 'betas' for y=f(x), as a constraint."""
+            for i in m.fokl_scenarios:
                 m.fokl_constr[i] = m.fokl_y[i] == m.fokl_expr[i]
             return
 
-        m.fokl_constr = pyo.Constraint(m.fokl_i)  # set of constraints, one per scenario
+        m.fokl_constr = pyo.Constraint(m.fokl_scenarios)  # set of constraints, one per scenario
         symbolic_scenario(m)  # may be better to write as rule
 
-        m.fokl_y_avg = pyo.Expression(expr=sum(m.fokl_y[i] for i in m.fokl_i) / draws)  # average of scenarios
-
         if y is not None:
-            for i in m.fokl_i:
+            for i in m.fokl_scenarios:
                 m.fokl_y[i].fix(y)
         for j in m.fokl_j:
             if x is not None:

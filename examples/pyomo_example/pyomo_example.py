@@ -39,6 +39,7 @@ def main(scenarios):
     m.x0 = pyo.Constraint(expr=m.fokl_x[0] == (sin(m.t * np.pi * 3) + 1) / 2)
     m.x1 = pyo.Constraint(expr=m.fokl_x[1] == (cos(m.t * np.pi * 3) + 1) / 2)
 
+    m.fokl_y_avg = pyo.Expression(expr=sum(m.fokl_y[i] for i in m.fokl_scenarios) / scenarios)  # average of scenarios
     m.obj = pyo.Objective(expr=m.fokl_y_avg, sense=pyo.maximize)
 
     # solve:
@@ -60,6 +61,6 @@ def main(scenarios):
 
 
 if __name__ == '__main__':
-    scenarios = 1000
+    scenarios = 10
     main(scenarios)
 
