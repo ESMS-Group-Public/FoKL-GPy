@@ -35,7 +35,7 @@ def main(scenarios):
     m = f.to_pyomo(scenarios)
 
     # additional constraints to enforce 'physics':
-    m.t = pyo.Var(within=pyo.Reals, bounds=[0, 1])
+    m.t = pyo.Var(within=pyo.Reals, bounds=[0, 1], initialize=0.5)
     m.x0 = pyo.Constraint(expr=m.fokl_x[0] == (sin(m.t * np.pi * 3) + 1) / 2)
     m.x1 = pyo.Constraint(expr=m.fokl_x[1] == (cos(m.t * np.pi * 3) + 1) / 2)
 
