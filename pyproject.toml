@@ -17,6 +17,7 @@ classifiers = [
 dependencies = [
     "requests",
     'importlib-metadata; python_version<"3.8"',
+    "Pyomo >= 6.7.0"
 ]
 dynamic = ["version"]
 
