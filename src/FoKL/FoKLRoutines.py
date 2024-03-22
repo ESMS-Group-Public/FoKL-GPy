@@ -98,7 +98,7 @@ def inputs_to_phind(self, inputs, phis, DefineAttributes=False, kernel=None):
     Twice normalize the inputs to index the spline coefficients.
 
     Inputs:
-        - inputs == normalized inputs as numpy array (i.e., self.inputs.np)
+        - inputs == normalized inputs as numpy array (i.e., self.inputs)
         - phis   == spline coefficients
     Optional Input:
         - DefineAttributes == boolean for updating class attributes with phind and xsm == False (default)
@@ -242,7 +242,7 @@ class FoKL:
                    'UserWarnings': True, 'ConsoleOutput': True
                    }
         current = process_kwargs(default, kwargs)  # = default, but updated by any user kwargs
-        for boolean in ['gimmie', 'way3', 'aic', 'UserWarnings']:
+        for boolean in ['gimmie', 'way3', 'aic', 'UserWarnings', 'ConsoleOutput']:
             if not (current[boolean] is False or current[boolean] is True):
                 current[boolean] = str_to_bool(current[boolean])
 
@@ -276,321 +276,137 @@ class FoKL:
         entered if available; otherwise, leave blank.
 
         Inputs:
-            inputs == NxM matrix of independent (or non-linearly dependent) 'x' variables for fitting f(x1, ..., xM)
-            data   == Nx1 vector of dependent variable to create model for predicting the value of f(x1, ..., xM)
+            inputs == [n x m] input matrix of n observations by m features (i.e., 'x' variables in model)
+            data   == [n x 1] output vector of n observations (i.e., 'y' variable in model)
 
         Keyword Inputs:
-            train                == percentage (0-1) of N datapoints to use for training           == 1 (default)
-            TrainMethod          == method for splitting test/train set for train < 1              == 'random' (default)
-            CatchOutliers        == logical for removing outliers from inputs and/or data          == False (default)
-            OutliersMethod       == the method for removing outliers (e.g., 'Z-Score)              == None (default)
-            OutliersMethodParams == parameters to modify OutliersMethod (format varies per method) == None (default)
-            kwargs_from_other    == used internally by fit or evaluate function (not for user)
+            bit               == floating point bits to represent dataset as          == 64 (default)
+            train             == percentage (0-1) of n datapoints to use for training == 1 (default)
+            kwargs_from_other == [NOT FOR USER] used internally by fit or evaluate function
 
         Added Attributes:
-            > 'inputs' and 'data' get automatically formatted, cleaned, reduced to a train set, and stored as:
-                > model.inputs         == all normalized inputs w/o outliers (i.e., model.traininputs plus
-                                          model.testinputs)
-                > model.data           == all data w/o outliers (i.e., model.traindata plus model.testdata)
-            > other useful info related to 'inputs' and 'data' get stored as:
-                > model.rawinputs      == all normalized inputs w/ outliers == user's 'inputs' but normalized and
-                                                                               formatted
-                > model.rawdata        == all data w/ outliers              == user's 'data' but formatted
-                > model.traininputs    == train set of model.inputs
-                > model.traindata      == train set of model.data
-                > model.testinputs     == test set of model.inputs
-                > model.testdata       == test set of model.data
-                > model.normalize      == [min, max] factors used to normalize user's 'inputs' to 0-1 scale of
-                                          model.rawinputs
-                > model.outliers       == indices removed from model.rawinputs and model.rawdata as outliers
-                > model.trainlog       == indices of model.inputs used for model.traininputs
-                > model.testlog        == indices of model.data used for model.traindata
-            > to access numpy versions of the above attributes related to 'inputs', use:
-                > model.inputs_np      == model.inputs as a numpy array of timestamps x input variables
-                > model.rawinputs_np   == model.rawinputs as a numpy array of timestamps x input variables
-                > model.traininputs_np == model.traininputs as a numpy array of timestamps x input variables
-                > model.testinputs_np  == model.testinputs as a numpy array of timestamps x input variables
-
-        Note additional methods for automatically cleaning data are in development.
+            - self.inputs    == 'inputs' as [n x m] numpy array where each column is normalized on [0, 1] scale
+            - self.data      == 'data' as [n x 1] numpy array
+            - self.normalize == [[min, max], ... [min, max]] factors used to normalize 'inputs' to 'self.inputs'
+            - self.trainlog  == indices of 'self.inputs' to use as training set
         """
+
+        # Allowable datatypes (https://numpy.org/doc/stable/reference/arrays.scalars.html#arrays-scalars-built-in):
+        bits = {16: np.float16, 32: np.float32, 64: np.float64}
 
         # Process keywords:
         if kwargs_from_other is not None:  # then clean is being called from fit or evaluate function
             kwargs = kwargs | kwargs_from_other  # merge dictionaries (kwargs={} is expected but just in case)
-        default = {'train': 1, 'TrainMethod': 'random', 'CatchOutliers': False, 'OutliersMethod': None,
-                   'OutliersMethodParams': None}
+        default = {'bit': 64, 'train': 1, 'AutoTranspose': True}
         current = process_kwargs(default, kwargs)
+        if current['bit'] not in bits.keys():
+            warnings.warn(f"Keyword 'bit={current['bit']}' limited to values of 16, 32, or 64. Assuming default value "
+                          f"of 64.", category=UserWarning)
+            current['bit'] = 64
+        current['AutoTranspose'] = str_to_bool(current['AutoTranspose'])
 
         # Define local variables from keywords:
-        p_train = current['train']  # percentage of datapoints to use as training data
-        p_train_method = current['TrainMethod']
-        CatchOutliers = current['CatchOutliers']
-        OutliersMethod = current['OutliersMethod']
-        OutliersMethodParams = current['OutliersMethodParams']
+        datatype = bits[current['bit']]
+        train = current['train']  # percentage of datapoints to use as training data
 
-        if isinstance(CatchOutliers, bool):
-            CatchOutliers = 1 * CatchOutliers
-        elif isinstance(CatchOutliers, str):  # then convert user input to logical for auto_cleanData to interpret
-            if CatchOutliers.lower() in ('inputs', 'input', 'in', 'x'):
-                CatchOutliers = [1, 0]  # note 1 will need to be replicated later to match number of input variables
-            elif CatchOutliers.lower() in ('data', 'outputs', 'output', 'out', 'y'):
-                CatchOutliers = [0, 1]  # note 0 will need to be replicated later to match number of input variables
-            else:  # apply to both inputs and data, i.e., not a vector but a single True/False
-                CatchOutliers = 1 * str_to_bool(CatchOutliers)  # 0 or 1
-        elif isinstance(CatchOutliers, np.ndarray): # then assume vector (which is goal)
-            if CatchOutliers.ndim != 1:
-                CatchOutliers = np.squeeze(CatchOutliers)
-                if CatchOutliers.ndim != 1:
-                    raise ValueError("CatchOutliers, if being applied to a user-selected inputs+data combo, must be a "
-                                     "boolean 1D list (e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., "
-                                     "inputM, data].")
-            CatchOutliers = list(CatchOutliers)  # should return 1D list
-        elif isinstance(CatchOutliers, tuple):
-            CatchOutliers = list(CatchOutliers)
-        elif not isinstance(CatchOutliers, list):
-            raise ValueError("CatchOutliers must be defined as 'inputs', 'data', 'all', or a boolean 1D list "
-                             "(e.g., [0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
-        # Note at this point CatchOutliers might be 0, 1, [1, 0], [0, 1, 0, 0], etc.
+        # Convert 'inputs' and 'datas' to numpy if pandas:
+        if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
+            inputs = inputs.to_numpy()
+            warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.",
+                          category=UserWarning)
+        if data is not None:
+            if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
+                data = data.to_numpy()
+                warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.",
+                              category=UserWarning)
 
-        # Automatically handle some data formatting exceptions:
-        def auto_cleanData(inputs, p_train, CatchOutliers, OutliersMethod, OutliersMethodParams, data=data):
-
-            # Convert 'inputs' and 'datas' to numpy if pandas:
-            if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
-                inputs = inputs.to_numpy()
-                warnings.warn(
-                    "'inputs' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-            if data is not None:
-                if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
-                    data = data.to_numpy()
-                    warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.", UserWarning)
-
-            # Normalize 'inputs' and convert to proper format for FoKL:
-            inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
-            # . . . inputs = {ndarray: (N, M)} = {ndarray: (datapoints, input variables)} =
-            # . . . . . . array([[x1(t1),x2(t1),...,xM(t1)],[x1(t2),x2(t2),...,xM(t2)],...,[x1(tN),x2(tN),...,xM(tN)]])
-            inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
-            if inputs.dtype != float:
-                inputs = np.array(inputs, dtype=float)
-                warnings.warn("'inputs' was converted to float64. May require user-confirmation that values did not get"
-                              "corrupted.", category=UserWarning)
-            if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
-                inputs = inputs[:, np.newaxis]
-            N = inputs.shape[0]
-            M = inputs.shape[1]
-            if M > N: # if more "input variables" than "datapoints", assume user is using transpose of proper format
+        # Format 'inputs' as [n x m] numpy array:
+        inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
+        inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
+        if inputs.dtype != datatype:
+            inputs = np.array(inputs, dtype=datatype)
+            warnings.warn(f"'inputs' was converted to float{current['bit']}. May require user-confirmation that "
+                          f"values did not get corrupted.", category=UserWarning)
+        if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
+            inputs = inputs[:, np.newaxis]
+        if current['AutoTranspose'] is True:
+            if inputs.shape[1] > inputs.shape[0]:  # assume user is using transpose of proper format
                 inputs = inputs.transpose()
-                warnings.warn(
-                    "'inputs' was transposed. Ignore if more datapoints than input variables.", category=UserWarning)
-                N_old = N
-                N = M # number of datapoints (i.e., timestamps)
-                M = N_old # number of input variables
-            inputs_max = np.max(inputs, axis=0) # max of each input variable
-            inputs_scale = []
-            for ii in range(len(inputs_max)):
-                inputs_min = np.min(inputs[:, ii])
-                if inputs_max[ii] != 1 or inputs_min != 0:
-                    if inputs_min == inputs_max[ii]:
-                        inputs[:,ii] = np.ones(len(inputs[:,ii]))
-                        warnings.warn("'inputs' contains a column of constants which will not improve the model's fit."
-                                      , category=UserWarning)
-                    else: # normalize
-                        inputs[:,ii] = (inputs[:,ii] - inputs_min) / (inputs_max[ii] - inputs_min)
-                inputs_scale.append(np.array([inputs_min, inputs_max[ii]]))  # store for post-processing convenience
+                warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables, else set "
+                              "'AutoTranspose=False' to disable.", category=UserWarning)
 
-            if data is not None:
-                # Transpose 'data' if needed:
-                data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
-                data = np.squeeze(data)
-                if data.dtype != float:
-                    data = np.array(data, dtype=float)
-                    warnings.warn(
-                        "'data' was converted to float64. May require user-confirmation that values did not get"
-                        "corrupted.", category=UserWarning)
-                if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
-                    data = data[:, np.newaxis]
-                    warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL formatting."
-                        , category=UserWarning)
-                else: # check user provided only one output column/row, then transpose if needed
-                    N_data = data.shape[0]
-                    M_data = data.shape[1]
-                    if (M_data != 1 and N_data != 1) or (M_data == 1 and N_data == 1):
-                        raise ValueError("Error: 'data' must be a vector.")
-                    elif M_data != 1 and N_data == 1:
-                        data = data.transpose()
-                        warnings.warn("'data' was transposed to match FoKL formatting.",category=UserWarning)
+        # Normalize 'inputs' to [0, 1] scale:
+        inputs_max = np.max(inputs, axis=0) # max of each input variable
+        normalize = []
+        for m in range(inputs.shape[1]):  # for input var in input vars, to check each var's normalization status
+            inputs_min = np.min(inputs[:, m])
+            if inputs_max[m] != 1 or inputs_min != 0:
+                if inputs_min == inputs_max[m]:
+                    warnings.warn("'inputs' contains a column of constants which will not improve the model's fit."
+                                  , category=UserWarning)
+                    inputs[:, m] = np.ones_like(inputs[:, m])
+                else:  # normalize
+                    inputs[:, m] = (inputs[:, m] - inputs_min) / (inputs_max[m] - inputs_min)
+            normalize.append([inputs_min, inputs_max[m]])  # store [min, max] for post-processing convenience
 
-            # Store properly formatted data and normalized inputs BEFORE removing outliers and BEFORE splitting train
-            rawinputs = inputs.tolist()  # convert to list, which was proper format for FoKL v2
-            rawdata = data
+        # Format 'data' as [n x 1] numpy array:
+        if data is not None:
+            data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
+            data = np.squeeze(data)
+            if data.dtype != datatype:
+                data = np.array(data, dtype=datatype)
+                warnings.warn(f"'data' was converted to float{current['bit']}. May require user-confirmation that "
+                              f"values did not get corrupted.", category=UserWarning)
+            if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
+                data = data[:, np.newaxis]
+                warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL "
+                              "formatting.", category=UserWarning)
+            else:  # check user provided only one output column/row, then transpose if needed
+                n = data.shape[0]
+                m = data.shape[1]
+                if (m != 1 and n != 1) or (m == 1 and n == 1):
+                    raise ValueError("Error: 'data' must be a vector.")
+                elif m != 1 and n == 1:
+                    data = data.transpose()
+                    warnings.warn("'data' was transposed to match FoKL formatting.", category=UserWarning)
 
-            # Catch and remove outliers:
-            if CatchOutliers == [1,0]: # i.e., inputs only
-                CatchOutliers = list(np.ones(M))+[0] # [1,1,...,1,0] as a list
-            elif CatchOutliers == [0,1]: # i.e., data only
-                CatchOutliers = list(np.zeros(M))+[1] # [0,0,...,0,1] as a list
-            elif CatchOutliers == 1: # i.e., all
-                CatchOutliers = list(np.ones(M+1)) # [1,1,...,1,1] as a list
-            elif CatchOutliers == 0: # i.e., none
-                CatchOutliers = list(np.zeros(M+1)) # [0,0,...,0,0] as a list
-            elif len(CatchOutliers) != M+1:
-                raise ValueError(
-                    "CatchOutliers must be defined as 'Inputs', 'Data', 'All', or a logical 1D list (e.g., "
-                    "'[0,1,...,1,0]) corresponding to [input1, input2, ..., inputM, data].")
-
-            def catch_outliers(inputs, data, CatchOutliers, OutliersMethod, OutliersMethodParams):
-                inputs_wo_outliers = inputs
-                data_wo_outliers = data
-                outliers_indices = [] # if logical true/false, then use np.zeros(len(data))
-                if OutliersMethod != []:
-                    CatchOutliers_np = np.array(CatchOutliers)
-                    CatchOutliers_id = np.where(CatchOutliers_np == 1)[0]
-                    inputs_data = np.hstack((inputs, data))
-                    inputs_data_rel = inputs_data[:, CatchOutliers_id]
-
-                    from scipy import stats
-
-                    if OutliersMethod == 'Z-Score':
-                        z_scores = np.abs(stats.zscore(inputs_data_rel))
-                        if OutliersMethodParams != []: # if user-defined
-                            threshold = OutliersMethodParams
-                        else:
-                            threshold = 3 # default value if threshold of z-score is not user-specified
-                        outliers_indices = np.any(np.where(z_scores > threshold, True, False), axis=1)
-
-                    elif OutliersMethod == 'other': # maybe ... Interquartile Range
-                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
-
-                    elif OutliersMethod == 'other': # maybe ... Kernel Density Estimation (KDE) ... can be multivariate
-                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
-
-                    elif OutliersMethod == 'other': # maybe ... Mahalanobis Distance ... can be multivariate
-                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
-
-                    elif OutliersMethod == 'other': # maybe ... Local Outlier Factor (LOF)
-                        outliers_indices = np.ones_like(inputs_data).astype(bool) # stand-in until future development
-
-                    elif not (OutliersMethod is None or OutliersMethod == []):
-                        raise ValueError("Keyword argument 'OutliersMethod' is limited to 'Z-Score'. Other methods are "
-                                         "in development.")
-
-                    inputs_data_wo_outliers = inputs_data[~outliers_indices, :]
-                    inputs_wo_outliers = inputs_data_wo_outliers[:, :-1]
-                    data_wo_outliers = inputs_data_wo_outliers[:, -1]
-
-                return inputs_wo_outliers, data_wo_outliers, outliers_indices
-
-            if OutliersMethod is not None and data is not None:
-                inputs, data, outliers_indices = catch_outliers(inputs, data, CatchOutliers, OutliersMethod,
-                                                                OutliersMethodParams)
-            else:
-                outliers_indices = []
-
-            # Spit [inputs,data] into train and test sets (depending on TrainMethod):
-            if p_train < 1: # split inputs+data into training and testing sets for validation of model
-                def random_train(p_train, inputs, data=data): # random split, if TrainMethod = 'random'
-                    Ldata = inputs.shape[0]
-                    l_log = int(Ldata * p_train)  # required length of indices for training
-                    train_log_i = np.array([])  # random indices used for training data
-                    while len(train_log_i) < l_log:
-                        train_log_i = np.append(train_log_i, np.random.random_integers(Ldata, size=l_log) - 1)
-                        train_log_i = np.unique(train_log_i)  # incidentally sorts low to high
-                        np.random.shuffle(train_log_i)  # randomize order
-                    if len(train_log_i) > l_log:
-                        train_log_i = train_log_i[0:l_log]  # cut-off extra indices (beyond p_train)
-                    train_log = np.zeros(Ldata, dtype=np.bool)  # indices used for training data (as a logical)
-                    for i in train_log_i:
-                        train_log[int(i)] = True
-                    test_log = ~train_log
-
-                    inputs_train = [inputs[ii] for ii, ele in enumerate(train_log) if ele]
-                    inputs_test = [inputs[ii] for ii, ele in enumerate(test_log) if ele]
-                    if data is not None:
-                        data_train = data[train_log]
-                        data_test = data[test_log]
-                    else:
-                        data_train = None
-                        data_test = None
-
-                    return inputs_train, data_train, inputs_test, data_test, train_log, test_log
-
-                def other_train(p_train, inputs, data): # IN DEVELOPMENT ... other split, if TrainMethod = 'other'
-                    # WRITE CODE HERE FOR NEW METHOD OF SPLITTING TEST/TRAIN SETS
-                    inputs_train = inputs
-                    data_train = data
-                    inputs_test = []
-                    data_test = []
-                    train_log = np.linspace(0, len(inputs[:, 0]) - 1, len(inputs[:, 0]))
-                    test_log = []
-
-                    return inputs_train, data_train, inputs_test, data_test, train_log, test_log
-
-                def otherN_train(p_train, inputs, data): # IN DEVELOPMENT ... otherN split, if TrainMethod = 'otherN'
-                    # WRITE CODE HERE FOR NEW METHOD OF SPLITTING TEST/TRAIN SETS
-                    inputs_train = inputs
-                    data_train = data
-                    inputs_test = []
-                    data_test = []
-                    train_log = np.linspace(0, len(inputs[:,0]) - 1, len(inputs[:,0]))
-                    test_log = []
-
-                    return inputs_train, data_train, inputs_test, data_test, train_log, test_log
-
-                function_mapping = {'random': random_train,'other': other_train,'otherN': otherN_train}
-                if p_train_method in function_mapping:
-                    inputs_train, data_train, inputs_test, data_test, train_log, test_log = \
-                        function_mapping[p_train_method](p_train, inputs, data=data)
-                else:
-                    raise ValueError("Keyword argument 'TrainMethod' is limited to 'random' as of now. Additional "
-                        "methods of splitting are in development.")
-
-            else:
-                inputs_train = inputs
-                data_train = data
-                inputs_test = []
-                data_test = []
-                train_log = []
-                test_log = []
-
-            return inputs, data, rawinputs, rawdata, inputs_train, data_train, inputs_test, data_test, inputs_scale, \
-                   outliers_indices, train_log, test_log
-
-        inputs, data, rawinputs, rawdata, traininputs, traindata, testinputs, testdata, inputs_scale, \
-            outliers_indices, train_log, test_log = auto_cleanData(inputs, p_train, CatchOutliers, OutliersMethod,
-                                                                   OutliersMethodParams, data=data)
-
-        def inputslist_to_np(inputslist, do_transpose):
-            was_auto_transposed = 0
-            if np.any(inputslist): # if inputslist is not empty (i.e., != [] )
-                inputslist_np = np.array(inputslist) # should be N datapoints x M inputs
-                NM = np.shape(inputslist_np)
-                if NM[0] < NM[1] and do_transpose == 'auto':
-                    inputslist_np = np.transpose(inputslist_np)
-                    was_auto_transposed = 1
-                elif do_transpose == 1:
-                    inputslist_np = np.transpose(inputslist_np)
-            else:
-                inputslist_np = np.array([])
-            return inputslist_np, was_auto_transposed
-
-        inputs_np, do_transpose = inputslist_to_np(inputs, 'auto')
-        rawinputs_np = inputslist_to_np(rawinputs, do_transpose)[0]
-        traininputs_np = inputslist_to_np(traininputs, do_transpose)[0]
-        testinputs_np = inputslist_to_np(testinputs, do_transpose)[0]
+        # Index percentage of dataset as training set:
+        n = inputs.shape[0]
+        if train < 1:
+            l_log = int(n * train)  # required length of indices for training
+            if l_log < 2:
+                l_log = int(2)  # minimum required for training set
+            trainlog_i = np.array([], dtype=int)  # indices of training data (as an index)
+            while len(trainlog_i) < l_log:
+                trainlog_i = np.append(trainlog_i, np.random.random_integers(n, size=l_log) - 1)
+                trainlog_i = np.unique(trainlog_i)  # also sorts low to high
+                np.random.shuffle(trainlog_i)  # randomize sort
+            if len(trainlog_i) > l_log:
+                trainlog_i = trainlog_i[0:l_log]  # cut-off extra indices (beyond 'percent')
+            trainlog = np.zeros(n, dtype=np.bool)  # indices of training data (as a logical)
+            for i in trainlog_i:
+                trainlog[i] = True
+        else:
+            trainlog = np.ones(n, dtype=np.bool)
+        # testlog = ~trainlog
 
         # Define/update attributes with cleaned data and other relevant variables:
-        attrs = {'inputs': inputs.tolist(), 'data': data, 'rawinputs': rawinputs, 'traininputs': traininputs,
-                 'traindata': traindata, 'testinputs': testinputs, 'testdata': testdata, 'normalize': inputs_scale,
-                 'outliers': outliers_indices, 'trainlog': train_log, 'testlog': test_log, 'inputs_np': inputs_np,
-                 'rawinputs_np': rawinputs_np, 'traininputs_np': traininputs_np, 'testinputs_np': testinputs_np}
-        # Notes (if not in documentation):
-        #   - self.normalize == [min,max] of each input before normalization
-        #   - outliers       == indices removed from raw
-        #   - trainlog       == indices used for training AFTER OUTLIERS WERE REMOVED from raw
-        #   - testlog        == indices used for validation testing AFTER OUTLIERS WERE REMOVED from raw
+        attrs = {'inputs': inputs, 'data': data, 'normalize': normalize, 'trainlog': trainlog}
         set_attributes(self, attrs)
 
         return
+
+    def trainset(self):
+        """
+        After running 'clean', call 'trainset' to get train inputs and train data. The purpose of this method is to
+        simplify syntax, such that the code here does not need to be re-written each time the train set is defined.
+
+        traininputs, _ = self.trainset()
+        _, traindata = self.trainset()
+        """
+        traininputs = self.inputs[self.trainlog, :]
+        traindata = self.data[self.trainlog]
+        return traininputs, traindata
 
     def bss_derivatives(self, **kwargs):
         """
@@ -598,7 +414,7 @@ class FoKL:
         If user overrides default settings, then 1st and 2nd partial derivatives can be returned for any variables.
 
         Keyword Inputs:
-            inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM)    == self.inputs_np (default)
+            inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM)    == self.inputs (default)
             kernel == function to use for differentiation (i.e., cubic or Bernoulli)  == self.kernel (default)
             d1     == index of input variable(s) to use for first partial derivative  == True (default)
             d2     == index of input variable(s) to use for second partial derivative == False (default)
@@ -631,7 +447,7 @@ class FoKL:
 
         # Load defaults:
         if current['inputs'] is None:
-            current['inputs'] = self.inputs_np
+            current['inputs'] = self.inputs
         if current['betas'] is None:
             current['betas'] = self.betas
         if current['phis'] is None:
@@ -856,7 +672,7 @@ class FoKL:
         call 'evaluate_basis' so this function is simply named 'evaluate'.
 
         Input:
-            inputs == input variable(s) at which to evaluate the FoKL model == self.inputs_np (default)
+            inputs == input variable(s) at which to evaluate the FoKL model == self.inputs (default)
 
         Optional Inputs:
             betas        == coefficients defining FoKL model                       == self.betas (default)
@@ -869,10 +685,9 @@ class FoKL:
 
         # Process keywords:
         default = {'normalize': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False}
-        default_for_clean = {'train': 1, 'TrainMethod': 'random', 'CatchOutliers': False, 'OutliersMethod': None,
-                             'OutliersMethodParams': None}
+        default_for_clean = {'bit': 64, 'train': 1}
         current = process_kwargs(default | default_for_clean, kwargs)
-        for boolean in ['clean', 'ReturnBounds', 'CatchOutliers']:
+        for boolean in ['clean', 'ReturnBounds']:
             current[boolean] = str_to_bool(current[boolean])
         kwargs_to_clean = {}
         for kwarg in default_for_clean.keys():
@@ -902,7 +717,7 @@ class FoKL:
 
         # Automatically normalize and format inputs:
         if inputs is None:  # default
-            inputs = self.inputs_np
+            inputs = self.inputs
             if current['clean']:
                 warnings.warn("Cleaning was already performed on default 'inputs', so overriding 'clean' to False.",
                               category=UserWarning)
@@ -910,9 +725,9 @@ class FoKL:
         else:  # user-defined 'inputs'
             if not current['clean']:  # assume provided inputs are already formatted and maybe normalized
                 if not isinstance(inputs, np.ndarray):
-                    warnings.warn("Provided inputs were converted to numpy array as float64. May want to manually "
-                                  "check that values were preserved.", category=UserWarning)
-                    inputs = np.array(inputs, dtype=float)
+                    warnings.warn(f"Provided inputs were converted to numpy array as float64. To change this datatype, "
+                                  f"call 'clean' first.", category=UserWarning)
+                    inputs = np.array(inputs, dtype=np.float64)
                 if current['normalize'] is None:  # assume already normalized
                     normputs = inputs
                 else:  # assume not normalized
@@ -922,9 +737,9 @@ class FoKL:
                     current['clean'] = True
         if current['clean']:
             self.clean(inputs, kwargs_from_other=kwargs_to_clean)
-            normputs = self.inputs_np
+            normputs = self.inputs
         elif inputs is None:
-            normputs = self.inputs_np
+            normputs = self.inputs
         else:
             normputs = np.array(inputs)
 
@@ -1178,12 +993,7 @@ class FoKL:
             clean         == boolean to perform automatic cleaning and formatting               == False (default)
             ConsoleOutput == boolean to print [ind, ev] to console during FoKL model generation == True (default)
 
-        Keyword Inputs (for clean):
-            train                == percentage (0-1) of N datapoints to use for training  == 1 (default)
-            TrainMethod          == method for splitting test/train set for train < 1     == 'random' (default)
-            CatchOutliers        == boolean for removing outliers from inputs and/or data == False (default)
-            OutliersMethod       == string defining the method to use for removing outliers (e.g., 'Z-Score)
-            OutliersMethodParams == parameters to modify OutliersMethod (format varies per method)
+        See 'clean' for additional keyword inputs, which may be entered here.
 
         Return Outputs:
             'betas' are a draw from the posterior distribution of coefficients: matrix, with
@@ -1207,8 +1017,7 @@ class FoKL:
         default_for_fit = {'ConsoleOutput': True}
         default_for_fit['ConsoleOutput'] = str_to_bool(kwargs.get('ConsoleOutput', self.ConsoleOutput))
         default_for_fit['clean'] = str_to_bool(kwargs.get('clean', False))
-        default_for_clean = {'train': 1, 'TrainMethod': 'random', 'CatchOutliers': False, 'OutliersMethod': None,
-                             'OutliersMethodParams': None}
+        default_for_clean = {'bit': 64, 'train': 1}
         expected = self.hypers + list(default_for_fit.keys()) + list(default_for_clean.keys())
         kwargs = process_kwargs(expected, kwargs)
         if default_for_fit['clean'] is False:
@@ -1225,33 +1034,32 @@ class FoKL:
                 else:
                     setattr(self, kwarg, kwargs[kwarg])
             elif kwarg in default_for_clean.keys():
-                if kwarg in ['CatchOutliers']:
-                    kwargs_to_clean.update({kwarg: str_to_bool(kwargs[kwarg])})
-                else:
-                    kwargs_to_clean.update({kwarg: kwargs[kwarg]})
+                # if kwarg in ['']:
+                #     kwargs_to_clean.update({kwarg: str_to_bool(kwargs[kwarg])})
+                # else:
+                kwargs_to_clean.update({kwarg: kwargs[kwarg]})
         self.ConsoleOutput = default_for_fit['ConsoleOutput']
 
         # Perform automatic cleaning of 'inputs' and 'data' (unless user already called 'fit' and now specifies not to):
         error_clean_failed = False
         if default_for_fit['clean'] is True:
             try:
-                if inputs is None:  # assume clean already called and len(data) same as traindata if data not None
-                    inputs = self.traininputs
-                if data is None:  # assume clean already called and len(inputs) same as traininputs if inputs not None
-                    data = self.traindata
+                if inputs is None:  # assume clean already called and len(data) same as train data if data not None
+                    inputs, _ = self.trainset()
+                if data is None:  # assume clean already called and len(inputs) same as train inputs if inputs not None
+                    _, data = self.trainset()
             except Exception as exception:
                 error_clean_failed = True
             self.clean(inputs, data, kwargs_from_other=kwargs_to_clean)
         else:  # user input implies that they already called clean prior to calling fit
             try:
-                if inputs is None:  # assume clean already called and len(data) same as traindata if data not None
-                    inputs = self.traininputs
-                if data is None:  # assume clean already called and len(inputs) same as traininputs if inputs not None
-                    data = self.traindata
+                if inputs is None:  # assume clean already called and len(data) same as train data if data not None
+                    inputs, _ = self.trainset()
+                if data is None:  # assume clean already called and len(inputs) same as train inputs if inputs not None
+                    _, data = self.trainset()
             except Exception as exception:
                 warnings.warn("Keyword 'clean' was set to False but is required prior to or during 'fit'. Assuming "
-                              "'clean' is True so that attributes 'traininputs' and 'traindata' get defined.",
-                              category=UserWarning)
+                              "'clean' is True.", category=UserWarning)
                 if inputs is None or data is None:
                     error_clean_failed = True
                 else:
@@ -1262,14 +1070,12 @@ class FoKL:
 
         # Define attributes as local variables:
         try:
-            inputs = self.traininputs
-            data = self.traindata
-            inputs_np = self.traininputs_np
+            inputs, data = self.trainset()
         except Exception as exception:
             warnings.warn("If not calling 'clean' prior to 'fit' or within the argument of 'fit', then this is the "
                           "likely source of any subsequent errors. To troubleshoot, simply include 'clean=True' within "
                           "the argument of 'fit'.", category=UserWarning)
-            inputs_np = np.array(inputs)
+            inputs = np.array(inputs)
         phis = self.phis
         relats_in = self.relats_in
         a = self.a
@@ -1304,10 +1110,10 @@ class FoKL:
 
         # Prepare phind and xsm if using cubic splines, else match variable names required for gibbs argument
         if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
-            _, phind, xsm = inputs_to_phind(self, inputs_np, phis)
+            _, phind, xsm = inputs_to_phind(self, inputs, phis)
         elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             phind = None
-            xsm = inputs_np
+            xsm = inputs
 
         def gibbs(inputs, data, phis, Xin, discmtx, a, b, atau, btau, draws, phind, xsm):
             """
@@ -1551,7 +1357,7 @@ class FoKL:
                     damtx = np.append(damtx, vecs, axis=0)
                 [dam, null] = np.shape(damtx)
 
-                [beters, null, null, null, xers, ev] = gibbs(inputs_np, data, phis, X, damtx, a, b, atau, btau, draws,
+                [beters, null, null, null, xers, ev] = gibbs(inputs, data, phis, X, damtx, a, b, atau, btau, draws,
                                                              phind, xsm)
 
                 if aic:
@@ -1582,7 +1388,7 @@ class FoKL:
                             damtx_test = np.delete(damtx_test, int(np.array(killtest[k])-1), 0)
                         damtest, null = np.shape(damtx_test)
 
-                        [betertest, null, null, null, Xtest, evtest] = gibbs(inputs_np, data, phis, X, damtx_test, a, b,
+                        [betertest, null, null, null, Xtest, evtest] = gibbs(inputs, data, phis, X, damtx_test, a, b,
                                                                              atau, btau, draws, phind, xsm)
                         if aic:
                             evtest = evtest + (2 - np.log(n))*(damtest+1)
@@ -1653,8 +1459,6 @@ class FoKL:
             betas = beters
             mtx = damtx
 
-        self.betas_avg = np.mean(betas, axis=0)
-
         self.betas = betas
         self.mtx = mtx
         self.evs = evs
@@ -1667,7 +1471,7 @@ class FoKL:
         specify otherwise. If an attribute is listed in both 'clear' and 'keep', then the attribute is cleared.
 
         Optional Inputs:
-            keep (list of strings)  == additional attributes to keep, e.g., ['inputs_np', 'mtx']
+            keep (list of strings)  == additional attributes to keep, e.g., ['mtx']
             clear (list of strings) == hyperparameters to delete, e.g., ['kernel', 'phis']
             all (boolean)           == if True then all attributes (including hyperparameters) get deleted regardless
 
@@ -1679,7 +1483,7 @@ class FoKL:
 
         if all is False:
             attrs_to_keep = self.keep  # default
-            if isinstance(keep, list) or isinstance(keep, str):  # str in case of single entry, e.g., keep='mtx' != ['mtx']
+            if isinstance(keep, list) or isinstance(keep, str):  # str in case single entry (e.g., keep='mtx')
                 attrs_to_keep += keep  # add user-specified attributes to list of ones to keep
                 attrs_to_keep = list(np.unique(attrs_to_keep))  # remove duplicates
             if isinstance(clear, list) or isinstance(clear, str):
