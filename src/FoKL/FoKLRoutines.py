@@ -12,6 +12,7 @@ import os
 import pickle
 import copy
 import pyomo.environ as pyo
+import sys
 
 
 def load(filename, directory=None):
@@ -284,8 +285,9 @@ class FoKL:
             data   == [n x 1] output vector of n observations (i.e., 'y' variable in model)
 
         Keyword Inputs:
-            bit               == floating point bits to represent dataset as          == 64 (default)
-            train             == percentage (0-1) of n datapoints to use for training == 1 (default)
+            bit               == floating point bits to represent dataset as               == 64 (default)
+            train             == percentage (0-1) of n datapoints to use for training      == 1 (default)
+            AutoTranspose     == boolean to transpose dataset so that instances > features == True (default)
             kwargs_from_other == [NOT FOR USER] used internally by fit or evaluate function
 
         Added Attributes:
@@ -1004,8 +1006,8 @@ class FoKL:
         See 'clean' for additional keyword inputs, which may be entered here.
 
         Return Outputs:
-            'betas' are a draw from the posterior distribution of coefficients: matrix, with
-            rows corresponding to draws and columns corresponding to terms in the GP
+            'betas' are a draw (after burn-in) from the posterior distribution of coefficients: matrix, with rows
+            corresponding to draws and columns corresponding to terms in the GP.
 
             'mtx' is the basis function interaction matrix from the
             best model: matrix, with rows corresponding to terms in the GP (and thus to the
@@ -1048,7 +1050,7 @@ class FoKL:
                 kwargs_to_clean.update({kwarg: kwargs[kwarg]})
         self.ConsoleOutput = default_for_fit['ConsoleOutput']
 
-        # Perform automatic cleaning of 'inputs' and 'data' (unless user already called 'fit' and now specifies not to):
+        # Perform automatic cleaning of 'inputs' and 'data' (unless user specified not to), and handle exceptions:
         error_clean_failed = False
         if default_for_fit['clean'] is True:
             try:
@@ -1076,13 +1078,15 @@ class FoKL:
         if error_clean_failed is True:
             raise ValueError("'inputs' and/or 'data' were not provided so 'clean' could not be performed.")
 
-        # Define attributes as local variables:
+        # After cleaning and/or handling exceptions, define cleaned 'inputs' and 'data' as local variables:
         try:
             inputs, data = self.trainset()
         except Exception as exception:
             warnings.warn("If not calling 'clean' prior to 'fit' or within the argument of 'fit', then this is the "
                           "likely source of any subsequent errors. To troubleshoot, simply include 'clean=True' within "
                           "the argument of 'fit'.", category=UserWarning)
+
+        # Define attributes as local variables:
         phis = self.phis
         relats_in = self.relats_in
         a = self.a
@@ -1140,7 +1144,36 @@ class FoKL:
             phind = None
             xsm = inputs
 
-        def gibbs(inputs, data, phis, Xin, discmtx, a, b, atau, btau, draws, phind, xsm):
+        # [BEGIN] initialization of constants (for use in gibbs to avoid repeat large calculations):
+
+        # initialize tausqd at the mode of its prior: the inverse of the mode of sigma squared, such that the
+        # initial variance for the betas is 1
+        sigsqd0 = b / (1 + a)
+        tausqd0 = btau / (1 + atau)
+
+        dtd = np.transpose(data).dot(data)
+
+        # Check for large datasets, where 'dtd=inf' is common and causes bug 'betas=nan', by only converting one
+        # point to 64-bit at a time since there is likely not enough memory to convert all of 'data' to 64-bit:
+        if dtd[0][0] == math.inf and data.dtype != np.float64:
+
+            # # If converting all of 'data' to 64-bit:
+            # data64 = np.array(data, dtype=np.float64)  # assuming large dataset means using less than 64-bit
+            # dtd = np.dot(data64.T, data64)  # same equation, but now 64-bit
+
+            # Converting one point at a time to limit memory use:
+            dtd = 0
+            for i in range(data.shape[0]):
+                data_i = np.array(data[i], dtype=np.float64)
+                dtd += data_i ** 2  # manually calculated inner dot product
+            dtd = np.array([dtd])  # to align with dimensions of 'np.transpose(data).dot(data)' such that dtd[0][0]
+        if dtd[0][0] == math.inf:
+            warnings.warn("The dataset is too large such that the inner product of the output 'data' vector is "
+                          "Inf. This will likely cause values in 'betas' to be Nan.", category=UserWarning)
+
+        # [END] initialization of constants
+
+        def gibbs(inputs, data, phis, Xin, discmtx, a, b, atau, btau, draws, phind, xsm, sigsqd, tausqd, dtd):
             """
             'inputs' is the set of normalized inputs -- both parameters and model
             inputs -- with columns corresponding to inputs and rows the different
@@ -1164,9 +1197,12 @@ class FoKL:
 
             'draws' is the total number of draws
 
-            Additional Function Arguments for Constants to Avoid Repeat Calculations and Optimize Performance (v3.1.1):
+            Additional Constants (to avoid repeat calculations found in later development):
                 - phind
                 - xsm
+                - sigsqd
+                - tausqd
+                - dtd
             """
             # building the matrix by calculating the corresponding basis function outputs for each set of inputs
             minp, ninp = np.shape(inputs)
@@ -1188,6 +1224,11 @@ class FoKL:
                 X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
 
             for i in range(minp):  # for datapoint in training datapoints
+                if self.ConsoleOutput and data.dtype != np.float64:  # only for large datasets
+                    percent = i / (minp - 1)
+                    sys.stdout.write('\r')  # set cursor at beginning of console output line
+                    sys.stdout.write(f"Gibbs: {round(100 * percent, 2):.2f}%")
+                    sys.stdout.flush()
                 for j in range(nxin, mmtx + 1):
                     null, nxin2 = np.shape(X)
                     if j == nxin2:
@@ -1204,10 +1245,8 @@ class FoKL:
 
                         if num != 0:  # enter if loop if num is nonzero
                             nid = int(num - 1)
-                            # phi = phi * (phis[nid][0][phind[i, k]] + phis[nid][1][phind[i, k]] * xsm[i, k] + \
-                            #     phis[nid][2][phind[i, k]] * xsm[i, k] ** 2 + phis[nid][3][phind[i, k]] * xsm[i, k] ** 3)
 
-                            # [v3.1.1] With inclusion of Bernoulli polynomial kernel, the above function may change. So,
+                            # Evaluate basis function:
                             if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
                                 coeffs = [phis[nid][order][phind[i, k]] for order in range(4)]  # coefficients for cubic
                             elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
@@ -1216,10 +1255,10 @@ class FoKL:
 
                     X[i][j] = phi
 
-            # initialize tausqd at the mode of its prior: the inverse of the mode of sigma squared, such that the
-            # initial variance for the betas is 1
-            sigsqd = b / (1 + a)
-            tausqd = btau / (1 + atau)
+            # # initialize tausqd at the mode of its prior: the inverse of the mode of sigma squared, such that the
+            # # initial variance for the betas is 1
+            # sigsqd = b / (1 + a)
+            # tausqd = btau / (1 + atau)
 
             XtX = np.transpose(X).dot(X)
 
@@ -1236,37 +1275,17 @@ class FoKL:
             betahat = Q.dot(Lamb_inv).dot(np.transpose(Q)).dot(Xty)
             squerr = LA.norm(data - X.dot(betahat)) ** 2
 
-            astar = a + 1 + len(data) / 2 + (mmtx + 1) / 2
+            n = len(data)
+            astar = a + 1 + n / 2 + (mmtx + 1) / 2
+
             atau_star = atau + mmtx / 2
-
-            dtd = np.transpose(data).dot(data)
-
-            # Check for large datasets, where 'dtd=inf' is common and causes bug 'betas=nan', by only converting one
-            # point to 64-bit at a time since there is likely not enough memory to convert all of 'data' to 64-bit:
-            if dtd[0][0] == math.inf and data.dtype != np.float64:
-
-                # # If converting all of 'data' to 64-bit:
-                # data64 = np.array(data, dtype=np.float64)  # assuming large dataset means using less than 64-bit
-                # dtd = np.dot(data64.T, data64)  # same equation, but now 64-bit
-
-                # Converting one point at a time to limit memory use:
-                dtd = 0
-                for i in range(data.shape[0]):
-                    data_i = np.array(data[i], dtype=np.float64)
-                    dtd += data_i ** 2  # manually calculated inner dot product
-                dtd = np.array([dtd])  # to align with dimensions of 'np.transpose(data).dot(data)' such that dtd[0][0]
-            if dtd[0][0] == math.inf:
-                warnings.warn("The dataset is too large such that the inner product of the output 'data' vector is "
-                              "Inf. This will likely cause values in 'betas' to be Nan.", category=UserWarning)
 
             # Gibbs iterations
 
             betas = np.zeros((draws, mmtx + 1))
             sigs = np.zeros((draws, 1))
             taus = np.zeros((draws, 1))
-
             lik = np.zeros((draws, 1))
-            n = len(data)
 
             for k in range(draws):
 
@@ -1280,7 +1299,6 @@ class FoKL:
                 betas[k][:] = np.transpose(mun + sigsqd ** (1 / 2) * (S).dot(vec))
 
                 vecc = mun - np.reshape(betas[k][:], (len(betas[k][:]), 1))
-
 
                 bstar = b + 0.5 * (betas[k][:].dot(XtX.dot(np.transpose([betas[k][:]]))) - 2 * betas[k][:].dot(Xty) +
                                    dtd + betas[k][:].dot(np.transpose([betas[k][:]])) / tausqd)
@@ -1365,7 +1383,7 @@ class FoKL:
                     if summ == 0:
                         break
 
-            while 1:
+            while True:
                 vecs = np.unique(perms(indvec),axis=0)
                 if ind > 1:
                     mvec, nvec = np.shape(vecs)
@@ -1401,7 +1419,7 @@ class FoKL:
                 [dam, null] = np.shape(damtx)
 
                 [beters, null, null, null, xers, ev] = gibbs(inputs, data, phis, X, damtx, a, b, atau, btau, draws,
-                                                             phind, xsm)
+                                                             phind, xsm, sigsqd0, tausqd0, dtd)
 
                 if aic:
                     ev = ev + (2 - np.log(n)) * (dam + 1)
@@ -1432,7 +1450,8 @@ class FoKL:
                         damtest, null = np.shape(damtx_test)
 
                         [betertest, null, null, null, Xtest, evtest] = gibbs(inputs, data, phis, X, damtx_test, a, b,
-                                                                             atau, btau, draws, phind, xsm)
+                                                                             atau, btau, draws, phind, xsm, sigsqd0,
+                                                                             tausqd0, dtd)
                         if aic:
                             evtest = evtest + (2 - np.log(n))*(damtest+1)
                         if evtest < evmin:
@@ -1447,6 +1466,8 @@ class FoKL:
                 X = xers
 
                 if self.ConsoleOutput:
+                    if data.dtype != np.float64:  # if large dataset, then 'Gibbs: 100.00%' printed from inside gibbs
+                        sys.stdout.write('\r')  # place cursor at start of line to erase 'Gibbs: 100.00%'
                     print([ind, ev])
                 if np.size(evs) > 0:
                     if ev < np.min(evs):
@@ -1506,7 +1527,7 @@ class FoKL:
         self.mtx = mtx
         self.evs = evs
 
-        return betas, mtx, evs
+        return betas[-self.draws::, :], mtx, evs  # discard 'burnin'
 
     def clear(self, keep=None, clear=None, all=False):
         """
