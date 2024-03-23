@@ -177,7 +177,10 @@ class FoKL:
             - 'tolerance' controls how hard the function builder tries to find a better model once adding terms starts
             to show diminishing returns. A good default is 3, but large datasets could benefit from higher values.
 
-            - 'draws' is the total number of draws from the posterior for each tested model.
+            - 'burnin' is the total number of draws from the posterior for each tested model before the 'draws' draws.
+
+            - 'draws' is the total number of draws from the posterior for each tested model after the 'burnin' draws.
+            There draws are what appear in 'betas' after calling 'fit', and the 'burnin' draws are discarded.
 
             - 'gimmie' is a boolean causing the routine to return the most complex model tried instead of the model with
             the optimum bic.
@@ -205,6 +208,7 @@ class FoKL:
             - atau       = 4
             - btau       = f(atau, data)
             - tolerance  = 3
+            - burnin     = 1000
             - draws      = 1000
             - gimmie     = False
             - way3       = False
@@ -219,8 +223,8 @@ class FoKL:
         """
 
         # Store list of hyperparameters for easy reference later, if sweeping through values in functions such as fit:
-        self.hypers = ['kernel', 'phis', 'relats_in', 'a', 'b', 'atau', 'btau', 'tolerance', 'draws', 'gimmie', 'way3',
-                       'threshav', 'threshstda', 'threshstdb', 'aic']
+        self.hypers = ['kernel', 'phis', 'relats_in', 'a', 'b', 'atau', 'btau', 'tolerance', 'burnin', 'draws',
+                       'gimmie', 'way3', 'threshav', 'threshstda', 'threshstdb', 'aic']
 
         # Store list of settings for easy reference later (namely, in 'clear'):
         self.settings = ['UserWarnings', 'ConsoleOutput']
@@ -235,8 +239,8 @@ class FoKL:
         default = {
                    # Hyperparameters:
                    'kernel': 'Cubic Splines', 'phis': None, 'relats_in': [], 'a': 4, 'b': None, 'atau': 4,
-                   'btau': None, 'tolerance': 3, 'draws': 1000, 'gimmie': False, 'way3': False, 'threshav': 0.05,
-                   'threshstda': 0.5, 'threshstdb': 2, 'aic': False,
+                   'btau': None, 'tolerance': 3, 'burnin': 1000, 'draws': 1000, 'gimmie': False, 'way3': False,
+                   'threshav': 0.05, 'threshstda': 0.5, 'threshstdb': 2, 'aic': False,
 
                    # Other:
                    'UserWarnings': True, 'ConsoleOutput': True
@@ -359,8 +363,6 @@ class FoKL:
                               f"values did not get corrupted.", category=UserWarning)
             if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
                 data = data[:, np.newaxis]
-                warnings.warn("'data' was made into (n,1) column vector from single list (n,) to match FoKL "
-                              "formatting.", category=UserWarning)
             else:  # check user provided only one output column/row, then transpose if needed
                 n = data.shape[0]
                 m = data.shape[1]
@@ -371,8 +373,19 @@ class FoKL:
                     warnings.warn("'data' was transposed to match FoKL formatting.", category=UserWarning)
 
         # Index percentage of dataset as training set:
-        n = inputs.shape[0]
+        trainlog = self.generate_trainlog(train, inputs.shape[0])
+
+        # Define/update attributes with cleaned data and other relevant variables:
+        attrs = {'inputs': inputs, 'data': data, 'normalize': normalize, 'trainlog': trainlog}
+        set_attributes(self, attrs)
+
+        return
+
+    def generate_trainlog(self, train, n=None):
+        """Generate random logical vector of length 'n' with 'train' percent as True."""
         if train < 1:
+            if n is None:
+                n = self.inputs.shape[0]  # number of observations
             l_log = int(n * train)  # required length of indices for training
             if l_log < 2:
                 l_log = int(2)  # minimum required for training set
@@ -387,26 +400,21 @@ class FoKL:
             for i in trainlog_i:
                 trainlog[i] = True
         else:
-            trainlog = np.ones(n, dtype=np.bool)
-        # testlog = ~trainlog
-
-        # Define/update attributes with cleaned data and other relevant variables:
-        attrs = {'inputs': inputs, 'data': data, 'normalize': normalize, 'trainlog': trainlog}
-        set_attributes(self, attrs)
-
-        return
+            # trainlog = np.ones(n, dtype=np.bool)  # wastes memory, so use following method coupled with 'trainset':
+            trainlog = None  # means use all observations
+        return trainlog
 
     def trainset(self):
         """
         After running 'clean', call 'trainset' to get train inputs and train data. The purpose of this method is to
         simplify syntax, such that the code here does not need to be re-written each time the train set is defined.
 
-        traininputs, _ = self.trainset()
-        _, traindata = self.trainset()
+        traininputs, traindata = self.trainset()
         """
-        traininputs = self.inputs[self.trainlog, :]
-        traindata = self.data[self.trainlog]
-        return traininputs, traindata
+        if self.trainlog is None:  # then use all observations for training
+            return self.inputs, self.data
+        else:  # self.trainlog is vector indexing observations
+            return self.inputs[self.trainlog, :], self.data[self.trainlog]
 
     def bss_derivatives(self, **kwargs):
         """
@@ -1075,7 +1083,6 @@ class FoKL:
             warnings.warn("If not calling 'clean' prior to 'fit' or within the argument of 'fit', then this is the "
                           "likely source of any subsequent errors. To troubleshoot, simply include 'clean=True' within "
                           "the argument of 'fit'.", category=UserWarning)
-            inputs = np.array(inputs)
         phis = self.phis
         relats_in = self.relats_in
         a = self.a
@@ -1083,7 +1090,7 @@ class FoKL:
         atau = self.atau
         btau = self.btau
         tolerance = self.tolerance
-        draws = self.draws
+        draws = self.burnin + self.draws  # after fitting, the 'burnin' draws will be discarded from 'betas'
         gimmie = self.gimmie
         way3 = self.way3
         threshav = self.threshav
@@ -1093,12 +1100,30 @@ class FoKL:
 
         # Update 'b' and/or 'btau' if set to default:
         if btau is None or b is None:  # then use 'data' to define (in combination with 'a' and/or 'atau')
-            sigmasq = np.var(data)
+            # Calculate variance and mean, both as 64-bit, but for large datasets (i.e., less than 64-bit) be careful
+            # to avoid converting the entire 'data' to 64-bit:
+            if data.dtype != np.float64:  # and sigmasq == math.inf  # then recalculate but as 64-bit
+                sigmasq = 0
+                n = data.shape[0]
+                data_mean = 0
+                for i in range(n):  # element-wise to avoid memory errors when entire 'data' is 64-bit
+                    data_mean += np.array(data[i], dtype=np.float64)
+                data_mean = data_mean / n
+                for i in range(n):  # element-wise to avoid memory errors when entire 'data' is 64-bit
+                    sigmasq += (np.array(data[i], dtype=np.float64) - data_mean) ** 2
+                sigmasq = sigmasq / (n - 1)
+            else:  # same as above but simplified syntax avoiding for loops since 'data.dtype=np.float64'
+                sigmasq = np.var(data)
+                data_mean = np.mean(data)
+            if sigmasq == math.inf:
+                warnings.warn("The dataset is too large such that 'sigmasq=inf' even as 64-bit. Consider training on a "
+                              "smaller percentage of the dataset.", category=UserWarning)
+
             if b is None:
                 b = sigmasq * (a + 1)
                 self.b = b
             if btau is None:
-                scale = np.abs(np.mean(data))
+                scale = np.abs(data_mean)
                 btau = (scale / sigmasq) * (atau + 1)
                 self.btau = btau
 
@@ -1215,6 +1240,24 @@ class FoKL:
             atau_star = atau + mmtx / 2
 
             dtd = np.transpose(data).dot(data)
+
+            # Check for large datasets, where 'dtd=inf' is common and causes bug 'betas=nan', by only converting one
+            # point to 64-bit at a time since there is likely not enough memory to convert all of 'data' to 64-bit:
+            if dtd[0][0] == math.inf and data.dtype != np.float64:
+
+                # # If converting all of 'data' to 64-bit:
+                # data64 = np.array(data, dtype=np.float64)  # assuming large dataset means using less than 64-bit
+                # dtd = np.dot(data64.T, data64)  # same equation, but now 64-bit
+
+                # Converting one point at a time to limit memory use:
+                dtd = 0
+                for i in range(data.shape[0]):
+                    data_i = np.array(data[i], dtype=np.float64)
+                    dtd += data_i ** 2  # manually calculated inner dot product
+                dtd = np.array([dtd])  # to align with dimensions of 'np.transpose(data).dot(data)' such that dtd[0][0]
+            if dtd[0][0] == math.inf:
+                warnings.warn("The dataset is too large such that the inner product of the output 'data' vector is "
+                              "Inf. This will likely cause values in 'betas' to be Nan.", category=UserWarning)
 
             # Gibbs iterations
 
@@ -1459,7 +1502,7 @@ class FoKL:
             betas = beters
             mtx = damtx
 
-        self.betas = betas
+        self.betas = betas[-self.draws::, :]  # discard 'burnin' draws by only keeping last 'draws' draws
         self.mtx = mtx
         self.evs = evs
 
