@@ -53,13 +53,19 @@ git clone https://github.com/ESMS-Group-Public/FoKL-GPy
 ```
 
 Once installed, import the FoKL module into your environment with:
-```from FoKL import FoKLRoutines```
+```python
+from FoKL import FoKLRoutines
+```
 
 If loading a pre-existing FoKL class object:
-```model = FoKLRoutines.load("sub_directory\\model.fokl")```
+```python
+model = FoKLRoutines.load("sub_directory\\model.fokl")
+```
 
 Else if creating a new FoKL class object:
-```model = FoKLRoutines.FoKL()```
+```python
+model = FoKLRoutines.FoKL()
+```
 
 Now you may call methods on the class and reference its attributes. For help with this, please see [Use Cases](#use-cases).
 
@@ -99,19 +105,23 @@ The ```FoKLRoutines``` module houses the primary routines for a FoKL model. Name
 
 #### load
 
-```model = FoKLRoutines.load(filename, directory=None)```
+```python
+model = FoKLRoutines.load(filename, directory=None)
+```
 
 Load a FoKL class from a file.
 
 By default, ```directory``` is the current working directory that contains the script calling this method. An absolute or 
 relative directory may be defined if the model to load is located elsewhere.
 
-For simplicity, enter the returned output from [model.save()](#save) as the argument here, i.e., for ```filename```. Do this while 
+For simplicity, enter the returned output from [save](#save) as the argument here, i.e., for ```filename```. Do this while 
 leaving ```directory``` blank since ```filename``` can simply include the directory itself.
 
 #### FoKL
 
-```model = FoKLRoutines.FoKL(**kwargs)```
+```python
+model = FoKLRoutines.FoKL(**kwargs)
+```
 
 This creates a class object that contains all information relevant to and defining a FoKL model.
 
@@ -162,7 +172,9 @@ each method as needed.
 
 ##### clean
 
-```model.clean(inputs, data=None, **kwargs)```
+```python
+model.clean(inputs, data=None, **kwargs)
+```
 
 For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required but should be entered 
 if available; otherwise, leave blank.
@@ -174,8 +186,8 @@ if available; otherwise, leave blank.
 
 | Keyword             | Type    | Description                                              | Default    |
 |---------------------|---------|----------------------------------------------------------|------------|
-| ```bit```           | integer | $(16, 32, 64)$ floating point bits to convert dataset to | ```64```   |
-| ```train```         | scalar  | $(0,1]$ fraction of $n$ instances to use for training    | ```1```    |
+| ```bit```           | integer | (16, 32, 64) floating point bits to save dataset as | ```64```   |
+| ```train```         | scalar  | (0,1] fraction of $n$ instances to use for training    | ```1```    |
 | ```AutoTranspose``` | boolean | assumes $n > m$ and transposes dataset accordingly       | ```True``` |
 
 After calling ```clean```, the now normalized and formatted dataset gets saved as attributes of the FoKL class. Be sure to use these attributes in place of the originally entered ```inputs``` and ```data``` so that normalization and formatting errors are avoided. The attributes are as follows:
@@ -187,23 +199,29 @@ After calling ```clean```, the now normalized and formatted dataset gets saved a
 | ```model.normalize``` | list of $m$ lists    | [min, max] factors used to normalize ```inputs``` to ```model.inputs``` |
 | ```model.trainlog```  | $n \times 1$ ndarray | logical index of instances from dataset to use as training set          |
 
-To then access the training set, simply call ```traininputs, traindata = trainset()```.
+To then access the training set ```[traininputs, traindata]```, see [trainset](#trainset).
 
 ##### generate_trainlog
 
-```model.trainlog = model.generate_trainlog(train, n=None)```
+```python
+model.trainlog = model.generate_trainlog(train, n=None)
+```
 
 Generate random logical vector of length ```n``` with ```train``` percent as ```True```. It is expected that ```generate_trainlog``` will be called internally by [clean](#clean) and not by the user, though this method is available if sweeping through values of ```train``` in order to compare the accuracy of models fitted to training sets of different sizes.
 
 ##### trainset
 
-```traininputs, traindata = model.trainset()```
+```python
+traininputs, traindata = model.trainset()
+```
 
 Run this line to access the training set, which is simply ```model.inputs``` and ```model.data``` indexed by ```model.trainlog```. See [clean](#clean) for how ```model.inputs``` and ```model.data``` get defined and/or [generate_trainlog](#generate_trainlog) for how ```model.trainlog``` gets defined.
 
 ##### bss_derivatives
 
-```dy = model.bss_derivatives(**kwargs)```
+```python
+dy = model.bss_derivatives(**kwargs)
+```
 
 For returning gradient of modeled function with respect to each, or specified, input variable.
 If user overrides default settings, then 1st and 2nd partial derivatives can be returned for any variables.
@@ -224,7 +242,7 @@ If user overrides default settings, then 1st and 2nd partial derivatives can be 
 
 | Output   | Type                                                                                                                                                    | Description                                                                                             | Default                                                                                           |
 |----------|---------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times #\partial$ where $#\partial \equiv number of partial derivatives requested$ | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times #\partial$ ndarray where $#\partial =m$ because ```d1=True, d2=False``` |
+| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times #\partial$ where $#\partial \equiv number of partial derivatives requested$ | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times \#\partial$ ndarray where $\#\partial =m$ because ```d1=True, d2=False``` |
 
 Tip:
 - To turn off all first-derivatives, set ```d1=False``` instead of ```d1=0```. The reason is ```d1``` and ```d2```, if set to an integer,
@@ -235,7 +253,7 @@ Tip:
 
 ##### evaluate_basis
 
-```
+```python
 basis = model.evaluate_basis(c, x, kernel=None, d=0)
 ```
 
@@ -251,7 +269,7 @@ For evaluating a FoKL model, see [evaluate](#evaluate).
 | Keyword      | Type    | Description                                    | Default            |
 |--------------|---------|------------------------------------------------|--------------------|
 | ```kernel``` | -       | see ```kernel``` of [FoKL](#fokl)              | ```model.kernel``` |
-| ```d```      | integer | order of derivative (where 0 is no derivative) | 0                  |
+| ```d```      | integer | order of derivative (where 0 is no derivative) | ```0```            |
 
 | Output      | Type   | Description                        |
 |-------------|--------|------------------------------------|
@@ -261,7 +279,7 @@ If insightful for understanding how to define ```c```, the kernels correspond to
 
 | Kernel                        | Order     | Basis                                                                                                                  |
 |-------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------|
-| ```'Cubic Splines'```         | ```d=0``` | $c_0 + c_1 x + c_2 x^2 + c_3 x^3 \implies $ <pre>c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)</pre>             |
+| ```'Cubic Splines'```         | ```d=0``` | $c_0 + c_1*x + c_2*x^2 + c_3*x^3$ <pre>c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)</pre>             |
 | "                             | ```d=1``` | $c_1 + 2 c_2 x + 3 c_3 x^2 \implies $ <pre>c[1] + 2 * c[2] * x + 3 * c[3] * (x ** 2)</pre>                             |
 | "                             | ```d=2``` | $2 c_2 + 6 c_3 x \implies $ <pre>2 * c[2] + 6 * c[3] * x</pre>                                                         |
 | ```'Bernoulli Polynomials'``` | ```d=0``` | $\sum_{k} c_k x^k \implies $ <pre>sum(c[k] * (x ** k) for k in range(len(c)))</pre>                                    |
@@ -270,7 +288,7 @@ If insightful for understanding how to define ```c```, the kernels correspond to
 
 ##### evaluate
 
-```
+```python
 mean = model.evaluate(inputs=None, betas=None, mtx=None, **kwargs)
 ```
 
@@ -294,7 +312,7 @@ If ```clean=True```, then any keywords documented for [clean](#clean) may be use
 | Output                  | Type                 | Description                                                                                                                                                                                                           |
 |-------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ```mean```              | $n \times 1$ ndarray | prediction of $\overline{y}$ in $\overline{y}=f(\overline{x}_1,...,\overline{x}_m)$ for provided ```inputs```; prediction of ```model.data``` defined in [clean](#clean) by default (i.e., ```inputs=model.inputs```) |
-| ```bounds``` (optional) | $n \times 2$ ndarray | upper and lower bounds for 95% confidence interval of predicting                                                                                                                                                      |
+| ```bounds``` (optional) | $n \times 2$ ndarray | upper and lower bounds for 95% confidence interval of predicting; returned if ```ReturnBounds=True```                                                                                                                                                      |
 
 Note if attempting to automatically format ```inputs``` but normalize to different [min, max] values than those of ```inputs```, this will have to be done manually. A workaround to achieve this is as follows:
 
@@ -348,7 +366,7 @@ mean = model.evaluate(u, normalize=model.normalize)
 
 ##### coverage3
 
-```
+```python
 mean, bounds, rmse = model.coverage3(**kwargs)
 ```
 
@@ -400,7 +418,7 @@ To govern detailed plot controls:
 
 ##### fit
 
-```
+```python
 betas, mtx, evs = model.fit(inputs=None, data=None, **kwargs)
 ```
 
@@ -414,7 +432,7 @@ Training routine for fitting model to known inputs and data.
 | Keyword             | Type    | Description                                                                                                                                                                                                               | Default     |
 |---------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
 | ```clean```         | boolean | pass ```inputs``` and ```data``` to [clean](#clean) if true                                                                                                                                                               | ```False``` |
-| ```ConsoleOutput``` | boolean | print [ind, ev] to console during FoKL model generation; will print percent completed of single Gibbs sampler call (i.e., single [ind, ev]) if large dataset (i.e., if less than 64-bit was requested in [clean](#clean)) | ```True```  |
+| ```ConsoleOutput``` | boolean | print [ind, ev] to console during FoKL model generation; will print percent completed of each Gibbs sampler call prior to [ind, ev] if large dataset (i.e., if less than 64-bit was requested in [clean](#clean)) | ```True```  |
 
 If ```clean=True```, then any keywords documented for [clean](#clean) may be used here.
 
@@ -422,11 +440,11 @@ If ```clean=True```, then any keywords documented for [clean](#clean) may be use
 |-------------|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ```betas``` | $draws \times terms$ ndarray | draws from the posterior distribution of coefficients, with rows corresponding to draws (i.e., a single set of coefficients) and columns corresponding to terms in the model (i.e., $\beta_0, \beta_1, \dots $)                                                              |
 | ```mtx```   | $(terms-1) \times m$ ndarray | interaction matrix defining order of basis function for term/variable combinations in FoKL model, with rows corresponding to terms (i.e., columns of ```betas``` beyond the first column) and columns corresponding to input variables (i.e., columns of ```model.inputs```) |
-| ```ev```    | $draws \times 1$ ndarray     | vector of BIC values from all the models evaluated                                                                                                                                                                                                                           |
+| ```evs```    | ndarray     | vector of BIC values corresponding to each proposed model during training                                                                                                                                                                                                                           |
 
 ##### clear
 
-```
+```python
 model.clear(keep=None, clear=None, all=False)
 ```
 
@@ -442,13 +460,13 @@ If an attribute is listed in both the ```clear``` and ```keep``` keywords, then 
 Note when the FoKL class was initialized, ```model.keep``` got defined by default as a list of strings including the names of all hyperparameters and settings. These then get preserved here by default.
 
 To remove all attributes from the class, simply call:
-```
+```python
 model.clear(all=True)
 ```
 
 ##### to_pyomo
 
-```
+```python
 m = model.to_pyomo(m=None, y=None, x=None, **kwargs)
 ```
 
@@ -462,7 +480,7 @@ Automatically convert ```draws``` from a FoKL model trained with or defined by t
 
 | Keyword     | Type | Description                                         | Default           |
 |-------------|------|-----------------------------------------------------|-------------------|
-| ```draws``` | -    | Pyomo *scenarios*; see ```draws``` of [FoKL](#fokl) | ```model.draws``` |
+| ```draws``` | -    | Pyomo scenarios; see ```draws``` of [FoKL](#fokl) | ```model.draws``` |
 
 | Output | Type        | Description                          |
 |--------|-------------|--------------------------------------|
@@ -477,7 +495,7 @@ Automatically convert ```draws``` from a FoKL model trained with or defined by t
 | ```m.fokl_basis```     | pyo.Expression | basis functions used in FoKL model                                                                                                                                                                                                                    |
 | ```m.fokl_k```         | pyo.Set        | index for FoKL term (where $k=0$ refers to $\beta_0$)                                                                                                                                                                                                 |
 | ```m.fokl_b```         | pyo.Var        | FoKL coefficients (i.e., ```model.betas```)                                                                                                                                                                                                           |
-| ```m.fokl_expr```      | pyo.Expression | FoKL model function (i.e., $\overline{\beta}$ draw in $\beta_0 +\sum_{j=1}^m \sum_{i=1}^n \beta_{ij} {\mathscr{B}}_{i} (x_j )+\sum_{j=1}^{m-1} \sum_{k=j+1}^m \sum_{i=1}^n \beta_{ijk} {\mathscr{B}}_{i} (x_j , x_k )+\dots$ where $i\equiv$scenario) |
+| ```m.fokl_expr```      | pyo.Expression | FoKL model function (i.e., $\overline{\beta}$ draw in $\beta_0 +\sum_{j=1}^m \sum_{i=1}^n \beta_{ij} B_i (x_j )+\sum_{j=1}^{m-1} \sum_{k=j+1}^m \sum_{i=1}^n \beta_{ijk} B_i (x_j , x_k )+\dots$ where $i\equiv$scenario) |
 | ```m.fokl_constr```    | pyo.Constraint | FoKL model equation (i.e., ```m.fokl_y[i] == m.fokl_expr[i] for i in m.fokl_scenarios```                                                                                                                                                              |
          
 Defining the Pyomo model's objective and any other constraints must be done outside of the ```to_pyomo``` method.
@@ -490,23 +508,23 @@ solver.solve(m, solver='ipopt')
 
 ##### save
 
-```
+```python
 filepath = model.save(filename=None, directory=None)
 ```
 
-Save a FoKL class as a file with extension *.fokl*.
+Save a FoKL class as a file with extension '*.fokl*'.
 
-Both inputs are optional. By default, ```filename``` is of the form *model_yyyymmddhhmmss.fokl* and is saved to the
+Both inputs are optional. By default, ```filename``` is of the form '*model_yyyymmddhhmmss.fokl*' and is saved to the
 current directory. To change the directory, embed within ```filename``` or assign to ```directory``` if using the default ```filename``` format.
 
 Returned is ```filepath```. Enter this as the argument to [load](#foklroutinesload) to later reload the model. Explicitly, that is:
-```
-FoKLRoutines.load(filepath)  # == FoKLRoutines.load(filename, directory)
+```python
+FoKLRoutines.load(filepath)
 ```
 
 | Input           | Type   | Description                                                                                      |
 |-----------------|--------|--------------------------------------------------------------------------------------------------|
-| ```filename```  | string | name of file to save model as (note '.fokl' extension can be automatically or manually appended) |
+| ```filename```  | string | name of file to save model as (note '*.fokl*' extension can be automatically or manually appended) |
 | ```directory``` | string | absolute or relative path to pre-existing folder in which to save ```filename```                 |
 
 | Output         | Type   | Description                               |
@@ -515,7 +533,7 @@ FoKLRoutines.load(filepath)  # == FoKLRoutines.load(filename, directory)
 
 ### GP_integrate
 
-```
+```python
 T, Y = GP_Integrate(betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs)
 ```
 
@@ -523,25 +541,25 @@ T, Y = GP_Integrate(betas, matrix, b, norms, phis, start, stop, y0, h, used_inpu
 |-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ```betas```       | ```betas``` is a list of arrays in which each entry to the list contains a specific row of the betas matrix, or the mean of the betas matrix for each model being integrated.                                                                                                                                                                                                        |
 | ```matrix```      | ```matrix``` is a list of arrays containing the interaction matrix of each model.                                                                                                                                                                                                                                                                                                    |
-| ```b```           | ```b``` is an array of the values of all the other inputs to the model(s) (including any forcing functions) over the time period we integrate over. The length of b should be equal to the number of points in the final time series (end-start)/h. All values in b need to be normalized with respect to the min and max values of their respective values in the training dataset. |
-| ```norms```       | ```norms``` is a matrix of the min and max values of all the inputs being integrated (in the same order as y0). Min values are in the top row, max values in the bottom.                                                                                                                                                                                                             |
+| ```b```           | ```b``` is an array of the values of all the other inputs to the model(s) (including any forcing functions) over the time period we integrate over. The length of ```b``` should be equal to the number of points in the final time series ```(stop - start) / h```. All values in ```b``` need to be normalized with respect to the min and max values of their respective values in the training dataset. |
+| ```norms```       | ```norms``` is a matrix of the min and max values of all the inputs being integrated (in the same order as ```y0```). Min values are in the top row, max values in the bottom.                                                                                                                                                                                                             |
 | ```phis```        | ```phis``` is a data structure with coefficients for basis functions.                                                                                                                                                                                                                                                                                                                |
 | ```start```       | ```start``` is the time at which integration begins.                                                                                                                                                                                                                                                                                                                                 |
 | ```stop```        | ```stop``` is the time to end integration.                                                                                                                                                                                                                                                                                                                                           |
 | ```y0```          | ```y0``` is an array of the inital conditions for the models being integrated.                                                                                                                                                                                                                                                                                                       |
 | ```h```           | ```h``` is the step size with respect to time.                                                                                                                                                                                                                                                                                                                                       |
-| ```used_inputs``` | ```used_inputs``` is a list of arrays containing the information as to what inputs are used in what model. Each array should contain a vector corresponding to a different model. Inputs should be referred to as those being integrated first, followed by those contained in b (in the same order as they appear in y0 and b respectively).                                        |
+| ```used_inputs``` | ```used_inputs``` is a list of arrays containing the information as to what inputs are used in what model. Each array should contain a vector corresponding to a different model. Inputs should be referred to as those being integrated first, followed by those contained in ```b``` (in the same order as they appear in ```y0``` and ```b``` respectively).                                        |
 
 | Output  | Description                                                                                    |
 |---------|------------------------------------------------------------------------------------------------|
 | ```T``` | ```T``` is an array of the time steps the models are integrated at.                            |
-| ```Y``` | ```Y``` is an array of the models that have been integrated, at the time steps contained in T. |
+| ```Y``` | ```Y``` is an array of the models that have been integrated, at the time steps contained in ```T```. |
 
 For example, if two models were being integrated, with 3 other inputs total
 and the 1st model used both models outputs as inputs and the 1st and 3rd additional
 inputs, while the 2nd model used its own output as an input and the 2nd
 and 3rd additional inputs,
-```
+```python
 used_inputs = [[1, 1, 1, 0, 1], [0, 1, 0, 1, 0]]
 ```
 If the models created do not follow this ordering scheme for their inputs,
@@ -551,7 +569,7 @@ numbering scheme provided to ```used_inputs```. E.g., if the inputs need to be r
 same example as before, if the 1st models inputs needed rearranged so that
 the 3rd additional input came first, followed by the two model outputs in
 the same order as they are in ```y0```, and ends with the 1st additional input,
-then the 1st cell in ```used_inputs``` would have the form [2, 3, 4, 0, 1].
+then the 1st cell in ```used_inputs``` would have the form ```[2, 3, 4, 0, 1]```.
 
 ## Benchmarks and Papers
 
