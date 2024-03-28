@@ -1745,7 +1745,7 @@ class FoKL:
         m.fokl_y = pyo.Var(m.fokl_scenarios, within=pyo.Reals)  # FoKL output
 
         m.fokl_j = pyo.Set(initialize=range(lv))  # index for FoKL input variable
-        m.fokl_x = pyo.Var(m.fokl_j, within=pyo.Reals, bounds=[0, 1])  # FoKL input variables
+        m.fokl_x = pyo.Var(m.fokl_j, within=pyo.Reals, bounds=[0, 1], initialize=0.0)  # FoKL input variables
 
         basis_nj = []
         for j in m.fokl_j:
