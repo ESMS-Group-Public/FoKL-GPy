@@ -425,13 +425,13 @@ class FoKL:
         Keyword Inputs:
             inputs == NxM matrix of 'x' input variables for fitting f(x1, ..., xM)    == self.inputs (default)
             kernel == function to use for differentiation (i.e., cubic or Bernoulli)  == self.kernel (default)
-            d1     == index of input variable(s) to use for first partial derivative  == True (default)
-            d2     == index of input variable(s) to use for second partial derivative == False (default)
-            draws  == number of beta terms used                                       == self.draws (default)
-            betas  == draw from the posterior distribution of coefficients            == self.betas (default)
-            phis   == spline coefficients for the basis functions                     == self.phis (default)
-            mtx    == basis function interaction matrix from the best model           == self.mtx (default)
-            span   == list of [min, max]'s of input data used in the normalization    == self.normalize (default)
+            d1        == index of input variable(s) to use for first partial derivative  == True (default)
+            d2        == index of input variable(s) to use for second partial derivative == False (default)
+            draws     == number of beta terms used                                       == self.draws (default)
+            betas     == draw from the posterior distribution of coefficients            == self.betas (default)
+            phis      == spline coefficients for the basis functions                     == self.phis (default)
+            mtx       == basis function interaction matrix from the best model           == self.mtx (default)
+            normalize == list of [min, max]'s of input data used in the normalization    == self.normalize (default)
             IndividualDraws == boolean for returning derivative(s) at each draw       == 0 (default)
             ReturnFullArray == boolean for returning NxMx2 array instead of Nx2M      == 0 (default)
 
@@ -448,7 +448,7 @@ class FoKL:
 
         # Process keywords:
         default = {'inputs': None, 'kernel': self.kernel, 'd1': None, 'd2': None, 'draws': self.draws, 'betas': None,
-                   'phis': None, 'mtx': self.mtx, 'span': self.normalize, 'IndividualDraws': False,
+                   'phis': None, 'mtx': self.mtx, 'normalize': self.normalize, 'IndividualDraws': False,
                    'ReturnFullArray': False, 'ReturnBasis': False}
         current = process_kwargs(default, kwargs)
         for boolean in ['IndividualDraws', 'ReturnFullArray', 'ReturnBasis']:
@@ -471,7 +471,7 @@ class FoKL:
         betas = current['betas']
         phis = current['phis']
         mtx = current['mtx']
-        span = current['span']
+        span = current['normalize']
 
         inputs = np.array(inputs)
         if inputs.ndim == 1:
@@ -707,6 +707,11 @@ class FoKL:
             warnings.warn("'draws' must be greater than or equal to 40 if calculating bounds. Setting 'draws=40'.")
         draws = current['draws']  # define local variable
         if betas is None:  # default
+            if draws > self.betas.shape[0]:
+                draws = self.betas.shape[0]  # more draws than models results in inf time, so threshold
+                self.draws = draws
+                warnings.warn("Updated attribute 'self.draws' to equal number of draws in 'self.betas'.",
+                              category=UserWarning)
             betas = self.betas[-draws::, :]  # use samples from last models
         else:  # user-defined betas may need to be formatted
             betas = np.array(betas)
@@ -797,7 +802,7 @@ class FoKL:
         modells = np.zeros((n, draws))  # note n == np.shape(data)[0] if data != 'ignore'
         for i in range(draws):
             modells[:, i] = np.matmul(X, betas[setnos[i], :])
-        meen = np.mean(modells, 1)
+        mean = np.mean(modells, 1)
 
         if current['ReturnBounds']:
             bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
@@ -806,14 +811,14 @@ class FoKL:
                 drawset = np.sort(modells[i, :])
                 bounds[i, 0] = drawset[cut]
                 bounds[i, 1] = drawset[draws - cut]
-            return meen, bounds
+            return mean, bounds
         else:
-            return meen
+            return mean
 
     def coverage3(self, **kwargs):
         """
         For validation testing of FoKL model. Default functionality is to evaluate all inputs (i.e., train+test sets).
-        Returned is the predicted output 'meen', confidence bounds 'bounds', and root mean square error 'rmse'. A plot
+        Returned is the predicted output 'mean', confidence bounds 'bounds', and root mean square error 'rmse'. A plot
         may be returned by calling 'coverage3(plot=1)'; or, for a potentially more meaningful plot in terms of judging
         accuracy, 'coverage3(plot='sorted')' plots the data in increasing value.
 
@@ -844,7 +849,7 @@ class FoKL:
             PlotSizeData   == scalar for Data's line size            == 2 (default)
 
         Return Outputs:
-            meen   == predicted output values for each indexed input
+            mean   == predicted output values for each indexed input
             bounds == confidence interval for each predicted output value
             rmse   == root mean squared deviation (RMSE) of prediction versus known data
         """
@@ -937,7 +942,7 @@ class FoKL:
         data = current['data']
         draws = current['draws']
 
-        meen, bounds = self.evaluate(normputs, draws=draws, ReturnBounds=1)
+        mean, bounds = self.evaluate(normputs, draws=draws, ReturnBounds=1)
         n, mputs = np.shape(normputs)  # Size of normalized inputs ... calculated in 'evaluate' but not returned
 
         if current['plot']:  # if user requested a plot
@@ -959,16 +964,16 @@ class FoKL:
 
             if current['plot'] == 'sorted':  # if user requested a sorted plot
                 sort_id = np.argsort(np.squeeze(data))
-                plt_meen = meen[sort_id]
+                plt_mean = mean[sort_id]
                 plt_bounds = bounds[sort_id]
                 plt_data = data[sort_id]
             else:  # elif current['plot'] is True:
-                plt_meen = meen
+                plt_mean = mean
                 plt_data = data
                 plt_bounds = bounds
 
             plt.figure()
-            plt.plot(plt_x, plt_meen, current['PlotTypeFoKL'], linewidth=current['PlotSizeFoKL'],
+            plt.plot(plt_x, plt_mean, current['PlotTypeFoKL'], linewidth=current['PlotSizeFoKL'],
                      label=current['LegendLabelFoKL'])
             if data is not False:
                 plt.plot(plt_x, plt_data, current['PlotTypeData'], markersize=current['PlotSizeData'],
@@ -990,11 +995,11 @@ class FoKL:
             plt.show()
 
         if data is not False:
-            rmse = np.sqrt(np.mean(meen - data) ** 2)
+            rmse = np.sqrt(np.mean(mean - data) ** 2)
         else:
             rmse = []
 
-        return meen, bounds, rmse
+        return mean, bounds, rmse
 
     def fit(self, inputs=None, data=None, **kwargs):
         """
@@ -1229,10 +1234,11 @@ class FoKL:
                 X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
 
             for i in range(minp):  # for datapoint in training datapoints
-                if self.ConsoleOutput and data.dtype != np.float64:  # only for large datasets
+                if self.ConsoleOutput and data.dtype != np.float64:  # if large dataset, show progress for sanity check
                     percent = i / (minp - 1)
-                    sys.stdout.write('\r')  # set cursor at beginning of console output line
-                    sys.stdout.write(f"Gibbs: {round(100 * percent, 2):.2f}%")
+                    sys.stdout.write(f"Gibbs: {round(100 * percent, 2):.2f}%")  # show percent of data looped through
+                    sys.stdout.write('\r')  # set cursor at beginning of console output line (such that next iteration
+                        # of Gibbs progress (or [ind, ev] if at end) overwrites current Gibbs progress)
                     sys.stdout.flush()
                 for j in range(nxin, mmtx + 1):
                     null, nxin2 = np.shape(X)
@@ -1568,17 +1574,17 @@ class FoKL:
 
         return
 
-    def to_pyomo(self, draws, m=None, y=None, x=None):
+    def to_pyomo(self, m=None, y=None, x=None, **kwargs):
         """
         Automatically convert a pre-trained FoKL model to constraints for a symbolic Pyomo model.
-
-        Input:
-            - draws == number of scenarios to include as Pyomo constraints
 
         Optional Inputs:
             - m               == Pyomo model (if already defined)
             - y               == FoKL output to include in Pyomo model (if known)
             - x               == FoKL input variables to include in Pyomo model (if known), e.g., x=[0.7, None, 0.4]
+
+        Keywords:
+            - draws == number of scenarios to include as Pyomo constraints == model.draws (default)
 
         Output:
             - m == Pyomo model with FoKL model included
@@ -1589,6 +1595,12 @@ class FoKL:
             - Only convert FoKL models defined with the 'Bernoulli Polynomials' kernel; otherwise, with 'Cubic
             Splines', the solution time is extremely impractical even for the simplest of models.
         """
+        # Process kwargs:
+        default = {'draws': self.draws}
+        current = process_kwargs(default, kwargs)
+
+        # Convert FoKL to Pyomo:
+
         t = np.array(self.mtx - 1, dtype=int)  # indices of polynomial (where 0 is B1 and -1 means none)
         lt = t.shape[0] + 1  # length of terms (including beta0)
         lv = t.shape[1]  # length of input variables
@@ -1608,7 +1620,7 @@ class FoKL:
         if m is None:
             m = pyo.ConcreteModel()
 
-        m.fokl_scenarios = pyo.Set(initialize=range(draws))  # index for scenario (i.e., FoKL draw)
+        m.fokl_scenarios = pyo.Set(initialize=range(current['draws']))  # index for scenario (i.e., FoKL draw)
         m.fokl_y = pyo.Var(m.fokl_scenarios, within=pyo.Reals)  # FoKL output
 
         m.fokl_j = pyo.Set(initialize=range(lv))  # index for FoKL input variable

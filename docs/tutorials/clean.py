@@ -57,7 +57,7 @@ def main():
 
     # (a) trained here on known data.
     a.fit()                                 # == a.fit([x0, x1, x2], y, clean=True, train=0.6)
-    y_a = a.evaluate()                      # == y_a = a.evaluate(a.inputs_np, a.betas, a.mtx)
+    y_a = a.evaluate()                      # == y_a = a.evaluate(a.inputs, a.betas, a.mtx)
 
     # (b, alt. 1) provided from elsewhere or hypothesized, using class attributes to define the model semi-permanently.
     b.betas = np.array([2.49, 1.52, 2.15])[np.newaxis]
