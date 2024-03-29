@@ -39,7 +39,7 @@ To read more about FoKL, please see the [Benchmarks and Papers](#benchmarks-and-
 
 ## Installation and Setup
 
-FoKL is available through PyPI:
+From your command-line terminal, FoKL is available through PyPI:
 
 ```cmd
 pip install FoKL
@@ -52,22 +52,12 @@ be included:
 git clone https://github.com/ESMS-Group-Public/FoKL-GPy
 ```
 
-Once installed, import the FoKL module into your environment with:
+Once installed, import the FoKL module in Python with:
 ```python
 from FoKL import FoKLRoutines
 ```
 
-If loading a pre-existing FoKL class object:
-```python
-model = FoKLRoutines.load("sub_directory\\model.fokl")
-```
-
-Else if creating a new FoKL class object:
-```python
-model = FoKLRoutines.FoKL()
-```
-
-Now you may call methods on the class and reference its attributes. For help with this, please see [Use Cases](#use-cases).
+From here, the FoKL class object may be created and its methods accessed. Please see [Use Cases](#use-cases) to learn more about working with FoKL models.
 
 ## Use Cases
 
@@ -101,7 +91,7 @@ Then, see [User Documentation](#user-documentation) as needed.
 
 ### FoKLRoutines
 
-The ```FoKLRoutines``` module houses the primary routines for a FoKL model. Namely, these are the [load](#load) function and [FoKL](#fokl) class object.
+The [FoKLRoutines](#foklroutines) module houses the primary routines for a FoKL model. Namely, these are the [load](#load) function and [FoKL](#fokl) class object.
 
 #### load
 
@@ -190,7 +180,7 @@ if available; otherwise, leave blank.
 | ```train```         | scalar  | (0,1] fraction of $n$ instances to use for training    | ```1```    |
 | ```AutoTranspose``` | boolean | assumes $n > m$ and transposes dataset accordingly       | ```True``` |
 
-After calling ```clean```, the now normalized and formatted dataset gets saved as attributes of the FoKL class. Be sure to use these attributes in place of the originally entered ```inputs``` and ```data``` so that normalization and formatting errors are avoided. The attributes are as follows:
+After calling [clean](#clean), the now normalized and formatted dataset gets saved as attributes of the FoKL class. Be sure to use these attributes in place of the originally entered ```inputs``` and ```data``` so that normalization and formatting errors are avoided. The attributes are as follows:
 
 | Attribute             | Type                 | Description                                                             |
 |-----------------------|----------------------|-------------------------------------------------------------------------|
@@ -207,7 +197,7 @@ To then access the training set ```[traininputs, traindata]```, see [trainset](#
 model.trainlog = model.generate_trainlog(train, n=None)
 ```
 
-Generate random logical vector of length ```n``` with ```train``` percent as ```True```. It is expected that ```generate_trainlog``` will be called internally by [clean](#clean) and not by the user, though this method is available if sweeping through values of ```train``` in order to compare the accuracy of models fitted to training sets of different sizes.
+Generate random logical vector of length ```n``` with ```train``` percent as ```True```. It is expected that [generate_trainlog](#generate_trainlog) will be called internally by [clean](#clean) and not by the user, though this method is available if sweeping through values of ```train``` in order to compare the accuracy of models fitted to training sets of different sizes.
 
 ##### trainset
 
@@ -242,7 +232,7 @@ If user overrides default settings, then 1st and 2nd partial derivatives can be 
 
 | Output   | Type                                                                                                                                                    | Description                                                                                             | Default                                                                                           |
 |----------|---------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times #\partial$ where $#\partial \equiv number of partial derivatives requested$ | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times \#\partial$ ndarray where $\#\partial =m$ because ```d1=True, d2=False``` |
+| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times \# \partial $ where $\# \partial \equiv $ number of partial derivatives requested | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times \# \partial $ ndarray where $\# \partial =m$ because ```d1=True, d2=False``` |
 
 Tip:
 - To turn off all first-derivatives, set ```d1=False``` instead of ```d1=0```. The reason is ```d1``` and ```d2```, if set to an integer,
@@ -279,9 +269,9 @@ If insightful for understanding how to define ```c```, the kernels correspond to
 
 | Kernel                        | Order     | Basis                                                                                                                  |
 |-------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------|
-| ```'Cubic Splines'```         | ```d=0``` | $c_0 + c_1*x + c_2*x^2 + c_3*x^3$ <pre>c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)</pre>             |
-| "                             | ```d=1``` | $c_1 + 2 c_2 x + 3 c_3 x^2 \implies $ <pre>c[1] + 2 * c[2] * x + 3 * c[3] * (x ** 2)</pre>                             |
-| "                             | ```d=2``` | $2 c_2 + 6 c_3 x \implies $ <pre>2 * c[2] + 6 * c[3] * x</pre>                                                         |
+| ```'Cubic Splines'```         | ```d=0``` | $ c_0 + c_1 x + c_2 x^2 + c_3 x^3 $ <pre>c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)</pre>             |
+| "                             | ```d=1``` | $ c_1 + 2 c_2 x + 3 c_3 x^2 \implies $ <pre>c[1] + 2 * c[2] * x + 3 * c[3] * (x ** 2)</pre>                             |
+| "                             | ```d=2``` | $ 2 c_2 + 6 c_3 x \implies $ <pre>2 * c[2] + 6 * c[3] * x</pre>                                                         |
 | ```'Bernoulli Polynomials'``` | ```d=0``` | $\sum_{k} c_k x^k \implies $ <pre>sum(c[k] * (x ** k) for k in range(len(c)))</pre>                                    |
 | "                             | ```d=1``` | $\sum_{k} k c_k x^{k-1} \implies $ <pre>sum(k * c[k] * (x ** (k - 1)) for k in range(1, len(c)))</pre>                 |
 | "                             | ```d=2``` | $\sum_{k} k (k-1) c_k x^{k-2} \implies $ <pre>sum((k - 1) * k * c[k] * (x ** (k - 2)) for k in range(2, len(c)))</pre> |
@@ -495,7 +485,7 @@ Automatically convert ```draws``` from a FoKL model trained with or defined by t
 | ```m.fokl_basis```     | pyo.Expression | basis functions used in FoKL model                                                                                                                                                                                                                    |
 | ```m.fokl_k```         | pyo.Set        | index for FoKL term (where $k=0$ refers to $\beta_0$)                                                                                                                                                                                                 |
 | ```m.fokl_b```         | pyo.Var        | FoKL coefficients (i.e., ```model.betas```)                                                                                                                                                                                                           |
-| ```m.fokl_expr```      | pyo.Expression | FoKL model function (i.e., $\overline{\beta}$ draw in $\beta_0 +\sum_{j=1}^m \sum_{i=1}^n \beta_{ij} B_i (x_j )+\sum_{j=1}^{m-1} \sum_{k=j+1}^m \sum_{i=1}^n \beta_{ijk} B_i (x_j , x_k )+\dots$ where $i\equiv$scenario) |
+| ```m.fokl_expr```      | pyo.Expression | FoKL model function (i.e., $\overline{\beta}$ draw in $\beta_0 +{\sum_{j=1}}^m {\sum_{i=1}}^n \beta_{ij} B_i (x_j )+{\sum_{j=1}}^{m-1} {\sum_{k=j+1}}^m {\sum_{i=1}}^n \beta_{ijk} B_i (x_j , x_k )+\dots$ where $i \equiv $scenario) |
 | ```m.fokl_constr```    | pyo.Constraint | FoKL model equation (i.e., ```m.fokl_y[i] == m.fokl_expr[i] for i in m.fokl_scenarios```                                                                                                                                                              |
          
 Defining the Pyomo model's objective and any other constraints must be done outside of the ```to_pyomo``` method.
