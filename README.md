@@ -197,7 +197,7 @@ To then access the training set ```[traininputs, traindata]```, see [trainset](#
 model.trainlog = model.generate_trainlog(train, n=None)
 ```
 
-Generate random logical vector of length ```n``` with ```train``` percent as ```True```. It is expected that [generate_trainlog](#generate_trainlog) will be called internally by [clean](#clean) and not by the user, though this method is available if sweeping through values of ```train``` in order to compare the accuracy of models fitted to training sets of different sizes.
+Generate random logical vector of length $n$ with ```train``` percent as ```True```. It is expected that [generate_trainlog](#generate_trainlog) will be called internally by [clean](#clean) and not by the user, though this method is available if sweeping through values of ```train``` in order to compare the accuracy of models fitted to training sets of different sizes.
 
 ##### trainset
 
@@ -232,7 +232,7 @@ If user overrides default settings, then 1st and 2nd partial derivatives can be 
 
 | Output   | Type                                                                                                                                                    | Description                                                                                             | Default                                                                                           |
 |----------|---------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times {\#} \partial $ where $\# \partial \equiv $ number of partial derivatives requested | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times \# \partial $ ndarray where $\# \partial =m$ because ```d1=True, d2=False``` |
+| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times \# \delta $ where $\# \delta = $ number of partial derivatives requested | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times \# \delta $ ndarray where $\# \delta =m$ because ```d1=True, d2=False``` |
 
 Tip:
 - To turn off all first-derivatives, set ```d1=False``` instead of ```d1=0```. The reason is ```d1``` and ```d2```, if set to an integer,
@@ -269,8 +269,8 @@ If insightful for understanding how to define ```c```, the kernels correspond to
 
 | Kernel                        | Order     | Basis                                                                                                                  |
 |-------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------|
-| ```'Cubic Splines'```         | ```d=0``` | $ c_0 + c_1 x + c_2 x^2 + c_3 x^3 $ <pre>c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)</pre>             |
-| "                             | ```d=1``` | $ c_1 + 2 c_2 x + 3 c_3 x^2 \implies $ <pre>c[1] + 2 * c[2] * x + 3 * c[3] * (x ** 2)</pre>                             |
+| ```'Cubic Splines'```         | ```d=0``` | $ c_0 + c_1 x + c_2 x^2 + c_3 x^3 \implies $             |
+| "                             | ```d=1``` | $ c_1 + 2 c_2 x + 3 c_3 x^2 $                             |
 | "                             | ```d=2``` | $ 2 c_2 + 6 c_3 x \implies $ <pre>2 * c[2] + 6 * c[3] * x</pre>                                                         |
 | ```'Bernoulli Polynomials'``` | ```d=0``` | $\sum_{k} c_k x^k \implies $ <pre>sum(c[k] * (x ** k) for k in range(len(c)))</pre>                                    |
 | "                             | ```d=1``` | $\sum_{k} k c_k x^{k-1} \implies $ <pre>sum(k * c[k] * (x ** (k - 1)) for k in range(1, len(c)))</pre>                 |
@@ -485,7 +485,7 @@ Automatically convert ```draws``` from a FoKL model trained with or defined by t
 | ```m.fokl_basis```     | pyo.Expression | basis functions used in FoKL model                                                                                                                                                                                                                    |
 | ```m.fokl_k```         | pyo.Set        | index for FoKL term (where $k=0$ refers to $\beta_0$)                                                                                                                                                                                                 |
 | ```m.fokl_b```         | pyo.Var        | FoKL coefficients (i.e., ```model.betas```)                                                                                                                                                                                                           |
-| ```m.fokl_expr```      | pyo.Expression | FoKL model function (i.e., $\overline{\beta}$ draw in $\beta_0 +{\sum_{j=1}}^m {\sum_{i=1}}^n \beta_{ij} B_i (x_j )+{\sum_{j=1}}^{m-1} {\sum_{k=j+1}}^m {\sum_{i=1}}^n \beta_{ijk} B_i (x_j , x_k )+\dots$ where $i \equiv $scenario) |
+| ```m.fokl_expr```      | pyo.Expression | FoKL model function (i.e., $\overline{\beta}$ draw in $\beta_0 +\sum_{j=1}^{m} \sum_{i=1}^{n} \beta_{ij} B_i (x_j )+\sum_{j=1}^{m-1} \sum_{k=j+1}^{m} \sum_{i=1}^{n} \beta_{ijk} B_i (x_j , x_k )+\dots$ where $i = $scenario) |
 | ```m.fokl_constr```    | pyo.Constraint | FoKL model equation (i.e., ```m.fokl_y[i] == m.fokl_expr[i] for i in m.fokl_scenarios```                                                                                                                                                              |
          
 Defining the Pyomo model's objective and any other constraints must be done outside of the ```to_pyomo``` method.
