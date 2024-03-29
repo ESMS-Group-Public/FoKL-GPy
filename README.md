@@ -442,11 +442,11 @@ model.clear(keep=None, clear=None, all=False)
 Delete all attributes from the FoKL class except for hyperparameters and settings, unless otherwise specified by the ```clear``` keyword.
 If an attribute is listed in both the ```clear``` and ```keep``` keywords, then the attribute is cleared.
 
-| Input       | Type            | Description                                                                                           | Default          |
-|-------------|-----------------|-------------------------------------------------------------------------------------------------------|------------------|
-| ```keep```  | list of strings | attributes to keep in addition to hyperparameters and settings, e.g., ```keep=['inputs_np', 'mtx']``` | ```model.keep``` |
-| ```clear``` | list of strings | hyperparameters to delete, e.g., ```clear=['kernel', 'phis']```                                       | ```None```       |
-| ```all```   | boolean         | if ```True``` then all attributes (including hyperparameters) get deleted regardless                  | ```False```      |
+| Input       | Type            | Description                                                                                        | Default          |
+|-------------|-----------------|----------------------------------------------------------------------------------------------------|------------------|
+| ```keep```  | list of strings | attributes to keep in addition to hyperparameters and settings, e.g., ```keep=['inputs', 'mtx']``` | ```model.keep``` |
+| ```clear``` | list of strings | hyperparameters to delete, e.g., ```clear=['kernel', 'phis']```                                    | ```None```       |
+| ```all```   | boolean         | if ```True``` then all attributes (including hyperparameters) get deleted regardless               | ```False```      |
 
 Note when the FoKL class was initialized, ```model.keep``` got defined by default as a list of strings including the names of all hyperparameters and settings. These then get preserved here by default.
 
