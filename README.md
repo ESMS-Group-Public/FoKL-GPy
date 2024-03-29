@@ -269,12 +269,12 @@ If insightful for understanding how to define ```c```, the kernels correspond to
 
 | Kernel                        | Order     | Basis                                                                                                                  |
 |-------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------|
-| ```'Cubic Splines'```         | ```d=0``` | $c_0+c_1 \cdot x+c_2 \cdot x^2+c_3 \cdot x^3$ <pre>$\implies$```c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)```</pre>             |
-| "                             | ```d=1``` | $c_1+2c_2 x+3c_3 x^2$ <pre>$\implies$```c[1] + 2 * c[2] * x + 3 * c[3] * (x ** 2)```</pre>                            |
-| "                             | ```d=2``` | $2c_2+6c_3 x$ <pre>$\implies$```2 * c[2] + 6 * c[3] * x```</pre>                                                         |
-| ```'Bernoulli Polynomials'``` | ```d=0``` | $\sum_k (c_k \cdot x^k)$ <pre>$\implies$```c[0] + sum(c[k] * (x ** k) for k in range(1, len(c)))```</pre>                                    |
-| "                             | ```d=1``` | $\sum_k (k \cdot c_k \cdot x^{k-1})$ <pre>$\implies$```c[1] + sum(k * c[k] * (x ** (k - 1)) for k in range(2, len(c)))```</pre>                 |
-| "                             | ```d=2``` | $\sum_k (k \cdot (k-1) \cdot c_k \cdot x^{k-2})$ <pre>$\implies$```sum((k - 1) * k * c[k] * (x ** (k - 2)) for k in range(2, len(c)))```</pre> |
+| ```'Cubic Splines'```         | ```d=0``` | $c_0+c_1 \cdot x+c_2 \cdot x^2+c_3 \cdot x^3 =$ <pre>```c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)```</pre>             |
+| "                             | ```d=1``` | $c_1+2\cdot c_2\cdot x+3\cdot c_3\cdot x^2 =$ <pre>```c[1] + 2 * c[2] * x + 3 * c[3] * (x ** 2)```</pre>                            |
+| "                             | ```d=2``` | $2\cdot c_2+6\cdot c_3\cdot x =$ <pre>```2 * c[2] + 6 * c[3] * x```</pre>                                                         |
+| ```'Bernoulli Polynomials'``` | ```d=0``` | $\sum_k (c_k \cdot x^k)=$ <pre>```c[0] + sum(c[k] * (x ** k) for k in range(1, len(c)))```</pre>                                    |
+| "                             | ```d=1``` | $\sum_k (k \cdot c_k \cdot x^{k-1})=$ <pre>```c[1] + sum(k * c[k] * (x ** (k - 1)) for k in range(2, len(c)))```</pre>                 |
+| "                             | ```d=2``` | $\sum_k (k \cdot (k-1) \cdot c_k \cdot x^{k-2})=$ <pre>```sum((k - 1) * k * c[k] * (x ** (k - 2)) for k in range(2, len(c)))```</pre> |
 
 ##### evaluate
 
