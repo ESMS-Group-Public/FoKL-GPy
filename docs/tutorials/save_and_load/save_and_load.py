@@ -43,7 +43,8 @@ def main():
     # Compare saved and loaded models to confirm functionality:
 
     print("\nConfirming functionality...\n")
-    if f.kernel == f_loaded.kernel and all(f.betas_avg == f_loaded.betas_avg) and all(f.mtx == f_loaded.mtx):
+    if f.kernel == f_loaded.kernel and all(all(f.betas[draw, :] == f_loaded.betas[draw, :]) for draw in range(1000)) \
+            and all(f.mtx == f_loaded.mtx):
         print("Success! The saving and loading functions are working properly.")
     else:
         warnings.warn("The saving and loading functions are NOT working properly.", category=UserWarning)

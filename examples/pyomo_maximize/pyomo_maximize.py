@@ -4,7 +4,7 @@
 This is an example of FoKL converting its GP model to a symbolic Pyomo expression and solving the generated Pyomo model
 algebraically for the maximum value of the GP model. The dataset used is arbitrarily defined and is a toy problem.
 """
-from src.FoKL import FoKLRoutines
+from FoKL import FoKLRoutines
 import numpy as np
 import pyomo.environ as pyo
 from pyomo.environ import *
@@ -34,7 +34,6 @@ def dataset():
 
 
 def main():
-
     # Define/Load dataset:
     t, x0, x1, y = dataset()  # t is parameter for x used for plot's x-axis, and dataset is <y|x>
 
@@ -53,7 +52,7 @@ def main():
 
     # Convert FoKL's GP model to Pyomo:
     scenarios = f.draws  # Pyomo 'scenarios' is synonym for FoKL 'draws'
-    m = f.to_pyomo(scenarios)
+    m = f.to_pyomo(draws=scenarios)  # default is 'draws=self.draws' so this is unnecessary but demonstrates idea
 
     # Add constraints (if any/known) to enforce 'physics':
     m.t = pyo.Var(within=pyo.Reals, bounds=[0, 1])
