@@ -232,7 +232,7 @@ If user overrides default settings, then 1st and 2nd partial derivatives can be 
 
 | Output   | Type                                                                                                                                                    | Description                                                                                             | Default                                                                                           |
 |----------|---------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times \# \partial $ where $\# \partial \equiv $ number of partial derivatives requested | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times \# \partial $ ndarray where $\# \partial =m$ because ```d1=True, d2=False``` |
+| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times {\#} \partial $ where $\# \partial \equiv $ number of partial derivatives requested | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times \# \partial $ ndarray where $\# \partial =m$ because ```d1=True, d2=False``` |
 
 Tip:
 - To turn off all first-derivatives, set ```d1=False``` instead of ```d1=0```. The reason is ```d1``` and ```d2```, if set to an integer,
