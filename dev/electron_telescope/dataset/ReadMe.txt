@@ -1,1 +1,0 @@
-Place TIFF file here and rename to 'vid.tif' if needed.
