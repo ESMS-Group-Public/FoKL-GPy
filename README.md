@@ -232,7 +232,7 @@ If user overrides default settings, then 1st and 2nd partial derivatives can be 
 
 | Output   | Type                                                                                                                                                    | Description                                                                                             | Default                                                                                           |
 |----------|---------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times m_{\delta} $ where $m_{\delta} = $ number of partial derivatives requested | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times m_{\delta} $ ndarray where $m_{\delta} =m$ because ```d1=True, d2=False``` |
+| ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times m_{\delta}$ where $m_{\delta} =$ number of partial derivatives requested | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times m_{\delta}$ ndarray where $m_{\delta} =m$ because ```d1=True, d2=False``` |
 
 Tip:
 - To turn off all first-derivatives, set ```d1=False``` instead of ```d1=0```. The reason is ```d1``` and ```d2```, if set to an integer,
@@ -269,12 +269,12 @@ If insightful for understanding how to define ```c```, the kernels correspond to
 
 | Kernel                        | Order     | Basis                                                                                                                  |
 |-------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------|
-| ```'Cubic Splines'```         | ```d=0``` | $c$ $c_0$ $c_0+c$ $c_0+c_1$ $c_0+c_1 \cdot x$ $c_0+c_1 \cdot x+c_2 \cdot x^2+c_3 \cdot x^3$              |
-| "                             | ```d=1``` | $ c_1 + 2 c_2 x + 3 c_3 x^2 $                             |
-| "                             | ```d=2``` | $ 2 c_2 + 6 c_3 x \implies $ <pre>2 * c[2] + 6 * c[3] * x</pre>                                                         |
-| ```'Bernoulli Polynomials'``` | ```d=0``` | $\sum_{k} c_k x^k \implies $ <pre>sum(c[k] * (x ** k) for k in range(len(c)))</pre>                                    |
-| "                             | ```d=1``` | $\sum_{k} k c_k x^{k-1} \implies $ <pre>sum(k * c[k] * (x ** (k - 1)) for k in range(1, len(c)))</pre>                 |
-| "                             | ```d=2``` | $\sum_{k} k (k-1) c_k x^{k-2} \implies $ <pre>sum((k - 1) * k * c[k] * (x ** (k - 2)) for k in range(2, len(c)))</pre> |
+| ```'Cubic Splines'```         | ```d=0``` | $c_0+c_1 \cdot x+c_2 \cdot x^2+c_3 \cdot x^3$              |
+| "                             | ```d=1``` | $c_1+2 \cdot c_2 \cdot x+3 \cdot c_3 \cdot x^2$                             |
+| "                             | ```d=2``` | $2 \cdot c_2+6 \cdot c_3 \cdot x$ <pre>2 * c[2] + 6 * c[3] * x</pre>                                                         |
+| ```'Bernoulli Polynomials'``` | ```d=0``` | $\sum_{k} c_k \cdot x^k$ <pre>sum(c[k] * (x ** k) for k in range(len(c)))</pre>                                    |
+| "                             | ```d=1``` | $\sum_{k} k \cdot c_k \cdot x^{k-1}$ <pre>sum(k * c[k] * (x ** (k - 1)) for k in range(1, len(c)))</pre>                 |
+| "                             | ```d=2``` | $\sum_{k} k \cdot (k-1) \cdot c_k \cdot x^{k-2} \implies$ <pre>sum((k - 1) * k * c[k] * (x ** (k - 2)) for k in range(2, len(c)))</pre> |
 
 ##### evaluate
 
