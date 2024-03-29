@@ -47,7 +47,7 @@ def main():
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    # Integrating with 'FoKL.GP_Integrate()':
+    # Integrating with 'GP_Integrate()':
 
     n, m = np.shape(y)
     norms1 = [np.min(y[0, 0:int(m / 2)]), np.max(y[0, 0:int(m / 2)])]

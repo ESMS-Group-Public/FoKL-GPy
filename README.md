@@ -63,10 +63,11 @@ From here, the FoKL class object may be created and its methods accessed. Please
 
 Please first refer to the following for tutorials and examples:
 - [Training and/or evaluating a model](docs/tutorials/clean.py)
-- [Saving and loading a model](docs/tutorials/save_and_load/save_and_load.py)
-- [Converting to Pyomo](docs/tutorials/fokl_to_pyomo.py)
-- [Plotting and RMSE](examples/sigmoid/sigmoid.py)
-- [Integration](examples/gp_integrate/gp_integrate.py)
+- [Saving and/or loading a model](docs/tutorials/save_and_load/save_and_load.py)
+- [Validating model via plot and RMSE](examples/sigmoid/sigmoid.py)
+- [Integrating models of derivatives](examples/gp_integrate/gp_integrate.py)
+- [Converting model to Pyomo](docs/tutorials/fokl_to_pyomo.py)
+- [Solving model in Pyomo with non-linear optimization](examples/pyomo_maximize/pyomo_maximize.py)
 
 Then, see [User Documentation](#user-documentation) as needed.
 
@@ -174,11 +175,11 @@ if available; otherwise, leave blank.
 | ```inputs``` | any  | $n \times m$ input matrix $\mathbf{x}$ of $n$ instances by $m$ features in model $\overline{y}=f(\overline{x}_1,...,\overline{x}_m)$ | n/a        |
 | ```data```   | any  | $n \times 1$ output vector $\overline{y}$ of $n$ instances in model $\overline{y}=f(\overline{x}_1,...,\overline{x}_m)$              | ```None``` |
 
-| Keyword             | Type    | Description                                              | Default    |
-|---------------------|---------|----------------------------------------------------------|------------|
+| Keyword             | Type    | Description                                         | Default    |
+|---------------------|---------|-----------------------------------------------------|------------|
 | ```bit```           | integer | (16, 32, 64) floating point bits to save dataset as | ```64```   |
-| ```train```         | scalar  | (0,1] fraction of $n$ instances to use for training    | ```1```    |
-| ```AutoTranspose``` | boolean | assumes $n > m$ and transposes dataset accordingly       | ```True``` |
+| ```train```         | scalar  | (0,1] fraction of $n$ instances to use for training | ```1```    |
+| ```AutoTranspose``` | boolean | assumes $n > m$ and transposes dataset accordingly  | ```True``` |
 
 After calling [clean](#clean), the now normalized and formatted dataset gets saved as attributes of the FoKL class. Be sure to use these attributes in place of the originally entered ```inputs``` and ```data``` so that normalization and formatting errors are avoided. The attributes are as follows:
 
@@ -230,8 +231,8 @@ If user overrides default settings, then 1st and 2nd partial derivatives can be 
 | ```IndividualDraws``` | boolean                                                 | for returning derivative(s) at each draw                                                                                                                                                                                                                       | ```False```           |              
 | ```ReturnFullArray``` | boolean                                                 | for returning $n \times m \times 2$ array with zeros for non-requested states such that indexing is preserved; otherwise, only requested states are squeezed into a 2D matrix where columns correspond to increasing input variable index and derivative order | ```False```           |              
 
-| Output   | Type                                                                                                                                                    | Description                                                                                             | Default                                                                                           |
-|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| Output   | Type                                                                                                                                                      | Description                                                                                             | Default                                                                                             |
+|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | ```dy``` | $n \times m \times 2$ ndarray if ```ReturnFullArray=True```, else $n \times m_{\delta}$ where $m_{\delta}$ is the number of partial derivatives requested | derivative of model with respect to input variable(s) (i.e., state(s)) defined by ```d1``` and ```d2``` | gradient (i.e., $n \times m_{\delta}$ ndarray where $m_{\delta} =m$ because ```d1=True, d2=False``` |
 
 Tip:
@@ -267,13 +268,13 @@ For evaluating a FoKL model, see [evaluate](#evaluate).
 
 If insightful for understanding how to define ```c```, the kernels correspond to the following basis function equations:
 
-| Kernel                        | Order     | Basis                                                                                                                  |
-|-------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------|
-| ```'Cubic Splines'```         | ```d=0``` | $c_0+c_1 \cdot x+c_2 \cdot x^2+c_3 \cdot x^3 \implies$ <pre>```c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)```</pre>             |
-| "                             | ```d=1``` | $c_1+2\cdot c_2\cdot x+3\cdot c_3\cdot x^2 \implies$ <pre>```c[1] + 2 * c[2] * x + 3 * c[3] * (x ** 2)```</pre>                            |
-| "                             | ```d=2``` | $2\cdot c_2+6\cdot c_3\cdot x \implies$ <pre>```2 * c[2] + 6 * c[3] * x```</pre>                                                         |
-| ```'Bernoulli Polynomials'``` | ```d=0``` | $\sum_k (c_k \cdot x^k)\implies$ <pre>```c[0] + sum(c[k] * (x ** k) for k in range(1, len(c)))```</pre>                                    |
-| "                             | ```d=1``` | $\sum_k (k \cdot c_k \cdot x^{k-1})\implies$ <pre>```c[1] + sum(k * c[k] * (x ** (k - 1)) for k in range(2, len(c)))```</pre>                 |
+| Kernel                        | Order     | Basis                                                                                                                                        |
+|-------------------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| ```'Cubic Splines'```         | ```d=0``` | $c_0+c_1 \cdot x+c_2 \cdot x^2+c_3 \cdot x^3 \implies$ <pre>```c[0] + c[1] * x + c[2] * (x ** 2) + c[3] * (x ** 3)```</pre>                  |
+| "                             | ```d=1``` | $c_1+2\cdot c_2\cdot x+3\cdot c_3\cdot x^2 \implies$ <pre>```c[1] + 2 * c[2] * x + 3 * c[3] * (x ** 2)```</pre>                              |
+| "                             | ```d=2``` | $2\cdot c_2+6\cdot c_3\cdot x \implies$ <pre>```2 * c[2] + 6 * c[3] * x```</pre>                                                             |
+| ```'Bernoulli Polynomials'``` | ```d=0``` | $\sum_k (c_k \cdot x^k)\implies$ <pre>```c[0] + sum(c[k] * (x ** k) for k in range(1, len(c)))```</pre>                                      |
+| "                             | ```d=1``` | $\sum_k (k \cdot c_k \cdot x^{k-1})\implies$ <pre>```c[1] + sum(k * c[k] * (x ** (k - 1)) for k in range(2, len(c)))```</pre>                |
 | "                             | ```d=2``` | $\sum_k (k \cdot (k-1) \cdot c_k \cdot x^{k-2})\implies$ <pre>```sum((k - 1) * k * c[k] * (x ** (k - 2)) for k in range(2, len(c)))```</pre> |
 
 ##### evaluate
@@ -302,7 +303,7 @@ If ```clean=True```, then any keywords documented for [clean](#clean) may be use
 | Output                  | Type                 | Description                                                                                                                                                                                                           |
 |-------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ```mean```              | $n \times 1$ ndarray | prediction of $\overline{y}$ in $\overline{y}=f(\overline{x}_1,...,\overline{x}_m)$ for provided ```inputs```; prediction of ```model.data``` defined in [clean](#clean) by default (i.e., ```inputs=model.inputs```) |
-| ```bounds``` (optional) | $n \times 2$ ndarray | upper and lower bounds for 95% confidence interval of predicting; returned if ```ReturnBounds=True```                                                                                                                                                      |
+| ```bounds``` (optional) | $n \times 2$ ndarray | upper and lower bounds for 95% confidence interval of predicting; returned if ```ReturnBounds=True```                                                                                                                 |
 
 Note if attempting to automatically format ```inputs``` but normalize to different [min, max] values than those of ```inputs```, this will have to be done manually. A workaround to achieve this is as follows:
 
@@ -419,9 +420,9 @@ Training routine for fitting model to known inputs and data.
 | ```inputs``` | -    | see ```traininputs``` of [trainset](#trainset) | ```traininputs, _ = model.trainset()``` |
 | ```data```   | -    | see ```traindata``` of [trainset](#trainset)   | ```_, traindata = model.trainset()```   |
 
-| Keyword             | Type    | Description                                                                                                                                                                                                               | Default     |
-|---------------------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
-| ```clean```         | boolean | pass ```inputs``` and ```data``` to [clean](#clean) if true                                                                                                                                                               | ```False``` |
+| Keyword             | Type    | Description                                                                                                                                                                                                       | Default     |
+|---------------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| ```clean```         | boolean | pass ```inputs``` and ```data``` to [clean](#clean) if true                                                                                                                                                       | ```False``` |
 | ```ConsoleOutput``` | boolean | print [ind, ev] to console during FoKL model generation; will print percent completed of each Gibbs sampler call prior to [ind, ev] if large dataset (i.e., if less than 64-bit was requested in [clean](#clean)) | ```True```  |
 
 If ```clean=True```, then any keywords documented for [clean](#clean) may be used here.
@@ -430,7 +431,7 @@ If ```clean=True```, then any keywords documented for [clean](#clean) may be use
 |-------------|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ```betas``` | $draws \times terms$ ndarray | draws from the posterior distribution of coefficients, with rows corresponding to draws (i.e., a single set of coefficients) and columns corresponding to terms in the model (i.e., $\beta_0, \beta_1, \dots $)                                                              |
 | ```mtx```   | $(terms-1) \times m$ ndarray | interaction matrix defining order of basis function for term/variable combinations in FoKL model, with rows corresponding to terms (i.e., columns of ```betas``` beyond the first column) and columns corresponding to input variables (i.e., columns of ```model.inputs```) |
-| ```evs```    | ndarray     | vector of BIC values corresponding to each proposed model during training                                                                                                                                                                                                                           |
+| ```evs```   | ndarray                      | vector of BIC values corresponding to each proposed model during training                                                                                                                                                                                                    |
 
 ##### clear
 
@@ -468,25 +469,25 @@ Automatically convert ```draws``` from a FoKL model trained with or defined by t
 | ```y``` | scalar                                 | if known, value of FoKL model output variable to include in Pyomo model                                     | ```None```              |
 | ```x``` | list of scalar(s) and/or ```None```(s) | if known, value(s) of FoKL model input variables to include in Pyomo model (e.g., ```x=[0.7, None, 0.4]```) | ```[None, ..., None]``` |
 
-| Keyword     | Type | Description                                         | Default           |
-|-------------|------|-----------------------------------------------------|-------------------|
+| Keyword     | Type | Description                                       | Default           |
+|-------------|------|---------------------------------------------------|-------------------|
 | ```draws``` | -    | Pyomo scenarios; see ```draws``` of [FoKL](#fokl) | ```model.draws``` |
 
-| Output | Type        | Description                          |
-|--------|-------------|--------------------------------------|
-| ```m```    | Pyomo model | Pyomo model with FoKL model included |
+| Output   | Type        | Description                          |
+|----------|-------------|--------------------------------------|
+| ```m```  | Pyomo model | Pyomo model with FoKL model included |
 
-| Objects of Pyomo Model | Type           | Description                                                                                                                                                                                                                                           |
-|------------------------|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ```m.fokl_scenarios``` | pyo.Set        | index of scenarios (i.e., ```draws```)                                                                                                                                                                                                                |
-| ```m.fokl_y```         | pyo.Var        | FoKL model output variable indexed over ```m.fokl_scenarios```                                                                                                                                                                                        |
-| ```m.fokl_j```         | pyo.Set        | index of FoKL input variables                                                                                                                                                                                                                         |
-| ```m.fokl_x```         | pyo.Var        | FoKL model input variables index over ```m.fokl_j```                                                                                                                                                                                                  |
-| ```m.fokl_basis```     | pyo.Expression | basis functions used in FoKL model                                                                                                                                                                                                                    |
-| ```m.fokl_k```         | pyo.Set        | index for FoKL term (where $k=0$ refers to $\beta_0$)                                                                                                                                                                                                 |
-| ```m.fokl_b```         | pyo.Var        | FoKL coefficients (i.e., ```model.betas```)                                                                                                                                                                                                           |
+| Objects of Pyomo Model | Type           | Description                                                                                                                                                                                                                                 |
+|------------------------|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ```m.fokl_scenarios``` | pyo.Set        | index of scenarios (i.e., ```draws```)                                                                                                                                                                                                      |
+| ```m.fokl_y```         | pyo.Var        | FoKL model output variable indexed over ```m.fokl_scenarios```                                                                                                                                                                              |
+| ```m.fokl_j```         | pyo.Set        | index of FoKL input variables                                                                                                                                                                                                               |
+| ```m.fokl_x```         | pyo.Var        | FoKL model input variables index over ```m.fokl_j```                                                                                                                                                                                        |
+| ```m.fokl_basis```     | pyo.Expression | basis functions used in FoKL model                                                                                                                                                                                                          |
+| ```m.fokl_k```         | pyo.Set        | index for FoKL term (where $k=0$ refers to $\beta_0$)                                                                                                                                                                                       |
+| ```m.fokl_b```         | pyo.Var        | FoKL coefficients (i.e., ```model.betas```)                                                                                                                                                                                                 |
 | ```m.fokl_expr```      | pyo.Expression | FoKL model function (i.e., $\overline{\beta}$ draw in $\beta_0 +\sum_{j=1:m} \sum_{i=1:n} (\beta_{ij} \cdot B_i (x_j ))+\sum_{j=1:m-1} \sum_{k=j+1:m} \sum_{i=1:n} (\beta_{ijk} \cdot B_i (x_j , x_k ))+\dots$ where $B_i=$ basis function) |
-| ```m.fokl_constr```    | pyo.Constraint | FoKL model equation (i.e., ```m.fokl_y[i] == m.fokl_expr[i] for i in m.fokl_scenarios```                                                                                                                                                              |
+| ```m.fokl_constr```    | pyo.Constraint | FoKL model equation (i.e., ```m.fokl_y[i] == m.fokl_expr[i] for i in m.fokl_scenarios```                                                                                                                                                    |
          
 Defining the Pyomo model's objective and any other constraints must be done outside of the ```to_pyomo``` method.
 
@@ -512,37 +513,51 @@ Returned is ```filepath```. Enter this as the argument to [load](#foklroutineslo
 FoKLRoutines.load(filepath)
 ```
 
-| Input           | Type   | Description                                                                                      |
-|-----------------|--------|--------------------------------------------------------------------------------------------------|
+| Input           | Type   | Description                                                                                        |
+|-----------------|--------|----------------------------------------------------------------------------------------------------|
 | ```filename```  | string | name of file to save model as (note '*.fokl*' extension can be automatically or manually appended) |
-| ```directory``` | string | absolute or relative path to pre-existing folder in which to save ```filename```                 |
+| ```directory``` | string | absolute or relative path to pre-existing folder in which to save ```filename```                   |
 
 | Output         | Type   | Description                               |
 |----------------|--------|-------------------------------------------|
 | ```filepath``` | string | absolute path to where the file was saved |
 
+### getKernels
+
+*For internal use.*
+
+This package is used by [FoKL](#fokl) during initialization to return the data structure ```phis```, containing coefficients for the basis functions specified by ```kernel```.
+```python
+import FoKL.getKernels
+phis = getKernels.sp500()  # kernel == 'Cubic Splines'
+phis = getKernels.bernoulli()  # kernel == 'Bernoulli Polynomials'
+```
+
 ### GP_integrate
 
 ```python
+from FoKL.GP_Integrate import GP_Integrate
 T, Y = GP_Integrate(betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs)
 ```
 
-| Input             | Description                                                                                                                                                                                                                                                                                                                                                                          |
-|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ```betas```       | ```betas``` is a list of arrays in which each entry to the list contains a specific row of the betas matrix, or the mean of the betas matrix for each model being integrated.                                                                                                                                                                                                        |
-| ```matrix```      | ```matrix``` is a list of arrays containing the interaction matrix of each model.                                                                                                                                                                                                                                                                                                    |
-| ```b```           | ```b``` is an array of the values of all the other inputs to the model(s) (including any forcing functions) over the time period we integrate over. The length of ```b``` should be equal to the number of points in the final time series ```(stop - start) / h```. All values in ```b``` need to be normalized with respect to the min and max values of their respective values in the training dataset. |
-| ```norms```       | ```norms``` is a matrix of the min and max values of all the inputs being integrated (in the same order as ```y0```). Min values are in the top row, max values in the bottom.                                                                                                                                                                                                             |
-| ```phis```        | ```phis``` is a data structure with coefficients for basis functions.                                                                                                                                                                                                                                                                                                                |
-| ```start```       | ```start``` is the time at which integration begins.                                                                                                                                                                                                                                                                                                                                 |
-| ```stop```        | ```stop``` is the time to end integration.                                                                                                                                                                                                                                                                                                                                           |
-| ```y0```          | ```y0``` is an array of the inital conditions for the models being integrated.                                                                                                                                                                                                                                                                                                       |
-| ```h```           | ```h``` is the step size with respect to time.                                                                                                                                                                                                                                                                                                                                       |
-| ```used_inputs``` | ```used_inputs``` is a list of arrays containing the information as to what inputs are used in what model. Each array should contain a vector corresponding to a different model. Inputs should be referred to as those being integrated first, followed by those contained in ```b``` (in the same order as they appear in ```y0``` and ```b``` respectively).                                        |
+Integrate FoKL models of derivatives.
 
-| Output  | Description                                                                                    |
-|---------|------------------------------------------------------------------------------------------------|
-| ```T``` | ```T``` is an array of the time steps the models are integrated at.                            |
+| Input             | Description                                                                                                                                                                                                                                                                                                                                                                                                 |
+|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ```betas```       | ```betas``` is a list of arrays in which each entry to the list contains a specific row of the betas matrix, or the mean of the betas matrix for each model being integrated.                                                                                                                                                                                                                               |
+| ```matrix```      | ```matrix``` is a list of arrays containing the interaction matrix of each model.                                                                                                                                                                                                                                                                                                                           |
+| ```b```           | ```b``` is an array of the values of all the other inputs to the model(s) (including any forcing functions) over the time period we integrate over. The length of ```b``` should be equal to the number of points in the final time series ```(stop - start) / h```. All values in ```b``` need to be normalized with respect to the min and max values of their respective values in the training dataset. |
+| ```norms```       | ```norms``` is a matrix of the min and max values of all the inputs being integrated (in the same order as ```y0```). Min values are in the top row, max values in the bottom.                                                                                                                                                                                                                              |
+| ```phis```        | ```phis``` is a data structure with coefficients for basis functions.                                                                                                                                                                                                                                                                                                                                       |
+| ```start```       | ```start``` is the time at which integration begins.                                                                                                                                                                                                                                                                                                                                                        |
+| ```stop```        | ```stop``` is the time to end integration.                                                                                                                                                                                                                                                                                                                                                                  |
+| ```y0```          | ```y0``` is an array of the inital conditions for the models being integrated.                                                                                                                                                                                                                                                                                                                              |
+| ```h```           | ```h``` is the step size with respect to time.                                                                                                                                                                                                                                                                                                                                                              |
+| ```used_inputs``` | ```used_inputs``` is a list of arrays containing the information as to what inputs are used in what model. Each array should contain a vector corresponding to a different model. Inputs should be referred to as those being integrated first, followed by those contained in ```b``` (in the same order as they appear in ```y0``` and ```b``` respectively).                                             |
+
+| Output  | Description                                                                                          |
+|---------|------------------------------------------------------------------------------------------------------|
+| ```T``` | ```T``` is an array of the time steps the models are integrated at.                                  |
 | ```Y``` | ```Y``` is an array of the models that have been integrated, at the time steps contained in ```T```. |
 
 For example, if two models were being integrated, with 3 other inputs total
