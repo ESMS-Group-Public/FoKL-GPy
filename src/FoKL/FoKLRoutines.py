@@ -369,13 +369,14 @@ class FoKL:
         else:  # self.trainlog is vector indexing observations
             return self.inputs[self.trainlog, :], self.data[self.trainlog]
 
-    def _inputs_to_phind(self, inputs, phis, kernel=None):
+    def _inputs_to_phind(self, inputs, phis=None, kernel=None):
         """
         Twice normalize the inputs to index the spline coefficients.
 
         Inputs:
             - inputs == normalized inputs as numpy array (i.e., self.inputs)
             - phis   == spline coefficients
+            - kernel == form of basis functions
 
         Outputs:
             - X     == twice normalized inputs, used in bss_derivatives
@@ -384,14 +385,17 @@ class FoKL:
         """
         if kernel is None:
             kernel = self.kernel
+        if phis is None:
+            phis = self.phis
 
-        if kernel == self.kernels[0]:  # == 'Cubic Splines':
-            l_phis = len(phis[0][0])  # = 499, length of cubic splines in basis functions
-        elif kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
+        if kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             warnings.warn("Twice normalization of inputs is not required for the 'Bernoulli Polynomials' kernel",
                           category=UserWarning)
             return inputs, [], []
 
+        # elif kernel == self.kernels[0]:  # == 'Cubic Splines':
+
+        l_phis = len(phis[0][0])  # = 499, length of cubic splines in basis functions
         phind = np.array(np.ceil(inputs * l_phis), dtype=np.uint16)  # 0-1 normalization to 0-499 normalization
 
         if phind.ndim == 1:  # if phind.shape == (number,) != (number,1), then add new axis to match indexing format
@@ -557,7 +561,7 @@ class FoKL:
 
         # Initialization before loops:
         if kernel == self.kernels[0]:  # == 'Cubic Splines':
-            X, phind, _ = self._inputs_to_phind(self, inputs, phis, kernel=kernel)  # phind needed for piecewise kernel
+            X, phind, _ = self._inputs_to_phind(inputs, phis, kernel)  # phind needed for piecewise kernel
             L_phis = len(phis[0][0])  # = 499
         elif kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             X = inputs  # twice-normalization not required
@@ -770,7 +774,7 @@ class FoKL:
         normputs = np.asarray(normputs)
 
         if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
-            _, phind, xsm = self._inputs_to_phind(self, normputs, phis)
+            _, phind, xsm = self._inputs_to_phind(normputs)  # ..., phis=self.phis, kernel=self.kernel) already true
         elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             phind = None
             xsm = normputs
@@ -1141,7 +1145,7 @@ class FoKL:
 
         # Prepare phind and xsm if using cubic splines, else match variable names required for gibbs argument
         if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
-            _, phind, xsm = self._inputs_to_phind(self, inputs, phis)
+            _, phind, xsm = self._inputs_to_phind(inputs)  # ..., phis=self.phis, kernel=self.kernel) already true
         elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             phind = None
             xsm = inputs
