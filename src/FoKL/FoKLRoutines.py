@@ -39,7 +39,7 @@ def load(filename, directory=None):
     return model
 
 
-def str_to_bool(s):
+def _str_to_bool(s):
     """Convert potential string (e.g., 'on'/'off') to boolean True/False. Intended to handle exceptions for keywords."""
     if isinstance(s, str):
         if s in ['yes', 'y', 'on', 'all', 'true', 'both']:
@@ -61,7 +61,7 @@ def str_to_bool(s):
     return s
 
 
-def process_kwargs(default, user):
+def _process_kwargs(default, user):
     """Update default values with user-defined keyword arguments (kwargs), or simply check all kwargs are expected."""
     if isinstance(default, dict):
         expected = default.keys()
@@ -83,7 +83,7 @@ def process_kwargs(default, user):
         raise ValueError("Input 'default' must be a dictionary or list.")
 
 
-def set_attributes(self, attrs):
+def _set_attributes(self, attrs):
     """Set items stored in Python dictionary 'attrs' as attributes of class."""
     if isinstance(attrs, dict):
         for key, value in attrs.items():
@@ -91,54 +91,6 @@ def set_attributes(self, attrs):
     else:
         warnings.warn("Input must be a Python dictionary.")
     return
-
-
-def inputs_to_phind(self, inputs, phis, DefineAttributes=False, kernel=None):
-    """
-    Twice normalize the inputs to index the spline coefficients.
-
-    Inputs:
-        - inputs == normalized inputs as numpy array (i.e., self.inputs)
-        - phis   == spline coefficients
-    Optional Input:
-        - DefineAttributes == boolean for updating class attributes with phind and xsm == False (default)
-
-    Output (and appended class attributes):
-        - phind        == index to spline coefficients
-        - xsm          ==
-        - inputs_2norm == twice normalized inputs
-    """
-    if kernel is None:
-        kernel = self.kernel
-
-    if kernel == self.kernels[0]:  # == 'Cubic Splines':
-        l_phis = len(phis[0][0])  # = 499, length of cubic splines in basis functions
-    elif kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
-        warnings.warn("Twice normalization of inputs is not required for the 'Bernoulli Polynomials' kernel",
-                      category=UserWarning)
-        return inputs, [], []
-
-    phind = np.array(np.ceil(inputs * l_phis), dtype=int)  # 0-1 normalization to 0-499 normalization
-
-    if phind.ndim == 1:  # if phind.shape == (number,) != (number,1), then add new axis to match indexing format
-        phind = phind[:, np.newaxis]
-
-    set = (phind == 0)  # set = 1 if phind = 0, otherwise set = 0
-    phind = phind + set  # makes sense assuming L_phis > M
-
-    r = 1 / l_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
-    xmin = (phind - 1) * r
-    X = (inputs - xmin) / r  # twice normalized inputs (0-1 first then to size of phis second)
-
-    phind = phind - 1
-    xsm = l_phis * inputs - phind
-
-    if DefineAttributes:
-        self.inputs_2norm = X  # twice normalized inputs
-        self.phind = phind  # adjust MATLAB indexing to Python indexing after twice normalization
-        self.xsm = xsm
-
-    return X, phind, xsm
 
 
 class FoKL:
@@ -245,10 +197,10 @@ class FoKL:
                    # Other:
                    'UserWarnings': True, 'ConsoleOutput': True
                    }
-        current = process_kwargs(default, kwargs)  # = default, but updated by any user kwargs
+        current = _process_kwargs(default, kwargs)  # = default, but updated by any user kwargs
         for boolean in ['gimmie', 'way3', 'aic', 'UserWarnings', 'ConsoleOutput']:
             if not (current[boolean] is False or current[boolean] is True):
-                current[boolean] = str_to_bool(current[boolean])
+                current[boolean] = _str_to_bool(current[boolean])
 
         # Load spline coefficients:
         phis = current['phis']  # in case advanced user is testing other splines
@@ -303,12 +255,12 @@ class FoKL:
         if kwargs_from_other is not None:  # then clean is being called from fit or evaluate function
             kwargs = kwargs | kwargs_from_other  # merge dictionaries (kwargs={} is expected but just in case)
         default = {'bit': 64, 'train': 1, 'AutoTranspose': True}
-        current = process_kwargs(default, kwargs)
+        current = _process_kwargs(default, kwargs)
         if current['bit'] not in bits.keys():
             warnings.warn(f"Keyword 'bit={current['bit']}' limited to values of 16, 32, or 64. Assuming default value "
                           f"of 64.", category=UserWarning)
             current['bit'] = 64
-        current['AutoTranspose'] = str_to_bool(current['AutoTranspose'])
+        current['AutoTranspose'] = _str_to_bool(current['AutoTranspose'])
 
         # Define local variables from keywords:
         datatype = bits[current['bit']]
@@ -378,7 +330,7 @@ class FoKL:
 
         # Define/update attributes with cleaned data and other relevant variables:
         attrs = {'inputs': inputs, 'data': data, 'normalize': normalize, 'trainlog': trainlog}
-        set_attributes(self, attrs)
+        _set_attributes(self, attrs)
 
         return
 
@@ -417,6 +369,46 @@ class FoKL:
         else:  # self.trainlog is vector indexing observations
             return self.inputs[self.trainlog, :], self.data[self.trainlog]
 
+    def _inputs_to_phind(self, inputs, phis, kernel=None):
+        """
+        Twice normalize the inputs to index the spline coefficients.
+
+        Inputs:
+            - inputs == normalized inputs as numpy array (i.e., self.inputs)
+            - phis   == spline coefficients
+
+        Outputs:
+            - X     == twice normalized inputs, used in bss_derivatives
+            - phind == index of coefficients for 'Cubic Splines' kernel for 'inputs' (i.e., piecewise cubic function)
+            - xsm   == unsure of description, but used in fit/gibbs (see MATLAB) as if is twice normalized
+        """
+        if kernel is None:
+            kernel = self.kernel
+
+        if kernel == self.kernels[0]:  # == 'Cubic Splines':
+            l_phis = len(phis[0][0])  # = 499, length of cubic splines in basis functions
+        elif kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
+            warnings.warn("Twice normalization of inputs is not required for the 'Bernoulli Polynomials' kernel",
+                          category=UserWarning)
+            return inputs, [], []
+
+        phind = np.array(np.ceil(inputs * l_phis), dtype=np.uint16)  # 0-1 normalization to 0-499 normalization
+
+        if phind.ndim == 1:  # if phind.shape == (number,) != (number,1), then add new axis to match indexing format
+            phind = phind[:, np.newaxis]
+
+        set = (phind == 0)  # set = 1 if phind = 0, otherwise set = 0
+        phind = phind + set  # makes sense assuming L_phis > M
+
+        r = 1 / l_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
+        xmin = np.array((phind - 1) * r, dtype=inputs.dtype)
+        X = (inputs - xmin) / r  # twice normalized inputs (0-1 first then to size of phis second)
+
+        phind = phind - 1
+        xsm = np.array(l_phis * inputs - phind, dtype=inputs.dtype)
+
+        return X, phind, xsm
+
     def bss_derivatives(self, **kwargs):
         """
         For returning gradient of modeled function with respect to each, or specified, input variable.
@@ -450,9 +442,9 @@ class FoKL:
         default = {'inputs': None, 'kernel': self.kernel, 'd1': None, 'd2': None, 'draws': self.draws, 'betas': None,
                    'phis': None, 'mtx': self.mtx, 'normalize': self.normalize, 'IndividualDraws': False,
                    'ReturnFullArray': False, 'ReturnBasis': False}
-        current = process_kwargs(default, kwargs)
+        current = _process_kwargs(default, kwargs)
         for boolean in ['IndividualDraws', 'ReturnFullArray', 'ReturnBasis']:
-            current[boolean] = str_to_bool(current[boolean])
+            current[boolean] = _str_to_bool(current[boolean])
 
         # Load defaults:
         if current['inputs'] is None:
@@ -516,7 +508,7 @@ class FoKL:
                 di = np.zeros(M, dtype=bool)  # default is no second derivatives (i.e., gradient)
                 error_di = False
             elif isinstance(di, str):
-                if str_to_bool(di):
+                if _str_to_bool(di):
                     di = np.ones(M, dtype=bool)
                 else:
                     di = np.zeros(M, dtype=bool)
@@ -565,7 +557,7 @@ class FoKL:
 
         # Initialization before loops:
         if kernel == self.kernels[0]:  # == 'Cubic Splines':
-            X, phind, _ = inputs_to_phind(self, inputs, phis, kernel=kernel)  # phind needed for non-continuous kernel
+            X, phind, _ = self._inputs_to_phind(self, inputs, phis, kernel=kernel)  # phind needed for piecewise kernel
             L_phis = len(phis[0][0])  # = 499
         elif kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             X = inputs  # twice-normalization not required
@@ -695,9 +687,9 @@ class FoKL:
         # Process keywords:
         default = {'normalize': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False}
         default_for_clean = {'bit': 64, 'train': 1}
-        current = process_kwargs(default | default_for_clean, kwargs)
+        current = _process_kwargs(default | default_for_clean, kwargs)
         for boolean in ['clean', 'ReturnBounds']:
-            current[boolean] = str_to_bool(current[boolean])
+            current[boolean] = _str_to_bool(current[boolean])
         kwargs_to_clean = {}
         for kwarg in default_for_clean.keys():
             kwargs_to_clean.update({kwarg: current[kwarg]})  # store kwarg for clean here
@@ -778,7 +770,7 @@ class FoKL:
         normputs = np.asarray(normputs)
 
         if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
-            _, phind, xsm = inputs_to_phind(self, normputs, phis)
+            _, phind, xsm = self._inputs_to_phind(self, normputs, phis)
         elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             phind = None
             xsm = normputs
@@ -868,7 +860,7 @@ class FoKL:
             'PlotTypeFoKL': 'b', 'PlotSizeFoKL': 2, 'PlotTypeBounds': 'k--', 'PlotSizeBounds': 2, 'PlotTypeData': 'ro',
             'PlotSizeData': 2
         }
-        current = process_kwargs(default, kwargs)
+        current = _process_kwargs(default, kwargs)
         if isinstance(current['plot'], str):
             if current['plot'].lower() in ['sort', 'sorted', 'order', 'ordered']:
                 current['plot'] = 'sorted'
@@ -878,9 +870,9 @@ class FoKL:
                 warnings.warn("Keyword input 'plot' is limited to True, False, or 'sorted'.", category=UserWarning)
                 current['plot'] = False
         else:
-            current['plot'] = str_to_bool(current['plot'])
+            current['plot'] = _str_to_bool(current['plot'])
         for boolean in ['bounds', 'labels', 'legend']:
-            current[boolean] = str_to_bool(current[boolean])
+            current[boolean] = _str_to_bool(current[boolean])
         if current['labels']:
             for label in ['xlabel', 'ylabel', 'title']:  # check all labels are strings
                 if current[label] and not isinstance(current[label], str):
@@ -1035,11 +1027,11 @@ class FoKL:
 
         # Check for unexpected keyword arguments:
         default_for_fit = {'ConsoleOutput': True}
-        default_for_fit['ConsoleOutput'] = str_to_bool(kwargs.get('ConsoleOutput', self.ConsoleOutput))
-        default_for_fit['clean'] = str_to_bool(kwargs.get('clean', False))
+        default_for_fit['ConsoleOutput'] = _str_to_bool(kwargs.get('ConsoleOutput', self.ConsoleOutput))
+        default_for_fit['clean'] = _str_to_bool(kwargs.get('clean', False))
         default_for_clean = {'bit': 64, 'train': 1}
         expected = self.hypers + list(default_for_fit.keys()) + list(default_for_clean.keys())
-        kwargs = process_kwargs(expected, kwargs)
+        kwargs = _process_kwargs(expected, kwargs)
         if default_for_fit['clean'] is False:
             if any(kwarg in default_for_clean.keys() for kwarg in kwargs.keys()):
                 warnings.warn("Keywords for automatic cleaning were defined but clean=False.")
@@ -1050,12 +1042,12 @@ class FoKL:
         for kwarg in kwargs.keys():
             if kwarg in self.hypers:  # for case of user sweeping through hyperparameters within 'fit' argument
                 if kwarg in ['gimmie', 'way3', 'aic']:
-                    setattr(self, kwarg, str_to_bool(kwargs[kwarg]))
+                    setattr(self, kwarg, _str_to_bool(kwargs[kwarg]))
                 else:
                     setattr(self, kwarg, kwargs[kwarg])
             elif kwarg in default_for_clean.keys():
                 # if kwarg in ['']:
-                #     kwargs_to_clean.update({kwarg: str_to_bool(kwargs[kwarg])})
+                #     kwargs_to_clean.update({kwarg: _str_to_bool(kwargs[kwarg])})
                 # else:
                 kwargs_to_clean.update({kwarg: kwargs[kwarg]})
         self.ConsoleOutput = default_for_fit['ConsoleOutput']
@@ -1149,7 +1141,7 @@ class FoKL:
 
         # Prepare phind and xsm if using cubic splines, else match variable names required for gibbs argument
         if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
-            _, phind, xsm = inputs_to_phind(self, inputs, phis)
+            _, phind, xsm = self._inputs_to_phind(self, inputs, phis)
         elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
             phind = None
             xsm = inputs
@@ -1234,12 +1226,20 @@ class FoKL:
                 X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
 
             for i in range(minp):  # for datapoint in training datapoints
-                if self.ConsoleOutput and data.dtype != np.float64:  # if large dataset, show progress for sanity check
-                    percent = i / (minp - 1)
-                    sys.stdout.write(f"Gibbs: {round(100 * percent, 2):.2f}%")  # show percent of data looped through
-                    sys.stdout.write('\r')  # set cursor at beginning of console output line (such that next iteration
-                        # of Gibbs progress (or [ind, ev] if at end) overwrites current Gibbs progress)
-                    sys.stdout.flush()
+
+                # ------------------------------
+                # [IN DEVELOPMENT] PRINT PERCENT COMPLETION TO CONSOLE (reported to cause significant delay):
+                #
+                # if self.ConsoleOutput and data.dtype != np.float64:  # if large dataset, show progress for sanity check
+                #     percent = i / (minp - 1)
+                #     sys.stdout.write(f"Gibbs: {round(100 * percent, 2):.2f}%")  # show percent of data looped through
+                #     sys.stdout.write('\r')  # set cursor at beginning of console output line (such that next iteration
+                #         # of Gibbs progress (or [ind, ev] if at end) overwrites current Gibbs progress)
+                #     sys.stdout.flush()
+                #
+                # [END]
+                # ----------------------------
+                
                 for j in range(nxin, mmtx + 1):
                     null, nxin2 = np.shape(X)
                     if j == nxin2:
@@ -1554,7 +1554,7 @@ class FoKL:
         """
 
         if all is not False:  # if not default
-            all = str_to_bool(all)  # convert to boolean if all='on', etc.
+            all = _str_to_bool(all)  # convert to boolean if all='on', etc.
 
         if all is False:
             attrs_to_keep = self.keep  # default
@@ -1597,7 +1597,7 @@ class FoKL:
         """
         # Process kwargs:
         default = {'draws': self.draws}
-        current = process_kwargs(default, kwargs)
+        current = _process_kwargs(default, kwargs)
 
         # Convert FoKL to Pyomo:
 
