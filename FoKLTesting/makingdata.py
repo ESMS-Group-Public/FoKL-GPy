@@ -16,7 +16,7 @@ np.random.seed(102823)
 
 model = FoKLRoutines.FoKL()
    
-betas, mtx, evs = model.fit(inputs, data) 
+betas, mtx, evs = model.fit(inputs, data, clean = True) 
 
 meen, bounds, rmse = model.coverage3()
 
@@ -32,7 +32,7 @@ np.random.seed(102923)
 
 model = FoKLRoutines.FoKL()
    
-betas, mtx, evs = model.fit(inputs, data, aic=True, a=3, b=1.8, atau=17, btau=2100.5, tolerance=3)
+betas, mtx, evs = model.fit(inputs, data, aic=True, a=3, b=1.8, atau=17, btau=2100.5, tolerance=3, clean = True)
 
 meen, bounds, rmse = model.coverage3()
 
