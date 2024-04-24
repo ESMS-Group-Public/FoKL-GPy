@@ -34,7 +34,7 @@ meen_tested2 = np.loadtxt("meenChange.csv")
 def test_fit_for_shaping(): #Ensures the values used in fit become numpy arrays, even if something like Pandas is used, this is necessary to ensure they are properly converted to lists later in the code
     model = FoKLRoutines.FoKL()
    
-    betas, mtx, evs = model.fit(inputs, data) 
+    betas, mtx, evs = model.fit(inputs, data, clean = True) 
     assert isinstance(betas, np.ndarray)
     assert isinstance(mtx, np.ndarray)
     assert isinstance(evs, np.ndarray)
@@ -47,7 +47,7 @@ def test_fit_with_data_and_default_params():
 
     #seeds above for defualt parameter testing for fit
 
-    betas, mtx, evs = model.fit(inputs, data)
+    betas, mtx, evs = model.fit(inputs, data, clean = True)
 
     assert betas.shape == (1000, len(data_load)) #The shape of betas is based on the rows of data used in the loaded data as well as draws (the 1000)
 
@@ -63,7 +63,7 @@ def test_fit_with_data_and_changed_params(): #This does the same thing as previo
     
     #seeds above for changed parameter testing for fit
 
-    betas, mtx, evs = model.fit(inputs, data, aic=True, a=3, b=1.8, atau=17, btau=2100.5, tolerance=3)
+    betas, mtx, evs = model.fit(inputs, data, aic=True, a=3, b=1.8, atau=17, btau=2100.5, tolerance=3, clean = True)
 
     assert betas.shape == (1000, len(data_load))
 
@@ -77,7 +77,7 @@ def test_coverage3():
 
     model = FoKLRoutines.FoKL()
     
-    betas, mtx, evs = model.fit(inputs, data)
+    betas, mtx, evs = model.fit(inputs, data, clean = True)
     meen, bounds, rmse = model.coverage3()
 
     assert len(meen) == 10 # ensures the meen array is the expected length (based on rows of data used)
@@ -94,7 +94,7 @@ def test_routines_works_defaultparams(): #this is an integration test, it is the
     
     #seeds above for defualt parameter testing for fit
 
-    betas, mtx, evs = model.fit(inputs, data)
+    betas, mtx, evs = model.fit(inputs, data, clean = True)
 
     assert betas.shape == (1000, len(data_load)) #The shape of betas is based on the rows of data used in the loaded data as well as draws (the 1000)
 
@@ -117,7 +117,7 @@ def test_routines_works_changedparams(): #this is an integration test, it is the
 
     model = FoKLRoutines.FoKL()\
     
-    betas, mtx, evs = model.fit(inputs, data, aic=True, a=3, b=1.8, atau=17, btau=2100.5, tolerance=3)
+    betas, mtx, evs = model.fit(inputs, data, aic=True, a=3, b=1.8, atau=17, btau=2100.5, tolerance=3, clean = True)
     meen, bounds, rmse = model.coverage3()
 
     #tests for fit
