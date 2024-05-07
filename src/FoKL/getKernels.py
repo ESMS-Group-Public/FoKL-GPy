@@ -305,7 +305,7 @@ def bss_anova(n=500):
     return
 
 
-def bernoulli(file='BernoulliPolynomials_20_orthonormal_scaled.txt'):
+def bernoulli(file='orthogonal_Bn_scaled.txt'):
     """
     Return coefficients for orthonormal Bernoulli polynomials.
 
