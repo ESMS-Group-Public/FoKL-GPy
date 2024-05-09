@@ -93,7 +93,7 @@ def _set_attributes(self, attrs):
     return
 
 
-def _merge_dicts(d1, d2)
+def _merge_dicts(d1, d2):
     """Merge two dictionaries into single dictionary in a backward-compatible way. Values of d2 replace any shared variables in d1."""
     d = d1.copy()
     d.update(d2)

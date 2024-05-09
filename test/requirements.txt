@@ -4,4 +4,4 @@ pytest
 scipy
 anyio
 matplotlib
-FoKL
+git+https://github.com/TannerJA/FoKL-GPy.git
