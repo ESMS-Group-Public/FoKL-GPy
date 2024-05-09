@@ -93,6 +93,13 @@ def _set_attributes(self, attrs):
     return
 
 
+def _merge_dicts(d1, d2)
+    """Merge two dictionaries into single dictionary in a backward-compatible way. Values of d2 replace any shared variables in d1."""
+    d = d1.copy()
+    d.update(d2)
+    return d
+    
+
 class FoKL:
     def __init__(self, **kwargs):
         """
@@ -253,7 +260,7 @@ class FoKL:
 
         # Process keywords:
         if kwargs_from_other is not None:  # then clean is being called from fit or evaluate function
-            kwargs = kwargs | kwargs_from_other  # merge dictionaries (kwargs={} is expected but just in case)
+            kwargs = _merge_dicts(kwargs, kwargs_from_other)  # merge dictionaries (kwargs={} is expected but just in case)
         default = {'bit': 64, 'train': 1, 'AutoTranspose': True}
         current = _process_kwargs(default, kwargs)
         if current['bit'] not in bits.keys():
@@ -691,7 +698,7 @@ class FoKL:
         # Process keywords:
         default = {'normalize': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False}
         default_for_clean = {'bit': 64, 'train': 1}
-        current = _process_kwargs(default | default_for_clean, kwargs)
+        current = _process_kwargs(_merge_dicts(default, default_for_clean), kwargs)
         for boolean in ['clean', 'ReturnBounds']:
             current[boolean] = _str_to_bool(current[boolean])
         kwargs_to_clean = {}
