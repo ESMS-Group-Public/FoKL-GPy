@@ -5,3 +5,5 @@ For testing FoKL as exists in your fork or branch, the process is not yet fully 
 - confirm the tests are successful
 - change 'CURRENT_REPO_URL' back to 'https://github.com/ESMS_Group-Public/FoKL-GPy'; commit
 - open a pull request to the official repo
+
+To automate, a method using 'get_current_repo_url.py' to define 'CURRENT_REPO_URL' is in progress.
