@@ -305,7 +305,7 @@ def bss_anova(n=500):
     return
 
 
-def bernoulli(file='BernoulliPolynomials_20_orthonormal_scaled.txt'):
+def bernoulli(file='orthogonal_Bn_scaled.txt'):
     """
     Return coefficients for orthonormal Bernoulli polynomials.
 
@@ -316,7 +316,7 @@ def bernoulli(file='BernoulliPolynomials_20_orthonormal_scaled.txt'):
     # Load coefficients of scaled orthonormal Bernoulli polynomials (generated in MATLAB):
     path_to_here = os.path.dirname(os.path.realpath(__file__))
     path_to_kernel = os.path.join(path_to_here, 'kernels', file)
-    coeffs = np.loadtxt(path_to_kernel, delimiter=',', dtype=np.double)
+    coeffs = np.loadtxt(path_to_kernel, delimiter=' ', dtype=np.double)
 
     # Covert 2D numpy matrix to Python tuple of lists of increasing length (i.e., triangular matrix)
     phis = []
