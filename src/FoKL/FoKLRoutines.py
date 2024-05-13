@@ -1628,8 +1628,8 @@ class FoKL:
                              "is expected to be as the resulting symbolic expressions are too infeasible to solve. Use "
                              "the 'to_pyomo' method with a FoKL model trained on the 'Bernoulli Polynomials' kernel.")
 
-        m.fokl_expr = pyo.Expression(m.fokl_scenarios)  # FoKL models (i.e., scenarios, draws)
-        symbolic_fokl(m)  # may be better to write as rule
+        if m is None:
+            m = pyo.ConcreteModel()
 
         m.fokl_scenarios = pyo.Set(initialize=range(current['draws']))  # index for scenario (i.e., FoKL draw)
         m.fokl_y = pyo.Var(m.fokl_scenarios, within=pyo.Reals)  # FoKL output
