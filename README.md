@@ -62,7 +62,8 @@ From here, the FoKL class object may be created and its methods accessed. Please
 ## Use Cases
 
 Please first refer to the following for tutorials and examples:
-- [Training and/or evaluating a model](docs/tutorials/clean.py)
+- [Automatically formatting and normalizing datasets](docs/tutorials/clean.ipynb)
+- [Training and/or evaluating a model](docs/tutorials/fit_and_evaluate.py)
 - [Saving and/or loading a model](docs/tutorials/save_and_load/save_and_load.py)
 - [Validating model via plot and RMSE](examples/sigmoid/sigmoid.py)
 - [Integrating models of derivatives](examples/gp_integrate/gp_integrate.py)
@@ -167,8 +168,8 @@ each method as needed.
 model.clean(inputs, data=None, **kwargs)
 ```
 
-For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required but should be entered 
-if available; otherwise, leave blank.
+Automatically format and normalize datasets. Note that data is not required but should be entered 
+if available; otherwise, leave blank. Multiple options are available to govern the normalization of inputs. See [Automatically formatting and normalizing datasets](#use-cases) for example usage.
 
 | Input        | Type | Description                                                                                                                          | Default    |
 |--------------|------|--------------------------------------------------------------------------------------------------------------------------------------|------------|
@@ -177,9 +178,12 @@ if available; otherwise, leave blank.
 
 | Keyword             | Type    | Description                                         | Default    |
 |---------------------|---------|-----------------------------------------------------|------------|
-| ```bit```           | integer | (16, 32, 64) floating point bits to save dataset as | ```64```   |
 | ```train```         | scalar  | (0,1] fraction of $n$ instances to use for training | ```1```    |
 | ```AutoTranspose``` | boolean | assumes $n > m$ and transposes dataset accordingly  | ```True``` |
+| ```bit```           | integer | (16, 32, 64) floating point bits to save dataset as | ```64```   |
+| ```normalize```     | boolean | to pass formatted dataset to ```_normalize()```     | ```True``` |
+| ```minmax```        | list of [min, max] lists | upper/lower bounds of each input variable | model.minmax |
+| ```pillow```        | list of [lower, upper] lists | fraction of span by which to expand [min, max]; or, values on 0-1 scale that [min, max] should map to | ```0``` |
 
 After calling [clean](#clean), the now normalized and formatted dataset gets saved as attributes of the FoKL class. Be sure to use these attributes in place of the originally entered ```inputs``` and ```data``` so that normalization and formatting errors are avoided. The attributes are as follows:
 
@@ -187,7 +191,7 @@ After calling [clean](#clean), the now normalized and formatted dataset gets sav
 |-----------------------|----------------------|-------------------------------------------------------------------------|
 | ```model.inputs```    | $n \times m$ ndarray | normalized and formatted ```inputs```                                   |
 | ```model.data```      | $n \times 1$ ndarray | formatted ```data```                                                    |                                                            |
-| ```model.normalize``` | list of $m$ lists    | [min, max] factors used to normalize ```inputs``` to ```model.inputs``` |
+| ```model.minmax``` | list of $m$ lists    | [min, max] factors used to normalize ```inputs``` to ```model.inputs``` |
 | ```model.trainlog```  | $n \times 1$ ndarray | logical index of instances from dataset to use as training set          |
 
 To then access the training set ```[traininputs, traindata]```, see [trainset](#trainset).
@@ -227,7 +231,7 @@ If user overrides default settings, then 1st and 2nd partial derivatives can be 
 | ```betas```           | -                                                       | see ```betas``` of [FoKL](#fokl)                                                                                                                                                                                                                               | ```model.betas```     |     
 | ```phis```            | -                                                       | see ```phis``` of [FoKL](#fokl)                                                                                                                                                                                                                                | ```model.phis```      |      
 | ```mtx```             | $(terms-1) \times m$ ndarray                            | interaction matrix defining terms in FoKL model by indexing basis function order for each term and input variable combination                                                                                                                                  | ```model.mtx```       |       
-| ```normalize```       | -                                                       | see ```normalize``` of [clean](#clean)                                                                                                                                                                                                                         | ```model.normalize``` | 
+| ```minmax```       | -                                                       | see ```minmax``` of [clean](#clean)                                                                                                                                                                                                                         | ```model.minmax``` | 
 | ```IndividualDraws``` | boolean                                                 | for returning derivative(s) at each draw                                                                                                                                                                                                                       | ```False```           |              
 | ```ReturnFullArray``` | boolean                                                 | for returning $n \times m \times 2$ array with zeros for non-requested states such that indexing is preserved; otherwise, only requested states are squeezed into a 2D matrix where columns correspond to increasing input variable index and derivative order | ```False```           |              
 
@@ -295,9 +299,9 @@ Evaluate the FoKL model for provided inputs and (optionally) calculate bounds.
 
 | Keyword            | Type    | Description                                                                                                                    | Default           |
 |--------------------|---------|--------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| ```normalize```    | -       | see ```normalize``` of [clean](#clean)                                                                                         | ```None```        |
+| ```minmax```    | -       | see ```minmax``` of [clean](#clean)                                                                                         | ```None```        |
 | ```draws```        | -       | see ```draws``` of [FoKL](#fokl)                                                                                               | ```model.draws``` |
-| ```clean```        | boolean | pass ```inputs``` to [clean](#clean) if true; note this will override ```normalize``` and result in ```inputs``` scaled to 0-1 | ```False```       |
+| ```clean```        | boolean | pass ```inputs``` to [clean](#clean) if true; note this will override ```minmax``` and result in ```inputs``` scaled to 0-1 | ```False```       |
 | ```ReturnBounds``` | boolean | return 95% confidence bounds as second output if true                                                                          | ```False```       |
 
 If ```clean=True```, then any keywords documented for [clean](#clean) may be used here.
@@ -306,56 +310,6 @@ If ```clean=True```, then any keywords documented for [clean](#clean) may be use
 |-------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ```mean```              | $n \times 1$ ndarray | prediction of $\overline{y}$ in $\overline{y}=f(\overline{x}_1,...,\overline{x}_m)$ for provided ```inputs```; prediction of ```model.data``` defined in [clean](#clean) by default (i.e., ```inputs=model.inputs```) |
 | ```bounds``` (optional) | $n \times 2$ ndarray | upper and lower bounds for 95% confidence interval of predicting; returned if ```ReturnBounds=True```                                                                                                                 |
-
-Note if attempting to automatically format ```inputs``` but normalize to different [min, max] values than those of ```inputs```, this will have to be done manually. A workaround to achieve this is as follows:
-
-```python
-# Un-normalized and un-formatted 'raw' input variables of dataset:
-x = [x0, x1, ..., xM]
-
-# Initialize FoKL class:
-model = FoKLRoutines.FoKL(...)
-
-# Automatically normalize and format:
-model.clean(x)
-
-# Normalized and formatted 'raw' input variables of dataset:
-x = model.inputs
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-# Un-normalized and un-formatted 'other' input variables to evaluate:
-u = [u0, u1, ..., uM]
-
-# Initialize additional "throw-away" FoKL class in order to access clean without overriding attributes:
-dummy = FoKLRoutines.FoKL(...)
-
-# Automatically normalize and format:
-dummy.clean(u)
-
-# Normalized and formatted 'other' input variables to evaluate:
-u = dummy.inputs
-
-# Both x and u are normalized to 0-1 scales, but we need to re-scale u according to x:
-u = u * (dummy.normalize[1] - dummy.normalize[0]) + dummy.normalize[0]  # scale of original u
-u = (u - model.normalize[0]) / (model.normalize[1] - model.normalize[0])  # scale of normalized x
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-# Both x and u are on the same scale now, normalized according to x, and so long as u is contained within x's extrema:
-mean = model.evaluate(u)
-```
-
-The following will *not* achieve the same result:
-```
-mean != model.evaluate(u, clean=True)
-mean != model.evaluate(u, clean=True, normalize=model.normalize)
-```
-
-However, if attempting to *only* normalize ```inputs``` to different [min, max] values, implying the format of ```inputs``` matches exactly with the format of ```model.inputs``` returned by [clean](#clean) (that is, $n \times m$ ndarray), then the following will achieve the same result:
-```
-mean = model.evaluate(u, normalize=model.normalize)
-```
 
 ##### coverage3
 

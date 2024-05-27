@@ -1,7 +1,8 @@
 """
-[TUTORIAL]: self.clean(self, inputs, data=None, **kwargs)
+[TUTORIAL]: self.fit(self, inputs=None, data=None, **kwargs)
+            self.evaluate(self, inputs=None, betas=None, mtx=None, **kwargs)
 
-This is a tutorial for the 'clean' method, a necessary step for ensuring FoKL may process almost any dataset. In the
+This is a tutorial for the 'fit' and 'evaluate' methods, necessary steps in most all FoKL models. In the
 following script, it will be shown how 'clean' may be called directly or from within the 'fit' and 'evaluate' arguments.
 If calling from 'fit' or 'evaluate', set 'clean=True' and include any desired keyword arguments from 'clean'.
 
