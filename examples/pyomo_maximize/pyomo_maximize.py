@@ -60,8 +60,7 @@ def main():
 
     # Convert FoKL's GP model to Pyomo:
     scenarios = f.draws  # Pyomo 'scenarios' is synonym for FoKL 'draws'
-    # m = f.to_pyomo(draws=scenarios)  # default is 'draws=self.draws' so this is unnecessary but demonstrates idea
-    m = f.to_pyomo(draws=2)  # default is 'draws=self.draws' so this is unnecessary but demonstrates idea
+    m = f.to_pyomo(draws=scenarios)  # default is 'draws=self.draws' so this is unnecessary but demonstrates idea
 
     # Add constraints (if any/known) to enforce 'physics':
     m.t = pyo.Var(within=pyo.Reals, bounds=[0, 1])

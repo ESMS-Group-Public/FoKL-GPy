@@ -63,7 +63,7 @@ def main():
 
     m_2b_preexisting = pyo.ConcreteModel()
     model.to_pyomo(x=[None, 0.7, None], y=213, m=m_2b_preexisting)
-    b=1
+
     # Note how the Pyomo model 'm_2b_preexisting' still gets updated without 'm_2b_preexisting = model.to_pyomo(...)'.
     # Either is fine and functions the same.
 
