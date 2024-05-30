@@ -101,7 +101,7 @@ The [FoKLRoutines](#foklroutines) module houses the primary routines for a FoKL 
 model = FoKLRoutines.load(filename, directory=None)
 ```
 
-Load a FoKL class from a file.
+Load a FoKL class from a file. If failing to load a file and/or directory relative to the run script, ensure the terminal directory is set to that of the run script.
 
 By default, ```directory``` is the current working directory that contains the script calling this method. An absolute or 
 relative directory may be defined if the model to load is located elsewhere.
@@ -459,7 +459,7 @@ solver.solve(m, solver='ipopt')
 filepath = model.save(filename=None, directory=None)
 ```
 
-Save a FoKL class as a file with extension '*.fokl*'.
+Save a FoKL class as a file with extension '*.fokl*'. If not saving where expected relative to the run script, ensure the terminal directory is set to that of the run script.
 
 Both inputs are optional. By default, ```filename``` is of the form '*model_yyyymmddhhmmss.fokl*' and is saved to the
 current directory. To change the directory, embed within ```filename``` or assign to ```directory``` if using the default ```filename``` format.

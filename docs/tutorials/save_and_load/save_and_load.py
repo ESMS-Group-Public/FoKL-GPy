@@ -10,7 +10,15 @@ In this tutorial, the following will be demonstrated:
     2) Save the model.
     3) Load a model.
 """
-from FoKL import FoKLRoutines
+# -----------------------------------------------------------------------
+# Local version of 'from FoKL import FoKLRoutines':
+import os
+import sys
+dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+sys.path.append(dir)
+sys.path.append(os.path.join(dir, '..', '..', '..'))  # package directory
+from src.FoKL import FoKLRoutines
+# -----------------------------------------------------------------------
 import warnings
 
 

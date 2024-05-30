@@ -247,17 +247,6 @@ class FoKL:
             bit = 64
         datatype = bits[bit]
 
-        # Check if already formatted correctly:
-        if isinstance(inputs, np.ndarray):
-            if inputs.ndim == 2:
-                if AutoTranspose is True:
-                    if inputs.shape[0] > inputs.shape[1]:
-                        return
-                elif inputs.shape[0] < inputs.shape[1]:
-                    return
-                
-        # Else, format:
-
         # Convert 'inputs' and 'data' to numpy if pandas:
         if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
             inputs = inputs.to_numpy()
@@ -465,15 +454,15 @@ class FoKL:
         # Format and normalize:
         inputs, data = self._format(inputs, data, current['AutoTranspose'], current['bit'])
         if current['normalize'] is True:
-            self._normalize(inputs, current['minmax'], current['pillow'], current['pillow_type'])
+            inputs = self._normalize(inputs, current['minmax'], current['pillow'], current['pillow_type'])
         
-        # Check if any 'inputs' exceeds [0, 1]:
-        inputs_cap0 = inputs < 0
-        inputs_cap1 = inputs > 1
-        if np.max(inputs_cap0) is True or np.max(inputs_cap1) is True:
-            warnings.warn("'inputs' exceeds [0, 1] normalization bounds. Capping values at 0 and 1.")
-            inputs[inputs_cap0] = 0.0  # cap at 0
-            inputs[inputs_cap1] = 1.0  # cap at 1
+            # Check if any 'inputs' exceeds [0, 1], since 'normalize=True' implies this is desired:
+            inputs_cap0 = inputs < 0
+            inputs_cap1 = inputs > 1
+            if np.max(inputs_cap0) is True or np.max(inputs_cap1) is True:
+                warnings.warn("'inputs' exceeds [0, 1] normalization bounds. Capping values at 0 and 1.")
+                inputs[inputs_cap0] = 0.0  # cap at 0
+                inputs[inputs_cap1] = 1.0  # cap at 1
 
         # Define full dataset with training log as attributes when clean called from fit, or when clean called for first time:
         if hasattr(self, 'inputs') is False or _setattr is True:
@@ -485,7 +474,11 @@ class FoKL:
             attrs = {'inputs': inputs, 'data': data, 'trainlog': trainlog}
             _set_attributes(self, attrs)
 
-        return inputs, data
+        # Return formatted and possibly normalized dataset, depending on if user passed 'inputs' only or 'inputs' and 'data':
+        if data is None:  # assume user only wants 'inputs' returned, e.g., 'clean_dataset = model.clean(dataset)'
+            return inputs
+        else:  # e.g., 'clean_inputs, clean_data = model.clean(inputs, data)'
+            return inputs, data
 
     def generate_trainlog(self, train, n=None):
         """Generate random logical vector of length 'n' with 'train' percent as True."""
@@ -900,7 +893,7 @@ class FoKL:
                 if current['_suppress_normalization_warning'] is False:  # to suppress warning when evaluate called from coverage3
                     warnings.warn("User-provided 'inputs' but 'clean=False'. Subsequent errors may be solved by enabling automatic formatting and normalization of 'inputs' via 'clean=True'.", category=UserWarning)
         if current['clean']:
-            normputs, _ = self.clean(inputs, kwargs_from_other=kwargs_to_clean)
+            normputs = self.clean(inputs, kwargs_from_other=kwargs_to_clean)
         elif inputs is None:
             normputs = self.inputs
         else:

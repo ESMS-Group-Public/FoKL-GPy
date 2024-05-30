@@ -4,7 +4,15 @@
 This is an example of FoKL converting its GP model to a symbolic Pyomo expression and solving the generated Pyomo model
 algebraically for the maximum value of the GP model. The dataset used is arbitrarily defined and is a toy problem.
 """
-from FoKL import FoKLRoutines
+# -----------------------------------------------------------------------
+# Local version of 'from FoKL import FoKLRoutines':
+import os
+import sys
+dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+sys.path.append(dir)
+sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+from src.FoKL import FoKLRoutines
+# -----------------------------------------------------------------------
 import numpy as np
 import pyomo.environ as pyo
 from pyomo.environ import *
@@ -52,7 +60,8 @@ def main():
 
     # Convert FoKL's GP model to Pyomo:
     scenarios = f.draws  # Pyomo 'scenarios' is synonym for FoKL 'draws'
-    m = f.to_pyomo(draws=scenarios)  # default is 'draws=self.draws' so this is unnecessary but demonstrates idea
+    # m = f.to_pyomo(draws=scenarios)  # default is 'draws=self.draws' so this is unnecessary but demonstrates idea
+    m = f.to_pyomo(draws=2)  # default is 'draws=self.draws' so this is unnecessary but demonstrates idea
 
     # Add constraints (if any/known) to enforce 'physics':
     m.t = pyo.Var(within=pyo.Reals, bounds=[0, 1])
@@ -63,10 +72,13 @@ def main():
     m.obj = pyo.Objective(expr=m.fokl_y_avg, sense=pyo.maximize)
 
     # Solve (need multistart 'https://pyomo.readthedocs.io/en/latest/contributed_packages/multistart.html'):
-    solver = pyo.SolverFactory('multistart')  # multistart to try local solver at various points for global solution
+    # solver = pyo.SolverFactory('multistart')  # multistart to try local solver at various points for global solution
     print("\nRunning Pyomo solver...")
-    solver.solve(m, solver='ipopt', suppress_unbounded_warning=True)  # IPOPT is local solver, and warning not needed
-    print("Done!")
+    # solver.solve(m, solver='ipopt', suppress_unbounded_warning=True)  # IPOPT is local solver, and warning not needed
+    # print("Done!")
+
+    solver = pyo.SolverFactory('ipopt')
+    solver.solve(m, tee=True)
 
     print("\nPyomo solution:")
     print(f"     y = {m.obj()}")
