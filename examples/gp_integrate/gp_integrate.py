@@ -3,8 +3,16 @@
 
 This is an example using the 'GP_Integrate' function with a FoKL model.
 """
-from FoKL import FoKLRoutines
-from FoKL.GP_Integrate import GP_Integrate
+# -----------------------------------------------------------------------
+# Local version of 'from FoKL import ...':
+import os
+import sys
+dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+sys.path.append(dir)
+sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+from src.FoKL import FoKLRoutines
+from src.FoKL.GP_Integrate import GP_Integrate
+# -----------------------------------------------------------------------
 import numpy as np
 import matplotlib.pyplot as plt
 
