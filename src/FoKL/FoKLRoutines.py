@@ -243,14 +243,20 @@ class FoKL:
         for key, value in current.items():
             setattr(self, key, value)
 
-    def _format(self, inputs, data=None, AutoTranspose=True, bit=64):
+    def _format(self, inputs, data=None, AutoTranspose=True, SingleInstance=False, bit=64):
         """
         Called by 'clean' to format dataset.
             - formats inputs as 2D ndarray, where columns are input variables; n_rows > n_cols if AutoTranspose=True
             - formats data as 2D ndarray, with single column
+
+        Note SingleInstance has priority over AutoTranspose. If SingleInstance=True, then AutoTranspose=False.
         """
+        # Format and check inputs:
         AutoTranspose = _str_to_bool(AutoTranspose)
+        SingleInstance = _str_to_bool(SingleInstance)
         bits = {16: np.float16, 32: np.float32, 64: np.float64}  # allowable datatypes: https://numpy.org/doc/stable/reference/arrays.scalars.html#arrays-scalars-built-in
+        if SingleInstance is True:
+            AutoTranspose = False
         if bit not in bits.keys():
             warnings.warn(f"Keyword 'bit={bit}' limited to values of 16, 32, or 64. Assuming default value of 64.", category=UserWarning)
             bit = 64
@@ -268,15 +274,19 @@ class FoKL:
                               category=UserWarning)
 
         # Format 'inputs' as [n x m] numpy array:
-        inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
-        inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
+        inputs = np.array(inputs)  # attempts to handle lists or any other format (i.e., not pandas)
+        if inputs.ndim > 2:  # remove axes with 1D for cases like (N x 1 x M) --> (N x M)
+            inputs = np.squeeze(inputs)
         if inputs.dtype != datatype:
             inputs = np.array(inputs, dtype=datatype)
             warnings.warn(f"'inputs' was converted to float{bit}. May require user-confirmation that "
                           f"values did not get corrupted.", category=UserWarning)
         if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
-            inputs = inputs[:, np.newaxis]
-        if AutoTranspose is True:
+            if SingleInstance is True:
+                inputs = inputs[np.newaxis, :]  # make 1D into (1, M)
+            else:
+                inputs = inputs[:, np.newaxis]  # make 1D into (N, 1)
+        if AutoTranspose is True and SingleInstance is False:
             if inputs.shape[1] > inputs.shape[0]:  # assume user is using transpose of proper format
                 inputs = inputs.transpose()
                 warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables, else set "
@@ -332,7 +342,9 @@ class FoKL:
 
         # Process 'pillow':
 
+        _skip_pillow = False  # to skip pillow's adjustment of minmax, if pillow is default
         if pillow is None:  # default
+            _skip_pillow = True
             pillow = 0.0
         if isinstance(pillow, int):  # scalar was provided
             pillow = float(pillow)
@@ -377,7 +389,7 @@ class FoKL:
             elif len(minmax) != mm:
                 _minmax_error()
 
-        if pillow is not None:
+        if pillow is not None and _skip_pillow is False:
             minmax_vals = copy.deepcopy(minmax)
             minmax = []
             for m in range(mm):  # for input var in input vars
@@ -437,6 +449,7 @@ class FoKL:
             _setattr          == [NOT FOR USER] defines 'self.inputs' and 'self.data' if True == False (default)
             train             == percentage (0-1) of n datapoints to use for training      == 1 (default)
             AutoTranspose     == boolean to transpose dataset so that instances > features == True (default)
+            SingleInstance    == boolean to make 1D vector (e.g., list) into (1,m) ndarray == False (default)
             bit               == floating point bits to represent dataset as               == 64 (default)
             normalize         == boolean to pass formatted dataset to '_normalize'         == True (default)
             minmax            == list of [min, max] lists; upper/lower bounds of each input variable == self.minmax (default)
@@ -452,7 +465,7 @@ class FoKL:
         # Process keywords:
         default = {'train': 1, 
                    # For '_format':
-                   'AutoTranspose': True, 'bit': 64, 
+                   'AutoTranspose': True, 'SingleInstance': False, 'bit': 64,
                    # For '_normalize':
                    'normalize': True, 'minmax': None, 'pillow': None, 'pillow_type': 'percent'}
         if kwargs_from_other is not None:  # then clean is being called from fit or evaluate function
@@ -461,7 +474,7 @@ class FoKL:
         current['normalize'] = _str_to_bool(current['normalize'])
 
         # Format and normalize:
-        inputs, data = self._format(inputs, data, current['AutoTranspose'], current['bit'])
+        inputs, data = self._format(inputs, data, current['AutoTranspose'], current['SingleInstance'], current['bit'])
         if current['normalize'] is True:
             inputs = self._normalize(inputs, current['minmax'], current['pillow'], current['pillow_type'])
         
@@ -848,7 +861,7 @@ class FoKL:
                    '_suppress_normalization_warning': False}                                    # if called from coverage3
         default_for_clean = {'train': 1, 
                              # For '_format':
-                             'AutoTranspose': True, 'bit': 64, 
+                             'AutoTranspose': True, 'SingleInstance': False, 'bit': 64,
                              # For '_normalize':
                              'normalize': True, 'minmax': None, 'pillow': None, 'pillow_type': 'percent'}
         current = _process_kwargs(_merge_dicts(default, default_for_clean), kwargs)
@@ -1186,7 +1199,7 @@ class FoKL:
         default_for_fit['clean'] = _str_to_bool(kwargs.get('clean', False))
         default_for_clean = {'train': 1, 
                              # For '_format':
-                             'AutoTranspose': True, 'bit': 64, 
+                             'AutoTranspose': True, 'SingleInstance': False, 'bit': 64,
                              # For '_normalize':
                              'normalize': True, 'minmax': None, 'pillow': None, 'pillow_type': 'percent'}
         expected = self.hypers + list(default_for_fit.keys()) + list(default_for_clean.keys())
