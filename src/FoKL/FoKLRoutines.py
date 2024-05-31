@@ -1,4 +1,13 @@
-from FoKL import getKernels
+# -----------------------------------------------------------------------
+# Local version of 'from FoKL import ...':
+import os
+import sys
+dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+sys.path.append(dir)
+sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+from src.FoKL import getKernels
+from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
+# -----------------------------------------------------------------------
 import pandas as pd
 import warnings
 import itertools
@@ -1724,117 +1733,9 @@ class FoKL:
 
         return
 
-    def to_pyomo(self, m=None, y=None, x=None, **kwargs):
-        """
-        Automatically convert a pre-trained FoKL model to constraints for a symbolic Pyomo model.
-
-        Optional Inputs:
-            - m               == Pyomo model (if already defined)
-            - y               == FoKL output to include in Pyomo model (if known)
-            - x               == FoKL input variables to include in Pyomo model (if known), e.g., x=[0.7, None, 0.4]
-
-        Keywords:
-            - draws == number of scenarios to include as Pyomo constraints == model.draws (default)
-
-        Output:
-            - m == Pyomo model with FoKL model included
-                - m.y    == evaluated output corresponding to FoKL model
-                - m.x[j] == input variable corresponding to FoKL model
-
-        Note:
-            - Only convert FoKL models defined with the 'Bernoulli Polynomials' kernel; otherwise, with 'Cubic
-            Splines', the solution time is extremely impractical even for the simplest of models.
-        """
-        # Process kwargs:
-        default = {'draws': self.draws}
-        current = _process_kwargs(default, kwargs)
-
-        # Convert FoKL to Pyomo:
-
-        t = np.array(self.mtx - 1, dtype=int)  # indices of polynomial (where 0 is B1 and -1 means none)
-        lt = t.shape[0] + 1  # length of terms (including beta0)
-        lv = t.shape[1]  # length of input variables
-
-        ni_ids = []  # orders of basis functions used (where 0 is B1), per term
-        basis_n = []  # for future use when indexing 'm.fokl_basis'
-        for j in range(lv):  # for input variable in input variables
-            ni_ids.append(np.sort(np.unique(t[:, j][t[:, j] != -1])).tolist())
-            basis_n += ni_ids[j]
-        n_ids = np.sort(np.unique(basis_n))
-
-        if self.kernel != self.kernels[1]:
-            raise ValueError("The method for the 'Cubic Splines' kernel has not yet been ported from development, nor "
-                             "is expected to be as the resulting symbolic expressions are too infeasible to solve. Use "
-                             "the 'to_pyomo' method with a FoKL model trained on the 'Bernoulli Polynomials' kernel.")
-
-        if m is None:
-            m = pyo.ConcreteModel()
-
-        m.fokl_scenarios = pyo.Set(initialize=range(current['draws']))  # index for scenario (i.e., FoKL draw)
-        m.fokl_y = pyo.Var(m.fokl_scenarios, within=pyo.Reals)  # FoKL output
-
-        m.fokl_j = pyo.Set(initialize=range(lv))  # index for FoKL input variable
-        m.fokl_x = pyo.Var(m.fokl_j, within=pyo.Reals, bounds=[0, 1], initialize=0.0)  # FoKL input variables
-
-        basis_nj = []
-        for j in m.fokl_j:
-            for n in ni_ids[j]:  # for order of basis function in unique orders, per current input variable 'm.x[j]'
-                basis_nj.append([n, j])
-
-        def symbolic_basis(m):
-            """Basis functions as symbolic. See 'evaluate_basis' for source of equation."""
-            for [n, j] in basis_nj:
-                m.fokl_basis[n, j] = self.phis[n][0] + sum(self.phis[n][k] * (m.fokl_x[j] ** k)
-                                                           for k in range(1, len(self.phis[n])))
-            return
-
-        m.fokl_basis = pyo.Expression(basis_nj)  # create indices ONLY for used basis functions
-        symbolic_basis(m)  # may be better to write as rule, but 'pyo.Expression(basis_nj, rule=basis)' failed
-
-        m.fokl_k = pyo.Set(initialize=range(lt))  # index for FoKL term (where 0 is beta0)
-        m.fokl_b = pyo.Var(m.fokl_scenarios, m.fokl_k)  # FoKL coefficients (i.e., betas)
-        for i in m.fokl_scenarios:  # for scenario (i.e., draw) in scenarios (i.e., draws)
-            for k in m.fokl_k:  # for term in terms
-                m.fokl_b[i, k].fix(self.betas[-(i + 1), k])  # define values of betas, with y[0] as last FoKL draws
-
-        def symbolic_fokl(m):
-            """FoKL models (i.e., scenarios) as symbolic, assuming 'Bernoulli Polynomials."""
-            for i in m.fokl_scenarios:  # for scenario (i.e., draw) in scenarios (i.e., draws)
-                m.fokl_expr[i] = m.fokl_b[i, 0]  # initialize with beta0
-                for k in range(1, lt):  # for term in non-zeros terms (i.e., exclude beta0)
-                    tk = t[k - 1, :]  # interaction matrix of current term
-                    tk_mask = tk != -1  # ignore if -1 (recall -1 basis function means none)
-                    if any(tk_mask):  # should always be true because FoKL 'fit' removes rows from 'mtx' without basis
-                        term_k = m.fokl_b[i, k]
-                        for j in m.fokl_j:  # for input variable in input variables
-                            if tk_mask[j]:  # for variable in term
-                                term_k *= m.fokl_basis[tk[j], j]  # multiply basis function(s) with beta to form term
-                    else:
-                        term_k = 0
-                    m.fokl_expr[i] += term_k  # add term to expression
-            return
-
-        m.fokl_expr = pyo.Expression(m.fokl_scenarios)  # FoKL models (i.e., scenarios, draws)
-        symbolic_fokl(m)  # may be better to write as rule
-
-        def symbolic_scenario(m):
-            """Define each scenario, meaning a different draw of 'betas' for y=f(x), as a constraint."""
-            for i in m.fokl_scenarios:
-                m.fokl_constr[i] = m.fokl_y[i] == m.fokl_expr[i]
-            return
-
-        m.fokl_constr = pyo.Constraint(m.fokl_scenarios)  # set of constraints, one per scenario
-        symbolic_scenario(m)  # may be better to write as rule
-
-        if y is not None:
-            for i in m.fokl_scenarios:
-                m.fokl_y[i].fix(y)
-        for j in m.fokl_j:
-            if x is not None:
-                if x[j] is not None:
-                    m.fokl_x[j].fix(x[j])
-
-        return m
+    def to_pyomo(self, xvars, yvars, draws=None, m=None, xfix=None, yfix=None, truescale=True):
+        """Passes arguments to external function. See 'fokl_to_pyomo' for more documentation."""
+        return fokl_to_pyomo(self, xvars, yvars, draws, m, xfix, yfix, truescale)
 
     def save(self, filename=None, directory=None):
         """
