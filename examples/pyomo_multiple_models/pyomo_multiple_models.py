@@ -1,7 +1,13 @@
 """
 [EXAMPLE]: Pyomo Multiple Models
 
-This is an example of embedding multiple FoKL GP models in a single Pyomo model, with user-defined variable names.
+This is an example of embedding multiple FoKL GP models in a single Pyomo model, where one is an input of another.
+
+The following will be modeled:
+     Cp = f(T)
+      G = f(T, Cp)
+
+Then, T will be found to maximize abs(G).
 """
 # -----------------------------------------------------------------------
 # Local version of 'from FoKL import ...':
@@ -15,48 +21,80 @@ from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
 # -----------------------------------------------------------------------
 from thermochem.janaf import Janafdb
 import pyomo.environ as pyo
+import numpy as np
+import pandas as pd
 
 
 def main():
-
+    """Train FoKL models, convert to Pyomo, and solve NLP."""
     try:
-        bFoKL__GmH0_T = FoKLRoutines.load('FoKL__GmH0_T.fokl')
-        FoKL__Delta_fG = FoKLRoutines.load('FoKL__Delta_fG.fokl')
+        model_Cp = FoKLRoutines.load('model_Cp.fokl')
+        model_G = FoKLRoutines.load('model_G.fokl')
+
     except Exception as exception:
-
         # Load dataset:
-
-        CO2 = Janafdb().getphasedata(filename='C-095').rawdata  # https://janaf.nist.gov/tables/C-095.txt
-
+        try:
+            CO2 = Janafdb().getphasedata(filename='C-095').rawdata  # https://janaf.nist.gov/tables/C-095.html
+        except Exception as exception:
+            CO2 = pd.read_csv('C-095.txt', delimiter="\t", header=1)
+            CO2.values[1::, 5:7] = CO2.values[1::, 5:7] * 1e3
         T = CO2.values[1::, 0]
         Cp = CO2.values[1::, 1]
-        GmH0_T = CO2.values[1::, 3]  # [G - H(Tr)]/T
-        Delta_fG = CO2.values[1::, 6]
+        G = CO2.values[1::, 6] * 1e-3  # $\text{G} \equiv \Delta_f G^{\circ}$
+
+        # Initialize models:
+        model_Cp = FoKLRoutines.FoKL(kernel=1)
+        model_G = FoKLRoutines.FoKL(kernel=1)
 
         # Train models:
+        print("\nTraining Cp = f(T):")
+        model_Cp.fit(T, Cp, clean=True)
+        print("Done!")
+        print("\nTraining G = f(T, Cp):")
+        model_G.fit([T, Cp], G, clean=True)
+        print("Done!")
 
-        FoKL__GmH0_T = FoKLRoutines.FoKL(kernel=1)
-        FoKL__Delta_fG = FoKLRoutines.FoKL(kernel=1)
+        # Save models:
+        model_Cp.save('model_Cp.fokl')
+        model_G.save('model_G.fokl')
 
-        FoKL__GmH0_T.fit([T, Cp], GmH0_T, clean=True)
-        FoKL__Delta_fG.fit([T, Cp], Delta_fG, clean=True)
+    # Validation of models:
+    model_Cp.coverage3(plot=True, xaxis=0, xlabel='T (K)', ylabel='Cp', title="Validation of 'model_Cp'")
+    model_G.coverage3(plot=True, xaxis=0, xlabel='T (K)', ylabel='G', title="Validation of 'model_G'")
 
-        # Initialize Pyomo model and embed GP's:
+    # Embed GP's in Pyomo model:
+    m = fokl_to_pyomo([model_Cp, model_G], [['T'], ['T', 'Cp']], ['Cp', 'G'])
 
-        m = pyo.ConcreteModel()
-        FoKL__GmH0_T.to_pyomo(m, ['T', 'Cp'], 'GmH0_T')
-        FoKL__Delta_fG.to_pyomo(m, ['T', 'Cp'], 'Delta_fG', overwrite=False)
+    # Set up objective (to maximize G and minimize Cp variance):
+    m.obj = pyo.Objective(expr=abs(m.G), sense=pyo.maximize)
 
-        # save
-        FoKL__GmH0_T.save('FoKL__GmH0_T')
-        FoKL__Delta_fG.save('FoKL__Delta_fG')
+    # Solve:
+    opt = pyo.SolverFactory('multistart')
+    print("\nRunning Pyomo solver:")
+    opt.solve(m, solver='ipopt', suppress_unbounded_warning=True)
+    print("Done!")
 
-    # debug fokl_to_pyomo
-    m = fokl_to_pyomo([FoKL__GmH0_T, FoKL__Delta_fG], [['T', 'Cp'], ['T', 'Cp']], ['GmH0_T', 'Delta_fG'], 3)
+    return m
 
-    breakpoint()
+
+def results(m):
+    """Print solution results to terminal."""
+
+    print("\nResults:")
+    print("\n|       |            T |               Cp |           G |")
+    print("|-------|--------------|------------------|-------------|")
+    print("| Janaf | (1700, 1900) | (59.317, 60.049) | <= -396.353 |")
+    print("| Pyomo |     ", "%.2f" % m.T(), "|          ", "%.3f" % m.Cp(), "|   ", "%.3f" % m.G(), "|")
+
+    print("\nThe standard deviations of the GP models are:")
+    print("    std(Cp) =", "%.3f" % np.sqrt(m.GP0_Cp_var()))
+    print("     std(G) =", "%.3f" % np.sqrt(m.GP1_G_var()))
+
+    print(f"\nThe error of the T solution is: {np.round((m.T() - 1800) / 18, 1)} %")
 
 
 if __name__ == '__main__':
-    main()
+    m = main()
+    results(m)
+    print("\nEnd of 'pyomo_multiple_models' example.")
 
