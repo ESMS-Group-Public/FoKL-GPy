@@ -419,7 +419,7 @@ model.clear(all=True)
 m = model.to_pyomo(xvars, yvars, m=None, xfix=None, yfix=None, truescale=True, std=True, draws=None)
 ```
 
-Pass inputs to [fokl_to_pyomo](#fokl_to_pyomo). If embedding a single GP in Pyomo rather than multiple, it is recommended to use this method to avoid importing an additional module in the run script.
+Pass arguments to [fokl_to_pyomo](#fokl_to_pyomo). If embedding a single GP in Pyomo rather than multiple, it is recommended to use this method to avoid importing an additional module in the run script.
 
 ##### save
 
@@ -461,7 +461,7 @@ solver = pyo.SolverFactory('multistart')
 solver.solve(m, solver='ipopt')
 ```
 
-For documentation on the components of the Pyomo model automatically generated, see [*nomenclature_of_fokl_to_pyomo.ipynb*](docs/_dev/in_dev__nomenclature_of_fokl_to_pyomo.ipynb). The function inputs are as follows.
+For documentation on the components of the Pyomo model automatically generated, see [*nomenclature_of_fokl_to_pyomo.ipynb*](docs/_dev/in_dev__nomenclature_of_fokl_to_pyomo.ipynb). The function arguments are as follows.
 
 | Input | Type | Description | Default |
 |---|---|---|---|
