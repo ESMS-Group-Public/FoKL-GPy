@@ -68,6 +68,7 @@ Please first refer to the following for tutorials and examples:
 - [Validating model via plot and RMSE](examples/sigmoid/sigmoid.py)
 - [Integrating models of derivatives](examples/gp_integrate/gp_integrate.py)
 - [Converting model to Pyomo](docs/tutorials/fokl_to_pyomo.py)
+- [Converting multiple models to Pyomo](examples/pyomo_multiple_models/pyomo_multiple_models.py)
 - [Solving model in Pyomo with non-linear optimization](examples/pyomo_maximize/pyomo_maximize.py)
 
 Then, see [User Documentation](#user-documentation) as needed.
@@ -88,6 +89,7 @@ Then, see [User Documentation](#user-documentation) as needed.
       - [clear](#clear)
       - [to_pyomo](#to_pyomo)
       - [save](#save)
+  - [fokl_to_pyomo](#fokl_to_pyomo)
   - [getKernels](#getkernels)
   - [GP_integrate](#gp_integrate)
 
@@ -414,44 +416,10 @@ model.clear(all=True)
 ##### to_pyomo
 
 ```python
-m = model.to_pyomo(m=None, y=None, x=None, **kwargs)
+m = model.to_pyomo(xvars, yvars, m=None, xfix=None, yfix=None, truescale=True, std=True, draws=None)
 ```
 
-Automatically convert ```draws``` from a FoKL model trained with or defined by the ```'Bernoulli Polynomials'``` kernel to symbolic expressions in a Pyomo model.
-
-| Input   | Type                                   | Description                                                                                                 | Default                 |
-|---------|----------------------------------------|-------------------------------------------------------------------------------------------------------------|-------------------------|
-| ```m``` | Pyomo model                            | pre-existing Pyomo model if already defined                                                                 | ```None```              |
-| ```y``` | scalar                                 | if known, value of FoKL model output variable to include in Pyomo model                                     | ```None```              |
-| ```x``` | list of scalar(s) and/or ```None```(s) | if known, value(s) of FoKL model input variables to include in Pyomo model (e.g., ```x=[0.7, None, 0.4]```) | ```[None, ..., None]``` |
-
-| Keyword     | Type | Description                                       | Default           |
-|-------------|------|---------------------------------------------------|-------------------|
-| ```draws``` | -    | Pyomo scenarios; see ```draws``` of [FoKL](#fokl) | ```model.draws``` |
-
-| Output   | Type        | Description                          |
-|----------|-------------|--------------------------------------|
-| ```m```  | Pyomo model | Pyomo model with FoKL model included |
-
-| Objects of Pyomo Model | Type           | Description                                                                                                                                                                                                                                 |
-|------------------------|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ```m.fokl_scenarios``` | pyo.Set        | index of scenarios (i.e., ```draws```)                                                                                                                                                                                                      |
-| ```m.fokl_y```         | pyo.Var        | FoKL model output variable indexed over ```m.fokl_scenarios```                                                                                                                                                                              |
-| ```m.fokl_j```         | pyo.Set        | index of FoKL input variables                                                                                                                                                                                                               |
-| ```m.fokl_x```         | pyo.Var        | FoKL model input variables index over ```m.fokl_j```                                                                                                                                                                                        |
-| ```m.fokl_basis```     | pyo.Expression | basis functions used in FoKL model                                                                                                                                                                                                          |
-| ```m.fokl_k```         | pyo.Set        | index for FoKL term (where $k=0$ refers to $\beta_0$)                                                                                                                                                                                       |
-| ```m.fokl_b```         | pyo.Var        | FoKL coefficients (i.e., ```model.betas```)                                                                                                                                                                                                 |
-| ```m.fokl_expr```      | pyo.Expression | FoKL model function (i.e., $\overline{\beta}$ draws of $\beta_0 +\sum_{j=1}^{m} \sum_{i=1}^{n} (\beta_{ij} \cdot B_i (x_j ))+\sum_{j=1}^{m-1} \sum_{k=j+1}^{m} \sum_{i=1}^{n} (\beta_{ijk} \cdot B_i (x_j , x_k ))+\dotsm$, where $B_i=$ basis function) |
-| ```m.fokl_constr```    | pyo.Constraint | FoKL model equation (i.e., ```m.fokl_y[i] == m.fokl_expr[i] for i in m.fokl_scenarios```                                                                                                                                                    |
-         
-Defining the Pyomo model's objective and any other constraints must be done outside of the ```to_pyomo``` method.
-
-The user must then define an appropriate solver for the Pyomo model. The following is known to work for global optimization problems, which will likely be required for a problem using a GP model.
-```python
-solver = pyo.SolverFactory('multistart')
-solver.solve(m, solver='ipopt')
-```  
+Pass inputs to [fokl_to_pyomo](#fokl_to_pyomo). If embedding a single GP in Pyomo rather than multiple, it is recommended to use this method to avoid importing an additional module in the run script.
 
 ##### save
 
@@ -477,6 +445,35 @@ FoKLRoutines.load(filepath)
 | Output         | Type   | Description                               |
 |----------------|--------|-------------------------------------------|
 | ```filepath``` | string | absolute path to where the file was saved |
+
+### fokl_to_pyomo
+
+```python
+from FoKL.fokl_to_pyomo import fokl_to_pyomo
+m = fokl_to_pyomo(models, xvars, yvars, m=None, xfix=None, yfix=None, truescale=True, std=True, draws=None)
+```
+
+Embed GP's in Pyomo by automatically converting ```draws``` from FoKL models trained with or defined by the ```'Bernoulli Polynomials'``` kernel to symbolic expressions in a Pyomo model.
+
+Defining the Pyomo model's objective and any other constraints must be done outside of ```fokl_to_pyomo```. The user must then define an appropriate solver for the Pyomo model. The following is known to work for global optimization problems, which will likely be required for a problem using a GP model.
+```python
+solver = pyo.SolverFactory('multistart')
+solver.solve(m, solver='ipopt')
+```
+
+For documentation on the components of the Pyomo model automatically generated, see [*nomenclature_of_fokl_to_pyomo.ipynb*](docs/_dev/in_dev__nomenclature_of_fokl_to_pyomo.ipynb). The function inputs are as follows.
+
+| Input | Type | Description | Default |
+|---|---|---|---|
+| ```models``` | list of FoKL class objects | multiple FoKL models to be embedded in single Pyomo model | - |
+| ```xvars``` | list of lists of strings | strings are input variable names, and lists correspond to models | - |
+| ```yvars``` | list of strings | strings are output variable names corresponding to models | - |
+| ```m``` | Pyomo model | pre-existing Pyomo model if existing | ```pyo.ConcreteModel()``` |
+| ```xfix``` | list of lists of floats | floats are input variable values if known and to be fixed), and lists correspond to models | - |
+| ```yfix``` | list of floats | floats are output variable values (if known and to be fixed) corresponding to models | - |
+| ```truescale``` | list of lists of booleans | corresponding to the variables created by ```xvars```, set ```True``` to use true scale (i.e., un-normalized) values and set ```False``` to use normalized values; unless ```xvars``` is to correspond to the normalized input variables, leave blank | ```[[True, ..., True], ..., [True, ..., True]]``` |
+| ```std``` | list of booleans | set ```False``` if standard deviation of FoKL model (corresponding to position in list) is not needed so Pyomo model only defines mean | ```[[True, ..., True], ..., [True, ..., True]]``` |
+| ```draws``` | int | number of most recent draws to embed in Pyomo | ```model.draws``` |
 
 ### getKernels
 
