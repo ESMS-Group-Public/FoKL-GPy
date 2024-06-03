@@ -145,6 +145,7 @@ def _add_gp(self, xvars, yvar, m, xfix, yfix, truescale, std, draws, igp):
     t = np.array(self.mtx - 1, dtype=int)  # indices of polynomial (where 0 is B1 and -1 means none)
     lt = t.shape[0] + 1  # length of terms (including beta0)
     lv = t.shape[1]  # length of input variables
+    b_ = np.mean(self.betas[-draws::, :], axis=0)  # average of betas across scenarios
 
     # Define some Pyomo sets (and indexed var):
 
@@ -152,7 +153,7 @@ def _add_gp(self, xvars, yvar, m, xfix, yfix, truescale, std, draws, igp):
     m.add_component(f"GP{igp}_j", pyo.Set(initialize=range(lv)))  # index for FoKL input variable
     m.add_component(f"GP{igp}_k", pyo.Set(initialize=range(lt)))  # index for FoKL term (where 0 is beta0)
     m.add_component(f"GP{igp}_b", pyo.Var(m.component(f"GP{igp}_scenarios"), m.component(f"GP{igp}_k")))  # FoKL coefficients (i.e., betas)
-    m.add_component(f"GP{igp}_b_", pyo.Var(m.component(f"GP{igp}_k")))  # mean of betas
+    m.add_component(f"GP{igp}_b_", pyo.Var(m.component(f"GP{igp}_k"), initialize=b_))  # mean of betas
 
     # Define FoKL output (and its counterparts) as Pyomo variable:
 
