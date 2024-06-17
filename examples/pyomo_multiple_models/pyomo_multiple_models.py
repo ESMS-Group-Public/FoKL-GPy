@@ -9,15 +9,18 @@ The following will be modeled:
 
 Then, T will be found to maximize abs(G).
 """
-# -----------------------------------------------------------------------
-# Local version of 'from FoKL import ...':
-import os
-import sys
-dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
-sys.path.append(dir)
-sys.path.append(os.path.join(dir, '..', '..'))  # package directory
-from src.FoKL import FoKLRoutines
-from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
+# # -----------------------------------------------------------------------
+# # Local version of 'from FoKL import ...':
+# import os
+# import sys
+# dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+# sys.path.append(dir)
+# sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+# from src.FoKL import FoKLRoutines
+# from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
+# # -----------------------------------------------------------------------
+from FoKL import FoKLRoutines
+from FoKL.fokl_to_pyomo import fokl_to_pyomo
 # -----------------------------------------------------------------------
 from thermochem.janaf import Janafdb
 import pyomo.environ as pyo

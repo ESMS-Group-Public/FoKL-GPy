@@ -16,14 +16,16 @@ In this tutorial, the following will be demonstrated:
 
     3) Demonstrate how a pre-existing Pyomo model could have been used, with (2b) for example.
 """
-# -----------------------------------------------------------------------
-# Local version of 'from FoKL import FoKLRoutines':
-import os
-import sys
-dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
-sys.path.append(dir)
-sys.path.append(os.path.join(dir, '..', '..'))  # package directory
-from src.FoKL import FoKLRoutines
+# # -----------------------------------------------------------------------
+# # Local version of 'from FoKL import FoKLRoutines':
+# import os
+# import sys
+# dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+# sys.path.append(dir)
+# sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+# from src.FoKL import FoKLRoutines
+# # -----------------------------------------------------------------------
+from FoKL import FoKLRoutines
 # -----------------------------------------------------------------------
 import pyomo.environ as pyo
 import numpy as np
