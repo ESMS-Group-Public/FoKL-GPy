@@ -1,12 +1,15 @@
-# -----------------------------------------------------------------------
-# Local version of 'from FoKL import ...':
-import os
-import sys
-dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
-sys.path.append(dir)
-sys.path.append(os.path.join(dir, '..', '..'))  # package directory
-from src.FoKL import getKernels
-from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
+# # -----------------------------------------------------------------------
+# # Local version of 'from FoKL import ...':
+# import os
+# import sys
+# dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+# sys.path.append(dir)
+# sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+# from src.FoKL import getKernels
+# from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
+# # -----------------------------------------------------------------------
+from FoKL import getKernels
+from FoKL.fokl_to_pyomo import fokl_to_pyomo
 # -----------------------------------------------------------------------
 import pandas as pd
 import warnings

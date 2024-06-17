@@ -4,14 +4,16 @@
 This is an example of FoKL converting its GP model to a symbolic Pyomo expression and solving the generated Pyomo model
 algebraically for the maximum value of the GP model. The dataset used is arbitrarily defined and is a toy problem.
 """
-# -----------------------------------------------------------------------
-# Local version of 'from FoKL import FoKLRoutines':
-import os
-import sys
-dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
-sys.path.append(dir)
-sys.path.append(os.path.join(dir, '..', '..'))  # package directory
-from src.FoKL import FoKLRoutines
+# # -----------------------------------------------------------------------
+# # Local version of 'from FoKL import FoKLRoutines':
+# import os
+# import sys
+# dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+# sys.path.append(dir)
+# sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+# from src.FoKL import FoKLRoutines
+# # -----------------------------------------------------------------------
+from FoKL import FoKLRoutines
 # -----------------------------------------------------------------------
 import numpy as np
 import pyomo.environ as pyo
