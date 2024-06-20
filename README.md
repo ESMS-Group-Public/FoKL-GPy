@@ -493,7 +493,21 @@ from FoKL.GP_Integrate import GP_Integrate
 T, Y = GP_Integrate(betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs)
 ```
 
-Integrate FoKL models of derivatives.
+Integrate FoKL models that were fitted to derivatives. Multiple models are able to be integrated simulatneously. 
+
+For example, training ```model1``` on $x = f(\dot{x}, b_1)$ and ```model2``` on $y = f(\dot{y}, b_2)$ is as usual. Then, to integrate the models with constants $(b_1, b_2)$ set to ```b``` and initial conditions $(x_0, y_0)$ set to ```y0```,
+
+```python
+betas1, mtx1, _ = model1.fit([xdot, b1], x)
+betas2, mtx2, _ = model2.fit([ydot, b2], y)
+
+T, Y = GP_integrate([np.mean(betas1, axis=0), np.mean(betas2, axis=0)], 
+             [mtx1, mtx2], 
+             [b1, b2], 
+             ..., 
+             [x0, y0], 
+             ...)
+```
 
 | Input             | Description                                                                                                                                                                                                                                                                                                                                                                                                 |
 |-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -513,21 +527,21 @@ Integrate FoKL models of derivatives.
 | ```T``` | ```T``` is an array of the time steps the models are integrated at.                                  |
 | ```Y``` | ```Y``` is an array of the models that have been integrated, at the time steps contained in ```T```. |
 
-For example, if two models were being integrated, with 3 other inputs total
-and the 1st model used both models outputs as inputs and the 1st and 3rd additional
-inputs, while the 2nd model used its own output as an input and the 2nd
-and 3rd additional inputs,
+To demonstrate ```used_inputs```, suppose two models were being integrated with 3 other inputs total.
+The 1st model uses the output of both models as inputs; and, the 1st and 3rd additional
+inputs. The 2nd model uses its own output as an input; and, the 2nd
+and 3rd additional inputs. This yields
 ```python
 used_inputs = [[1, 1, 1, 0, 1], [0, 1, 0, 1, 0]]
 ```
 If the models created do not follow this ordering scheme for their inputs,
 the inputs can be rearranged based upon an alternate
 numbering scheme provided to ```used_inputs```. E.g., if the inputs need to be reordered then the 1st input should have a '1' in its place in the
-```used_inputs``` vector, the 2nd input should have a '2' and so on. Using the
-same example as before, if the 1st models inputs needed rearranged so that
-the 3rd additional input came first, followed by the two model outputs in
+```used_inputs``` vector, the 2nd input should have a '2', and so on. Using the
+same example as before, if the 1st model's inputs need to be rearranged so that
+the 3rd additional input comes first, followed by the two model outputs in
 the same order as they are in ```y0```, and ends with the 1st additional input,
-then the 1st cell in ```used_inputs``` would have the form ```[2, 3, 4, 0, 1]```.
+then the 1st list in ```used_inputs``` would be ```[2, 3, 4, 0, 1]```.
 
 ## Benchmarks and Papers
 
