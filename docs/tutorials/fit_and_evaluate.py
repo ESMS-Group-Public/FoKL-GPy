@@ -34,16 +34,15 @@ In this tutorial, the following will be demonstrated:
         formatting issues so please ensure both 'betas' and 'mtx' are 2D numpy arrays, where columns of 'betas' index
         the 0th-Nth terms in the model and rows of 'mtx' index the 1st-Nth terms.
 """
-# # -----------------------------------------------------------------
-# # Local version of 'from FoKL import FoKLRoutines':
-# import os
-# import sys
-# sys.path.append(os.path.join(os.getcwd(), '..', '..'))  # for debug
-# sys.path.append(os.getcwd())                            # for run
-# from src.FoKL import FoKLRoutines
-# # -----------------------------------------------------------------
 from FoKL import FoKLRoutines
-# -----------------------------------------------------------------
+import os
+dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+# # # -----------------------------------------------------------------------
+# # UNCOMMENT IF USING LOCAL FOKL PACKAGE:
+# import sys
+# sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+# from src.FoKL import FoKLRoutines
+# # -----------------------------------------------------------------------
 import numpy as np
 
 

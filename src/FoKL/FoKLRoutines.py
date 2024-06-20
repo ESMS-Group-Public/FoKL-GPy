@@ -1,16 +1,14 @@
+from FoKL import getKernels
+from FoKL.fokl_to_pyomo import fokl_to_pyomo
+import os
+import sys
 # # -----------------------------------------------------------------------
-# # Local version of 'from FoKL import ...':
-# import os
-# import sys
+# # # UNCOMMENT IF USING LOCAL FOKL PACKAGE:
 # dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
-# sys.path.append(dir)
 # sys.path.append(os.path.join(dir, '..', '..'))  # package directory
 # from src.FoKL import getKernels
 # from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
 # # -----------------------------------------------------------------------
-from FoKL import getKernels
-from FoKL.fokl_to_pyomo import fokl_to_pyomo
-# -----------------------------------------------------------------------
 import pandas as pd
 import warnings
 import itertools
@@ -20,10 +18,7 @@ from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 import time
-import os
 import pickle
-import pyomo.environ as pyo
-import sys
 import copy
 
 

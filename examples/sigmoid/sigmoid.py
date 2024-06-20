@@ -5,25 +5,23 @@ This is an example of FoKL modeling a dataset based on an arbitrary sigmoid func
 how to initialize the FoKL class (i.e., model), how to train the model on the dataset by calling 'fit', and how to
 perform some very basic post-processing with a 'coverage3' plot and included RMSE calculation.
 """
+from FoKL import FoKLRoutines
+import os
+dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
 # # -----------------------------------------------------------------------
-# # Local version of 'from FoKL import FoKLRoutines':
-# import os
+# # UNCOMMENT IF USING LOCAL FOKL PACKAGE:
 # import sys
-# dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
-# sys.path.append(dir)
 # sys.path.append(os.path.join(dir, '..', '..'))  # package directory
 # from src.FoKL import FoKLRoutines
 # # -----------------------------------------------------------------------
-from FoKL import FoKLRoutines
-# -----------------------------------------------------------------------
 import numpy as np
 
 
 def main():
     # Known dataset:
-    x_grid = np.loadtxt('x.csv', dtype=float, delimiter=',')  # first input
-    y_grid = np.loadtxt('y.csv', dtype=float, delimiter=',')  # second input
-    z_grid = np.loadtxt('z.csv', dtype=float, delimiter=',')  # data
+    x_grid = np.loadtxt(os.path.join(dir, 'x.csv'), dtype=float, delimiter=',')  # first input
+    y_grid = np.loadtxt(os.path.join(dir, 'y.csv'), dtype=float, delimiter=',')  # second input
+    z_grid = np.loadtxt(os.path.join(dir, 'z.csv'), dtype=float, delimiter=',')  # data
 
     # Some formatting of dataset (i.e., reshaping grid matrices into vectors via fortran index order):
     m, n = np.shape(x_grid) # == np.shape(y_grid) == np.shape(z_grid) == dimensions of grid

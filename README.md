@@ -67,7 +67,6 @@ Please first refer to the following for tutorials and examples:
 - [Saving and/or loading a model](docs/tutorials/save_and_load/save_and_load.py)
 - [Validating model via plot and RMSE](examples/sigmoid/sigmoid.py)
 - [Integrating models of derivatives](examples/gp_integrate/gp_integrate.py)
-- [Converting model to Pyomo](docs/tutorials/fokl_to_pyomo.py)
 - [Converting multiple models to Pyomo](examples/pyomo_multiple_models/pyomo_multiple_models.py)
 - [Solving model in Pyomo with non-linear optimization](examples/pyomo_maximize/pyomo_maximize.py)
 

@@ -10,17 +10,15 @@ In this tutorial, the following will be demonstrated:
     2) Save the model.
     3) Load a model.
 """
+from FoKL import FoKLRoutines
+import os
+dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
 # # -----------------------------------------------------------------------
-# # Local version of 'from FoKL import FoKLRoutines':
-# import os
+# # UNCOMMENT IF USING LOCAL FOKL PACKAGE:
 # import sys
-# dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
-# sys.path.append(dir)
 # sys.path.append(os.path.join(dir, '..', '..', '..'))  # package directory
 # from src.FoKL import FoKLRoutines
 # # -----------------------------------------------------------------------
-from FoKL import FoKLRoutines
-# -----------------------------------------------------------------------
 import warnings
 
 
@@ -30,7 +28,7 @@ def main():
     # Define filename of model to save/load, and its directory:
 
     filename = "model.fokl"
-    directory = "folder_for_model"
+    directory = os.path.join(dir, "folder_for_model")
 
     # (1) Train a new FoKL model:
 
