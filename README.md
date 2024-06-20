@@ -492,7 +492,7 @@ from FoKL.GP_Integrate import GP_Integrate
 T, Y = GP_Integrate(betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs)
 ```
 
-Integrate FoKL models that were fitted to derivatives. Multiple models are able to be integrated simulatneously. 
+Integrate FoKL models that were fitted to derivatives. Multiple models are able to be integrated simulatneously. Currently, only models trained on the "Cubic Splines" basis functions are supported.
 
 For example, training ```model1``` on $x = f(\dot{x}, b_1)$ and ```model2``` on $y = f(\dot{y}, b_2)$ is as usual. Then, to integrate the models with constants $(b_1, b_2)$ set to ```b``` and initial conditions $(x_0, y_0)$ set to ```y0```,
 
