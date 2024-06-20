@@ -501,11 +501,11 @@ betas1, mtx1, _ = model1.fit([xdot, b1], x)
 betas2, mtx2, _ = model2.fit([ydot, b2], y)
 
 T, Y = GP_integrate([np.mean(betas1, axis=0), np.mean(betas2, axis=0)], 
-             [mtx1, mtx2], 
-             [b1, b2], 
-             ..., 
-             [x0, y0], 
-             ...)
+                    [mtx1, mtx2], 
+                    [b1, b2], 
+                    ..., 
+                    [x0, y0], 
+                    ...)
 ```
 
 | Input             | Description                                                                                                                                                                                                                                                                                                                                                                                                 |
