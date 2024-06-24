@@ -1,4 +1,14 @@
 from FoKL import getKernels
+from FoKL.fokl_to_pyomo import fokl_to_pyomo
+import os
+import sys
+# # -----------------------------------------------------------------------
+# # # UNCOMMENT IF USING LOCAL FOKL PACKAGE:
+# dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+# sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+# from src.FoKL import getKernels
+# from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
+# # -----------------------------------------------------------------------
 import pandas as pd
 import warnings
 import itertools
@@ -8,10 +18,8 @@ from numpy import linalg as LA
 from scipy.linalg import eigh
 import matplotlib.pyplot as plt
 import time
-import os
 import pickle
-import pyomo.environ as pyo
-import sys
+import copy
 
 
 def load(filename, directory=None):
@@ -92,6 +100,13 @@ def _set_attributes(self, attrs):
         warnings.warn("Input must be a Python dictionary.")
     return
 
+
+def _merge_dicts(d1, d2):
+    """Merge two dictionaries into single dictionary in a backward-compatible way. Values of d2 replace any shared variables in d1."""
+    d = d1.copy()
+    d.update(d2)
+    return d
+    
 
 class FoKL:
     def __init__(self, **kwargs):
@@ -226,47 +241,26 @@ class FoKL:
         for key, value in current.items():
             setattr(self, key, value)
 
-    def clean(self, inputs, data=None, kwargs_from_other=None, **kwargs):
+    def _format(self, inputs, data=None, AutoTranspose=True, SingleInstance=False, bit=64):
         """
-        For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required but should be
-        entered if available; otherwise, leave blank.
+        Called by 'clean' to format dataset.
+            - formats inputs as 2D ndarray, where columns are input variables; n_rows > n_cols if AutoTranspose=True
+            - formats data as 2D ndarray, with single column
 
-        Inputs:
-            inputs == [n x m] input matrix of n observations by m features (i.e., 'x' variables in model)
-            data   == [n x 1] output vector of n observations (i.e., 'y' variable in model)
-
-        Keyword Inputs:
-            bit               == floating point bits to represent dataset as               == 64 (default)
-            train             == percentage (0-1) of n datapoints to use for training      == 1 (default)
-            AutoTranspose     == boolean to transpose dataset so that instances > features == True (default)
-            kwargs_from_other == [NOT FOR USER] used internally by fit or evaluate function
-
-        Added Attributes:
-            - self.inputs    == 'inputs' as [n x m] numpy array where each column is normalized on [0, 1] scale
-            - self.data      == 'data' as [n x 1] numpy array
-            - self.normalize == [[min, max], ... [min, max]] factors used to normalize 'inputs' to 'self.inputs'
-            - self.trainlog  == indices of 'self.inputs' to use as training set
+        Note SingleInstance has priority over AutoTranspose. If SingleInstance=True, then AutoTranspose=False.
         """
+        # Format and check inputs:
+        AutoTranspose = _str_to_bool(AutoTranspose)
+        SingleInstance = _str_to_bool(SingleInstance)
+        bits = {16: np.float16, 32: np.float32, 64: np.float64}  # allowable datatypes: https://numpy.org/doc/stable/reference/arrays.scalars.html#arrays-scalars-built-in
+        if SingleInstance is True:
+            AutoTranspose = False
+        if bit not in bits.keys():
+            warnings.warn(f"Keyword 'bit={bit}' limited to values of 16, 32, or 64. Assuming default value of 64.", category=UserWarning)
+            bit = 64
+        datatype = bits[bit]
 
-        # Allowable datatypes (https://numpy.org/doc/stable/reference/arrays.scalars.html#arrays-scalars-built-in):
-        bits = {16: np.float16, 32: np.float32, 64: np.float64}
-
-        # Process keywords:
-        if kwargs_from_other is not None:  # then clean is being called from fit or evaluate function
-            kwargs = kwargs | kwargs_from_other  # merge dictionaries (kwargs={} is expected but just in case)
-        default = {'bit': 64, 'train': 1, 'AutoTranspose': True}
-        current = _process_kwargs(default, kwargs)
-        if current['bit'] not in bits.keys():
-            warnings.warn(f"Keyword 'bit={current['bit']}' limited to values of 16, 32, or 64. Assuming default value "
-                          f"of 64.", category=UserWarning)
-            current['bit'] = 64
-        current['AutoTranspose'] = _str_to_bool(current['AutoTranspose'])
-
-        # Define local variables from keywords:
-        datatype = bits[current['bit']]
-        train = current['train']  # percentage of datapoints to use as training data
-
-        # Convert 'inputs' and 'datas' to numpy if pandas:
+        # Convert 'inputs' and 'data' to numpy if pandas:
         if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
             inputs = inputs.to_numpy()
             warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.",
@@ -278,33 +272,23 @@ class FoKL:
                               category=UserWarning)
 
         # Format 'inputs' as [n x m] numpy array:
-        inputs = np.array(inputs) # attempts to handle lists or any other format (i.e., not pandas)
-        inputs = np.squeeze(inputs) # removes axes with 1D for cases like (N x 1 x M) --> (N x M)
+        inputs = np.array(inputs)  # attempts to handle lists or any other format (i.e., not pandas)
+        if inputs.ndim > 2:  # remove axes with 1D for cases like (N x 1 x M) --> (N x M)
+            inputs = np.squeeze(inputs)
         if inputs.dtype != datatype:
             inputs = np.array(inputs, dtype=datatype)
-            warnings.warn(f"'inputs' was converted to float{current['bit']}. May require user-confirmation that "
+            warnings.warn(f"'inputs' was converted to float{bit}. May require user-confirmation that "
                           f"values did not get corrupted.", category=UserWarning)
         if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
-            inputs = inputs[:, np.newaxis]
-        if current['AutoTranspose'] is True:
+            if SingleInstance is True:
+                inputs = inputs[np.newaxis, :]  # make 1D into (1, M)
+            else:
+                inputs = inputs[:, np.newaxis]  # make 1D into (N, 1)
+        if AutoTranspose is True and SingleInstance is False:
             if inputs.shape[1] > inputs.shape[0]:  # assume user is using transpose of proper format
                 inputs = inputs.transpose()
                 warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables, else set "
                               "'AutoTranspose=False' to disable.", category=UserWarning)
-
-        # Normalize 'inputs' to [0, 1] scale:
-        inputs_max = np.max(inputs, axis=0) # max of each input variable
-        normalize = []
-        for m in range(inputs.shape[1]):  # for input var in input vars, to check each var's normalization status
-            inputs_min = np.min(inputs[:, m])
-            if inputs_max[m] != 1 or inputs_min != 0:
-                if inputs_min == inputs_max[m]:
-                    warnings.warn("'inputs' contains a column of constants which will not improve the model's fit."
-                                  , category=UserWarning)
-                    inputs[:, m] = np.ones_like(inputs[:, m])
-                else:  # normalize
-                    inputs[:, m] = (inputs[:, m] - inputs_min) / (inputs_max[m] - inputs_min)
-            normalize.append([inputs_min, inputs_max[m]])  # store [min, max] for post-processing convenience
 
         # Format 'data' as [n x 1] numpy array:
         if data is not None:
@@ -312,7 +296,7 @@ class FoKL:
             data = np.squeeze(data)
             if data.dtype != datatype:
                 data = np.array(data, dtype=datatype)
-                warnings.warn(f"'data' was converted to float{current['bit']}. May require user-confirmation that "
+                warnings.warn(f"'data' was converted to float{bit}. May require user-confirmation that "
                               f"values did not get corrupted.", category=UserWarning)
             if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
                 data = data[:, np.newaxis]
@@ -324,15 +308,197 @@ class FoKL:
                 elif m != 1 and n == 1:
                     data = data.transpose()
                     warnings.warn("'data' was transposed to match FoKL formatting.", category=UserWarning)
+                
+        return inputs, data
+    
+    def _normalize(self, inputs, minmax=None, pillow=None, pillow_type='percent'):
+        """
+        Called by 'clean' to normalize dataset inputs.
 
-        # Index percentage of dataset as training set:
-        trainlog = self.generate_trainlog(train, inputs.shape[0])
+        Inputs:
+            inputs      == [n x m] ndarray where columns are input variables
+            minmax      == list of [min, max] lists; upper/lower bounds of each input variable                      == self.minmax (default)
+            pillow      == list of [lower buffer, upper buffer] lists; fraction of span by which to expand 'minmax' == 0 (default)
+            pillow_type == string, 'percent' (i.e., fraction of span to buffer truescale) or 'absolute' (i.e., [min, max] on 0-1 scale), defining units of 'pillow' == 'percent' (default)
+            
+        Note 'pillow' is ignored if reading 'minmax' from previously defined 'self.minmax'; a warning is thrown if 'pillow' is defined in this case.
+        
+        Updates 'self.minmax'.
+        """
+        mm = inputs.shape[1]  # number of input variables
+        
+        # Process 'pillow_type':
+        pillow_types = ['percent', 'absolute']
+        if isinstance(pillow_type, str):
+            pillow_type = [pillow_type] * mm
+        elif isinstance(pillow_type, list):
+            if len(pillow_type) != mm:
+                raise ValueError("Input 'pillow_type' must be string or correspond to input variables (i.e., columns of 'inputs').")
+        for pt in range(len(pillow_type)):
+            if pillow_type[pt] not in pillow_types:
+                raise ValueError(f"'pillow_type' is limited to {pillow_types}.")
 
-        # Define/update attributes with cleaned data and other relevant variables:
-        attrs = {'inputs': inputs, 'data': data, 'normalize': normalize, 'trainlog': trainlog}
-        _set_attributes(self, attrs)
+        # Process 'pillow':
 
-        return
+        _skip_pillow = False  # to skip pillow's adjustment of minmax, if pillow is default
+        if pillow is None:  # default
+            _skip_pillow = True
+            pillow = 0.0
+        if isinstance(pillow, int):  # scalar was provided
+            pillow = float(pillow)
+        if isinstance(pillow, float):
+            pillow = [[pillow, pillow]] * mm
+        elif isinstance(pillow[0], int) or isinstance(pillow[0], float):  # list was provided
+            lp = len(pillow)
+            if lp == 2:  # assume [lb, ub] was provided
+                pillow = [[float(pillow[0]), float(pillow[1])]]  # add outer list, and ensure float
+                lp = 1  # = len(pillow)
+            if lp != int(mm * 2):
+                raise ValueError("Input 'pillow' must correspond to input variables (i.e., columns of 'inputs').")
+            else:  # assume [lb1, ub1, ..., lbm, upm] needs to be formatted to [[lb1, ub1], ..., [lbm, ubm]]
+                pillow_vals = copy.deepcopy(pillow)
+                pillow = []
+                for i in range(0, lp, 2):
+                    pillow.append([float(pillow_vals[i]), float(pillow_vals[i + 1])])  # list of [lb, ub] lists
+        
+        # Process 'minmax':
+        
+        def _minmax_error():
+            raise ValueError("Input 'minmax' must correspond to input variables (i.e., columns of 'inputs').")
+
+        if minmax is None:  # default, read 'model.normalize' or define if does not exist
+            if hasattr(self, 'minmax'):
+                minmax = self.minmax
+            else:
+                minmax = list([np.min(inputs[:, m]), np.max(inputs[:, m])] for m in range(mm))
+        else:  # process 'minmax'
+            if isinstance(minmax[0], int) or isinstance(minmax[0], float):  # list was provided
+                lm = len(minmax)
+                if lm == 2:  # assume [min, max] was provided
+                    minmax = [minmax]  # add outer list
+                    lm = 1  # = len(minmax)
+                if lm != int(mm * 2):
+                    _minmax_error()
+                else:  # assume [min1, max1, ..., minm, maxm] needs to be formatted to [[min1, max1], ..., [minm, maxm]]
+                    minmax_vals = copy.deepcopy(minmax)
+                    minmax = []
+                    for i in range(0, lm, 2):
+                        minmax.append([minmax_vals[i], minmax_vals[i + 1]])  # list of [min, max] lists
+            elif len(minmax) != mm:
+                _minmax_error()
+
+        if pillow is not None and _skip_pillow is False:
+            minmax_vals = copy.deepcopy(minmax)
+            minmax = []
+            for m in range(mm):  # for input var in input vars
+                x_min = minmax_vals[m][0]
+                x_max = minmax_vals[m][1]
+                span = x_max - x_min  # span of minmax
+                if pillow_type[m] == 'percent':
+                    minmax.append([x_min - span * pillow[m][0], x_max + span * pillow[m][1]])  # [min, max] with pillow buffers
+                elif pillow_type[m] == 'absolute':
+                    # Derivation:
+                    #   Nomenclature: pillow[m] == [q, 1 - p], minmax_vals[m] == [n, m]
+                    #   For [q, 1 - p] to align to 0-1 scale after normalization,
+                    #       (n - min) / (max - min) = q
+                    #       (m - min) / (max - min) = p
+                    #   Then,
+                    #       (n - min) / q = (m - min) / p
+                    #       n / q - m / p = min * (1 / q - 1 / p)
+                    #       min = (n / q - m / p) / (1 / q - 1 / p) = (n * p - m * q) / (p - q)
+                    #   And,
+                    #       max = (n - min) / q + min
+                    
+                    if pillow[m][0] == 0:  # then n = min
+                        minmax_min = x_min
+                    else:  # see above equation
+                        minmax_min = (x_min * (1 - pillow[m][1]) - x_max * pillow[m][0]) / (1 - pillow[m][1] - pillow[m][0])
+                    
+                    if pillow[m][1] == 0:  # then m = max
+                        minmax_max = x_max
+                    elif pillow[m][0] == 0:  # empirically need equation rearranged in this case to avoid nan
+                        minmax_max = (x_max - pillow[m][1] * minmax_min) / (1 - pillow[m][1])
+                    else:  # see above equation
+                        minmax_max = (x_min - minmax_min) / pillow[m][0] + minmax_min
+                    
+                    minmax.append([minmax_min, minmax_max])  # [min, max] such that 'pillow' values map to 0-1 scale
+            
+        if hasattr(self, 'minmax'):  # check if 'self.minmax' is defined, in which case give warning to re-train model
+            if any(minmax[m] == self.minmax[m] for m in range(mm)) is False:
+                warnings.warn("The model already contains normalization [min, max] bounds, so the currently trained model will not be valid for the new bounds requested. Train a new model with these new bounds.", category=UserWarning)
+        self.minmax = minmax  # always update
+
+        # Normalize 'inputs' to 0-1 scale according to 'minmax':
+        for m in range(mm):  # for input var in input vars
+            inputs[:, m] = (inputs[:, m] - minmax[m][0]) / (minmax[m][1] - minmax[m][0])
+        
+        return inputs
+    
+    def clean(self, inputs, data=None, kwargs_from_other=None, _setattr=False, **kwargs):
+        """
+        For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required but should be
+        entered if available; otherwise, leave blank.
+
+        Inputs:
+            inputs == [n x m] input matrix of n observations by m features (i.e., 'x' variables in model)
+            data   == [n x 1] output vector of n observations (i.e., 'y' variable in model)
+
+        Keyword Inputs:
+            _setattr          == [NOT FOR USER] defines 'self.inputs' and 'self.data' if True == False (default)
+            train             == percentage (0-1) of n datapoints to use for training      == 1 (default)
+            AutoTranspose     == boolean to transpose dataset so that instances > features == True (default)
+            SingleInstance    == boolean to make 1D vector (e.g., list) into (1,m) ndarray == False (default)
+            bit               == floating point bits to represent dataset as               == 64 (default)
+            normalize         == boolean to pass formatted dataset to '_normalize'         == True (default)
+            minmax            == list of [min, max] lists; upper/lower bounds of each input variable == self.minmax (default)
+            pillow            == list of [lower buffer, upper buffer] lists; fraction of span by which to expand 'minmax' == 0 (default)
+            kwargs_from_other == [NOT FOR USER] used internally by fit or evaluate function
+
+        Added Attributes:
+            - self.inputs    == 'inputs' as [n x m] numpy array where each column is normalized on [0, 1] scale
+            - self.data      == 'data' as [n x 1] numpy array
+            - self.minmax    == [[min, max], ... [min, max]] factors used to normalize 'inputs' to 'self.inputs'
+            - self.trainlog  == indices of 'self.inputs' to use as training set
+        """
+        # Process keywords:
+        default = {'train': 1, 
+                   # For '_format':
+                   'AutoTranspose': True, 'SingleInstance': False, 'bit': 64,
+                   # For '_normalize':
+                   'normalize': True, 'minmax': None, 'pillow': None, 'pillow_type': 'percent'}
+        if kwargs_from_other is not None:  # then clean is being called from fit or evaluate function
+            kwargs = _merge_dicts(kwargs, kwargs_from_other)  # merge dictionaries (kwargs={} is expected but just in case)
+        current = _process_kwargs(default, kwargs)
+        current['normalize'] = _str_to_bool(current['normalize'])
+
+        # Format and normalize:
+        inputs, data = self._format(inputs, data, current['AutoTranspose'], current['SingleInstance'], current['bit'])
+        if current['normalize'] is True:
+            inputs = self._normalize(inputs, current['minmax'], current['pillow'], current['pillow_type'])
+        
+            # Check if any 'inputs' exceeds [0, 1], since 'normalize=True' implies this is desired:
+            inputs_cap0 = inputs < 0
+            inputs_cap1 = inputs > 1
+            if np.max(inputs_cap0) is True or np.max(inputs_cap1) is True:
+                warnings.warn("'inputs' exceeds [0, 1] normalization bounds. Capping values at 0 and 1.")
+                inputs[inputs_cap0] = 0.0  # cap at 0
+                inputs[inputs_cap1] = 1.0  # cap at 1
+
+        # Define full dataset with training log as attributes when clean called from fit, or when clean called for first time:
+        if hasattr(self, 'inputs') is False or _setattr is True:
+
+            # Index percentage of dataset as training set:
+            trainlog = self.generate_trainlog(current['train'], inputs.shape[0])
+
+            # Define/update attributes with cleaned data and other relevant variables:
+            attrs = {'inputs': inputs, 'data': data, 'trainlog': trainlog}
+            _set_attributes(self, attrs)
+
+        # Return formatted and possibly normalized dataset, depending on if user passed 'inputs' only or 'inputs' and 'data':
+        if data is None:  # assume user only wants 'inputs' returned, e.g., 'clean_dataset = model.clean(dataset)'
+            return inputs
+        else:  # e.g., 'clean_inputs, clean_data = model.clean(inputs, data)'
+            return inputs, data
 
     def generate_trainlog(self, train, n=None):
         """Generate random logical vector of length 'n' with 'train' percent as True."""
@@ -349,11 +515,11 @@ class FoKL:
                 np.random.shuffle(trainlog_i)  # randomize sort
             if len(trainlog_i) > l_log:
                 trainlog_i = trainlog_i[0:l_log]  # cut-off extra indices (beyond 'percent')
-            trainlog = np.zeros(n, dtype=np.bool)  # indices of training data (as a logical)
+            trainlog = np.zeros(n, dtype=bool)  # indices of training data (as a logical)
             for i in trainlog_i:
                 trainlog[i] = True
         else:
-            # trainlog = np.ones(n, dtype=np.bool)  # wastes memory, so use following method coupled with 'trainset':
+            # trainlog = np.ones(n, dtype=bool)  # wastes memory, so use following method coupled with 'trainset':
             trainlog = None  # means use all observations
         return trainlog
 
@@ -427,7 +593,7 @@ class FoKL:
             betas     == draw from the posterior distribution of coefficients            == self.betas (default)
             phis      == spline coefficients for the basis functions                     == self.phis (default)
             mtx       == basis function interaction matrix from the best model           == self.mtx (default)
-            normalize == list of [min, max]'s of input data used in the normalization    == self.normalize (default)
+            minmax    == list of [min, max]'s of input data used in the normalization    == self.minmax (default)
             IndividualDraws == boolean for returning derivative(s) at each draw       == 0 (default)
             ReturnFullArray == boolean for returning NxMx2 array instead of Nx2M      == 0 (default)
 
@@ -444,7 +610,7 @@ class FoKL:
 
         # Process keywords:
         default = {'inputs': None, 'kernel': self.kernel, 'd1': None, 'd2': None, 'draws': self.draws, 'betas': None,
-                   'phis': None, 'mtx': self.mtx, 'normalize': self.normalize, 'IndividualDraws': False,
+                   'phis': None, 'mtx': self.mtx, 'minmax': self.minmax, 'IndividualDraws': False,
                    'ReturnFullArray': False, 'ReturnBasis': False}
         current = _process_kwargs(default, kwargs)
         for boolean in ['IndividualDraws', 'ReturnFullArray', 'ReturnBasis']:
@@ -467,7 +633,7 @@ class FoKL:
         betas = current['betas']
         phis = current['phis']
         mtx = current['mtx']
-        span = current['normalize']
+        span = current['minmax']
 
         inputs = np.array(inputs)
         if inputs.ndim == 1:
@@ -682,16 +848,21 @@ class FoKL:
         Optional Inputs:
             betas        == coefficients defining FoKL model                       == self.betas (default)
             mtx          == interaction matrix defining FoKL model                 == self.mtx (default)
-            normalize    == [min, max] of inputs used for normalization            == None (default)
+            minmax       == [min, max] of inputs used for normalization            == None (default)
             draws        == number of beta terms used                              == self.draws (default)
             clean        == boolean to automatically normalize and format 'inputs' == False (default)
             ReturnBounds == boolean to return confidence bounds as second output   == False (default)
         """
 
         # Process keywords:
-        default = {'normalize': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False}
-        default_for_clean = {'bit': 64, 'train': 1}
-        current = _process_kwargs(default | default_for_clean, kwargs)
+        default = {'minmax': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False,  # for evaluate
+                   '_suppress_normalization_warning': False}                                    # if called from coverage3
+        default_for_clean = {'train': 1, 
+                             # For '_format':
+                             'AutoTranspose': True, 'SingleInstance': False, 'bit': 64,
+                             # For '_normalize':
+                             'normalize': True, 'minmax': None, 'pillow': None, 'pillow_type': 'percent'}
+        current = _process_kwargs(_merge_dicts(default, default_for_clean), kwargs)
         for boolean in ['clean', 'ReturnBounds']:
             current[boolean] = _str_to_bool(current[boolean])
         kwargs_to_clean = {}
@@ -737,21 +908,12 @@ class FoKL:
                               category=UserWarning)
                 current['clean'] = False
         else:  # user-defined 'inputs'
-            if not current['clean']:  # assume provided inputs are already formatted and maybe normalized
-                if not isinstance(inputs, np.ndarray):
-                    warnings.warn(f"Provided inputs were converted to numpy array as float64. To change this datatype, "
-                                  f"call 'clean' first.", category=UserWarning)
-                    inputs = np.array(inputs, dtype=np.float64)
-                if current['normalize'] is None:  # assume already normalized
-                    normputs = inputs
-                else:  # assume not normalized
-                    normputs = (inputs - current['normalize'][0]) / (current['normalize'][1] - current['normalize'][0])
-                if np.max(normputs) > 1 or np.min(normputs) < 0:
-                    warnings.warn("Provided inputs were not normalized, so overriding 'clean' to True.")
-                    current['clean'] = True
+            if not current['clean']:  # assume provided inputs are already formatted and normalized
+                normputs = inputs
+                if current['_suppress_normalization_warning'] is False:  # to suppress warning when evaluate called from coverage3
+                    warnings.warn("User-provided 'inputs' but 'clean=False'. Subsequent errors may be solved by enabling automatic formatting and normalization of 'inputs' via 'clean=True'.", category=UserWarning)
         if current['clean']:
-            self.clean(inputs, kwargs_from_other=kwargs_to_clean)
-            normputs = self.inputs
+            normputs = self.clean(inputs, kwargs_from_other=kwargs_to_clean)
         elif inputs is None:
             normputs = self.inputs
         else:
@@ -938,7 +1100,7 @@ class FoKL:
         data = current['data']
         draws = current['draws']
 
-        mean, bounds = self.evaluate(normputs, draws=draws, ReturnBounds=1)
+        mean, bounds = self.evaluate(normputs, draws=draws, ReturnBounds=1, _suppress_normalization_warning=True)
         n, mputs = np.shape(normputs)  # Size of normalized inputs ... calculated in 'evaluate' but not returned
 
         if current['plot']:  # if user requested a plot
@@ -948,8 +1110,8 @@ class FoKL:
             elif isinstance(current['xaxis'], int):  # if user-defined but not a vector
                 try:
                     normputs_np = np.array(normputs)  # in case list
-                    min = self.normalize[current['xaxis']][0]
-                    max = self.normalize[current['xaxis']][1]
+                    min = self.minmax[current['xaxis']][0]
+                    max = self.minmax[current['xaxis']][1]
                     plt_x = normputs_np[:, current['xaxis']] * (max - min) + min  # un-normalized vector for x-axis
                 except:
                     warnings.warn(f"Keyword argument 'xaxis'={current['xaxis']} failed to index 'inputs'. Plotting indices instead.",
@@ -1033,7 +1195,11 @@ class FoKL:
         default_for_fit = {'ConsoleOutput': True}
         default_for_fit['ConsoleOutput'] = _str_to_bool(kwargs.get('ConsoleOutput', self.ConsoleOutput))
         default_for_fit['clean'] = _str_to_bool(kwargs.get('clean', False))
-        default_for_clean = {'bit': 64, 'train': 1}
+        default_for_clean = {'train': 1, 
+                             # For '_format':
+                             'AutoTranspose': True, 'SingleInstance': False, 'bit': 64,
+                             # For '_normalize':
+                             'normalize': True, 'minmax': None, 'pillow': None, 'pillow_type': 'percent'}
         expected = self.hypers + list(default_for_fit.keys()) + list(default_for_clean.keys())
         kwargs = _process_kwargs(expected, kwargs)
         if default_for_fit['clean'] is False:
@@ -1066,7 +1232,7 @@ class FoKL:
                     _, data = self.trainset()
             except Exception as exception:
                 error_clean_failed = True
-            self.clean(inputs, data, kwargs_from_other=kwargs_to_clean)
+            self.clean(inputs, data, kwargs_from_other=kwargs_to_clean, _setattr=True)
         else:  # user input implies that they already called clean prior to calling fit
             try:
                 if inputs is None:  # assume clean already called and len(data) same as train data if data not None
@@ -1080,7 +1246,7 @@ class FoKL:
                     error_clean_failed = True
                 else:
                     default_for_fit['clean'] = True
-                    self.clean(inputs, data, kwargs_from_other=kwargs_to_clean)
+                    self.clean(inputs, data, kwargs_from_other=kwargs_to_clean, _setattr=True)
         if error_clean_failed is True:
             raise ValueError("'inputs' and/or 'data' were not provided so 'clean' could not be performed.")
 
@@ -1578,117 +1744,9 @@ class FoKL:
 
         return
 
-    def to_pyomo(self, m=None, y=None, x=None, **kwargs):
-        """
-        Automatically convert a pre-trained FoKL model to constraints for a symbolic Pyomo model.
-
-        Optional Inputs:
-            - m               == Pyomo model (if already defined)
-            - y               == FoKL output to include in Pyomo model (if known)
-            - x               == FoKL input variables to include in Pyomo model (if known), e.g., x=[0.7, None, 0.4]
-
-        Keywords:
-            - draws == number of scenarios to include as Pyomo constraints == model.draws (default)
-
-        Output:
-            - m == Pyomo model with FoKL model included
-                - m.y    == evaluated output corresponding to FoKL model
-                - m.x[j] == input variable corresponding to FoKL model
-
-        Note:
-            - Only convert FoKL models defined with the 'Bernoulli Polynomials' kernel; otherwise, with 'Cubic
-            Splines', the solution time is extremely impractical even for the simplest of models.
-        """
-        # Process kwargs:
-        default = {'draws': self.draws}
-        current = _process_kwargs(default, kwargs)
-
-        # Convert FoKL to Pyomo:
-
-        t = np.array(self.mtx - 1, dtype=int)  # indices of polynomial (where 0 is B1 and -1 means none)
-        lt = t.shape[0] + 1  # length of terms (including beta0)
-        lv = t.shape[1]  # length of input variables
-
-        ni_ids = []  # orders of basis functions used (where 0 is B1), per term
-        basis_n = []  # for future use when indexing 'm.fokl_basis'
-        for j in range(lv):  # for input variable in input variables
-            ni_ids.append(np.sort(np.unique(t[:, j][t[:, j] != -1])).tolist())
-            basis_n += ni_ids[j]
-        n_ids = np.sort(np.unique(basis_n))
-
-        if self.kernel != self.kernels[1]:
-            raise ValueError("The method for the 'Cubic Splines' kernel has not yet been ported from development, nor "
-                             "is expected to be as the resulting symbolic expressions are too infeasible to solve. Use "
-                             "the 'to_pyomo' method with a FoKL model trained on the 'Bernoulli Polynomials' kernel.")
-
-        if m is None:
-            m = pyo.ConcreteModel()
-
-        m.fokl_scenarios = pyo.Set(initialize=range(current['draws']))  # index for scenario (i.e., FoKL draw)
-        m.fokl_y = pyo.Var(m.fokl_scenarios, within=pyo.Reals)  # FoKL output
-
-        m.fokl_j = pyo.Set(initialize=range(lv))  # index for FoKL input variable
-        m.fokl_x = pyo.Var(m.fokl_j, within=pyo.Reals, bounds=[0, 1], initialize=0.0)  # FoKL input variables
-
-        basis_nj = []
-        for j in m.fokl_j:
-            for n in ni_ids[j]:  # for order of basis function in unique orders, per current input variable 'm.x[j]'
-                basis_nj.append([n, j])
-
-        def symbolic_basis(m):
-            """Basis functions as symbolic. See 'evaluate_basis' for source of equation."""
-            for [n, j] in basis_nj:
-                m.fokl_basis[n, j] = self.phis[n][0] + sum(self.phis[n][k] * (m.fokl_x[j] ** k)
-                                                           for k in range(1, len(self.phis[n])))
-            return
-
-        m.fokl_basis = pyo.Expression(basis_nj)  # create indices ONLY for used basis functions
-        symbolic_basis(m)  # may be better to write as rule, but 'pyo.Expression(basis_nj, rule=basis)' failed
-
-        m.fokl_k = pyo.Set(initialize=range(lt))  # index for FoKL term (where 0 is beta0)
-        m.fokl_b = pyo.Var(m.fokl_scenarios, m.fokl_k)  # FoKL coefficients (i.e., betas)
-        for i in m.fokl_scenarios:  # for scenario (i.e., draw) in scenarios (i.e., draws)
-            for k in m.fokl_k:  # for term in terms
-                m.fokl_b[i, k].fix(self.betas[-(i + 1), k])  # define values of betas, with y[0] as last FoKL draws
-
-        def symbolic_fokl(m):
-            """FoKL models (i.e., scenarios) as symbolic, assuming 'Bernoulli Polynomials."""
-            for i in m.fokl_scenarios:  # for scenario (i.e., draw) in scenarios (i.e., draws)
-                m.fokl_expr[i] = m.fokl_b[i, 0]  # initialize with beta0
-                for k in range(1, lt):  # for term in non-zeros terms (i.e., exclude beta0)
-                    tk = t[k - 1, :]  # interaction matrix of current term
-                    tk_mask = tk != -1  # ignore if -1 (recall -1 basis function means none)
-                    if any(tk_mask):  # should always be true because FoKL 'fit' removes rows from 'mtx' without basis
-                        term_k = m.fokl_b[i, k]
-                        for j in m.fokl_j:  # for input variable in input variables
-                            if tk_mask[j]:  # for variable in term
-                                term_k *= m.fokl_basis[tk[j], j]  # multiply basis function(s) with beta to form term
-                    else:
-                        term_k = 0
-                    m.fokl_expr[i] += term_k  # add term to expression
-            return
-
-        m.fokl_expr = pyo.Expression(m.fokl_scenarios)  # FoKL models (i.e., scenarios, draws)
-        symbolic_fokl(m)  # may be better to write as rule
-
-        def symbolic_scenario(m):
-            """Define each scenario, meaning a different draw of 'betas' for y=f(x), as a constraint."""
-            for i in m.fokl_scenarios:
-                m.fokl_constr[i] = m.fokl_y[i] == m.fokl_expr[i]
-            return
-
-        m.fokl_constr = pyo.Constraint(m.fokl_scenarios)  # set of constraints, one per scenario
-        symbolic_scenario(m)  # may be better to write as rule
-
-        if y is not None:
-            for i in m.fokl_scenarios:
-                m.fokl_y[i].fix(y)
-        for j in m.fokl_j:
-            if x is not None:
-                if x[j] is not None:
-                    m.fokl_x[j].fix(x[j])
-
-        return m
+    def to_pyomo(self, xvars, yvars, m=None, xfix=None, yfix=None, truescale=True, std=True, draws=None):
+        """Passes arguments to external function. See 'fokl_to_pyomo' for more documentation."""
+        return fokl_to_pyomo(self, xvars, yvars, m, xfix, yfix, truescale, std, draws)
 
     def save(self, filename=None, directory=None):
         """

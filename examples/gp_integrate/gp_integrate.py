@@ -5,17 +5,26 @@ This is an example using the 'GP_Integrate' function with a FoKL model.
 """
 from FoKL import FoKLRoutines
 from FoKL.GP_Integrate import GP_Integrate
+import os
+dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
+# # -----------------------------------------------------------------------
+# # UNCOMMENT IF USING LOCAL FOKL PACKAGE:
+# import sys
+# sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+# from src.FoKL import FoKLRoutines
+# from src.FoKL.GP_Integrate import GP_Integrate
+# # -----------------------------------------------------------------------
 import numpy as np
 import matplotlib.pyplot as plt
 
 
 def main():
     # Known dataset:
-    traininputs = np.loadtxt('traininputs.txt', dtype=float, delimiter=',')  # input variables for both datasets
-    traindata = [np.loadtxt('traindata1.txt', dtype=float, delimiter=','),   # data for first and second datasets
-                 np.loadtxt('traindata2.txt', dtype=float, delimiter=',')]
-    y = np.loadtxt('y.txt', dtype=float, delimiter=',')
-    utest = np.loadtxt('utest.csv', dtype=float, delimiter=',')
+    traininputs = np.loadtxt(os.path.join(dir, 'traininputs.txt'), dtype=float, delimiter=',')  # input variables for both datasets
+    traindata = [np.loadtxt(os.path.join(dir, 'traindata1.txt'), dtype=float, delimiter=','),   # data for first and second datasets
+                 np.loadtxt(os.path.join(dir, 'traindata2.txt'), dtype=float, delimiter=',')]
+    y = np.loadtxt(os.path.join(dir, 'y.txt'), dtype=float, delimiter=',')
+    utest = np.loadtxt(os.path.join(dir, 'utest.csv'), dtype=float, delimiter=',')
 
     # Initializing FoKL model with user-defined constant hyperparameters (to override default values) and turning off
     # user-warnings (i.e., warnings from FoKL) since working example requires no troubleshooting:

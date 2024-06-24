@@ -62,11 +62,12 @@ From here, the FoKL class object may be created and its methods accessed. Please
 ## Use Cases
 
 Please first refer to the following for tutorials and examples:
-- [Training and/or evaluating a model](docs/tutorials/clean.py)
+- [Automatically formatting and normalizing datasets](docs/tutorials/clean.ipynb)
+- [Training and/or evaluating a model](docs/tutorials/fit_and_evaluate.py)
 - [Saving and/or loading a model](docs/tutorials/save_and_load/save_and_load.py)
 - [Validating model via plot and RMSE](examples/sigmoid/sigmoid.py)
 - [Integrating models of derivatives](examples/gp_integrate/gp_integrate.py)
-- [Converting model to Pyomo](docs/tutorials/fokl_to_pyomo.py)
+- [Converting multiple models to Pyomo](examples/pyomo_multiple_models/pyomo_multiple_models.py)
 - [Solving model in Pyomo with non-linear optimization](examples/pyomo_maximize/pyomo_maximize.py)
 
 Then, see [User Documentation](#user-documentation) as needed.
@@ -87,6 +88,7 @@ Then, see [User Documentation](#user-documentation) as needed.
       - [clear](#clear)
       - [to_pyomo](#to_pyomo)
       - [save](#save)
+  - [fokl_to_pyomo](#fokl_to_pyomo)
   - [getKernels](#getkernels)
   - [GP_integrate](#gp_integrate)
 
@@ -100,7 +102,7 @@ The [FoKLRoutines](#foklroutines) module houses the primary routines for a FoKL 
 model = FoKLRoutines.load(filename, directory=None)
 ```
 
-Load a FoKL class from a file.
+Load a FoKL class from a file. If failing to load a file and/or directory relative to the run script, ensure the terminal directory is set to that of the run script.
 
 By default, ```directory``` is the current working directory that contains the script calling this method. An absolute or 
 relative directory may be defined if the model to load is located elsewhere.
@@ -167,8 +169,8 @@ each method as needed.
 model.clean(inputs, data=None, **kwargs)
 ```
 
-For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required but should be entered 
-if available; otherwise, leave blank.
+Automatically format and normalize datasets. Note that data is not required but should be entered 
+if available; otherwise, leave blank. Multiple options are available to govern the normalization of inputs. See [Automatically formatting and normalizing datasets](#use-cases) for example usage.
 
 | Input        | Type | Description                                                                                                                          | Default    |
 |--------------|------|--------------------------------------------------------------------------------------------------------------------------------------|------------|
@@ -177,9 +179,12 @@ if available; otherwise, leave blank.
 
 | Keyword             | Type    | Description                                         | Default    |
 |---------------------|---------|-----------------------------------------------------|------------|
-| ```bit```           | integer | (16, 32, 64) floating point bits to save dataset as | ```64```   |
 | ```train```         | scalar  | (0,1] fraction of $n$ instances to use for training | ```1```    |
 | ```AutoTranspose``` | boolean | assumes $n > m$ and transposes dataset accordingly  | ```True``` |
+| ```bit```           | integer | (16, 32, 64) floating point bits to save dataset as | ```64```   |
+| ```normalize```     | boolean | to pass formatted dataset to ```_normalize()```     | ```True``` |
+| ```minmax```        | list of [min, max] lists | upper/lower bounds of each input variable | model.minmax |
+| ```pillow```        | list of [lower, upper] lists | fraction of span by which to expand [min, max]; or, values on 0-1 scale that [min, max] should map to | ```0``` |
 
 After calling [clean](#clean), the now normalized and formatted dataset gets saved as attributes of the FoKL class. Be sure to use these attributes in place of the originally entered ```inputs``` and ```data``` so that normalization and formatting errors are avoided. The attributes are as follows:
 
@@ -187,7 +192,7 @@ After calling [clean](#clean), the now normalized and formatted dataset gets sav
 |-----------------------|----------------------|-------------------------------------------------------------------------|
 | ```model.inputs```    | $n \times m$ ndarray | normalized and formatted ```inputs```                                   |
 | ```model.data```      | $n \times 1$ ndarray | formatted ```data```                                                    |                                                            |
-| ```model.normalize``` | list of $m$ lists    | [min, max] factors used to normalize ```inputs``` to ```model.inputs``` |
+| ```model.minmax``` | list of $m$ lists    | [min, max] factors used to normalize ```inputs``` to ```model.inputs``` |
 | ```model.trainlog```  | $n \times 1$ ndarray | logical index of instances from dataset to use as training set          |
 
 To then access the training set ```[traininputs, traindata]```, see [trainset](#trainset).
@@ -227,7 +232,7 @@ If user overrides default settings, then 1st and 2nd partial derivatives can be 
 | ```betas```           | -                                                       | see ```betas``` of [FoKL](#fokl)                                                                                                                                                                                                                               | ```model.betas```     |     
 | ```phis```            | -                                                       | see ```phis``` of [FoKL](#fokl)                                                                                                                                                                                                                                | ```model.phis```      |      
 | ```mtx```             | $(terms-1) \times m$ ndarray                            | interaction matrix defining terms in FoKL model by indexing basis function order for each term and input variable combination                                                                                                                                  | ```model.mtx```       |       
-| ```normalize```       | -                                                       | see ```normalize``` of [clean](#clean)                                                                                                                                                                                                                         | ```model.normalize``` | 
+| ```minmax```       | -                                                       | see ```minmax``` of [clean](#clean)                                                                                                                                                                                                                         | ```model.minmax``` | 
 | ```IndividualDraws``` | boolean                                                 | for returning derivative(s) at each draw                                                                                                                                                                                                                       | ```False```           |              
 | ```ReturnFullArray``` | boolean                                                 | for returning $n \times m \times 2$ array with zeros for non-requested states such that indexing is preserved; otherwise, only requested states are squeezed into a 2D matrix where columns correspond to increasing input variable index and derivative order | ```False```           |              
 
@@ -295,9 +300,9 @@ Evaluate the FoKL model for provided inputs and (optionally) calculate bounds.
 
 | Keyword            | Type    | Description                                                                                                                    | Default           |
 |--------------------|---------|--------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| ```normalize```    | -       | see ```normalize``` of [clean](#clean)                                                                                         | ```None```        |
+| ```minmax```    | -       | see ```minmax``` of [clean](#clean)                                                                                         | ```None```        |
 | ```draws```        | -       | see ```draws``` of [FoKL](#fokl)                                                                                               | ```model.draws``` |
-| ```clean```        | boolean | pass ```inputs``` to [clean](#clean) if true; note this will override ```normalize``` and result in ```inputs``` scaled to 0-1 | ```False```       |
+| ```clean```        | boolean | pass ```inputs``` to [clean](#clean) if true; note this will override ```minmax``` and result in ```inputs``` scaled to 0-1 | ```False```       |
 | ```ReturnBounds``` | boolean | return 95% confidence bounds as second output if true                                                                          | ```False```       |
 
 If ```clean=True```, then any keywords documented for [clean](#clean) may be used here.
@@ -306,56 +311,6 @@ If ```clean=True```, then any keywords documented for [clean](#clean) may be use
 |-------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ```mean```              | $n \times 1$ ndarray | prediction of $\overline{y}$ in $\overline{y}=f(\overline{x}_1,...,\overline{x}_m)$ for provided ```inputs```; prediction of ```model.data``` defined in [clean](#clean) by default (i.e., ```inputs=model.inputs```) |
 | ```bounds``` (optional) | $n \times 2$ ndarray | upper and lower bounds for 95% confidence interval of predicting; returned if ```ReturnBounds=True```                                                                                                                 |
-
-Note if attempting to automatically format ```inputs``` but normalize to different [min, max] values than those of ```inputs```, this will have to be done manually. A workaround to achieve this is as follows:
-
-```python
-# Un-normalized and un-formatted 'raw' input variables of dataset:
-x = [x0, x1, ..., xM]
-
-# Initialize FoKL class:
-model = FoKLRoutines.FoKL(...)
-
-# Automatically normalize and format:
-model.clean(x)
-
-# Normalized and formatted 'raw' input variables of dataset:
-x = model.inputs
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-# Un-normalized and un-formatted 'other' input variables to evaluate:
-u = [u0, u1, ..., uM]
-
-# Initialize additional "throw-away" FoKL class in order to access clean without overriding attributes:
-dummy = FoKLRoutines.FoKL(...)
-
-# Automatically normalize and format:
-dummy.clean(u)
-
-# Normalized and formatted 'other' input variables to evaluate:
-u = dummy.inputs
-
-# Both x and u are normalized to 0-1 scales, but we need to re-scale u according to x:
-u = u * (dummy.normalize[1] - dummy.normalize[0]) + dummy.normalize[0]  # scale of original u
-u = (u - model.normalize[0]) / (model.normalize[1] - model.normalize[0])  # scale of normalized x
-
-# ----------------------------------------------------------------------------------------------------------------------
-
-# Both x and u are on the same scale now, normalized according to x, and so long as u is contained within x's extrema:
-mean = model.evaluate(u)
-```
-
-The following will *not* achieve the same result:
-```
-mean != model.evaluate(u, clean=True)
-mean != model.evaluate(u, clean=True, normalize=model.normalize)
-```
-
-However, if attempting to *only* normalize ```inputs``` to different [min, max] values, implying the format of ```inputs``` matches exactly with the format of ```model.inputs``` returned by [clean](#clean) (that is, $n \times m$ ndarray), then the following will achieve the same result:
-```
-mean = model.evaluate(u, normalize=model.normalize)
-```
 
 ##### coverage3
 
@@ -460,44 +415,10 @@ model.clear(all=True)
 ##### to_pyomo
 
 ```python
-m = model.to_pyomo(m=None, y=None, x=None, **kwargs)
+m = model.to_pyomo(xvars, yvars, m=None, xfix=None, yfix=None, truescale=True, std=True, draws=None)
 ```
 
-Automatically convert ```draws``` from a FoKL model trained with or defined by the ```'Bernoulli Polynomials'``` kernel to symbolic expressions in a Pyomo model.
-
-| Input   | Type                                   | Description                                                                                                 | Default                 |
-|---------|----------------------------------------|-------------------------------------------------------------------------------------------------------------|-------------------------|
-| ```m``` | Pyomo model                            | pre-existing Pyomo model if already defined                                                                 | ```None```              |
-| ```y``` | scalar                                 | if known, value of FoKL model output variable to include in Pyomo model                                     | ```None```              |
-| ```x``` | list of scalar(s) and/or ```None```(s) | if known, value(s) of FoKL model input variables to include in Pyomo model (e.g., ```x=[0.7, None, 0.4]```) | ```[None, ..., None]``` |
-
-| Keyword     | Type | Description                                       | Default           |
-|-------------|------|---------------------------------------------------|-------------------|
-| ```draws``` | -    | Pyomo scenarios; see ```draws``` of [FoKL](#fokl) | ```model.draws``` |
-
-| Output   | Type        | Description                          |
-|----------|-------------|--------------------------------------|
-| ```m```  | Pyomo model | Pyomo model with FoKL model included |
-
-| Objects of Pyomo Model | Type           | Description                                                                                                                                                                                                                                 |
-|------------------------|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ```m.fokl_scenarios``` | pyo.Set        | index of scenarios (i.e., ```draws```)                                                                                                                                                                                                      |
-| ```m.fokl_y```         | pyo.Var        | FoKL model output variable indexed over ```m.fokl_scenarios```                                                                                                                                                                              |
-| ```m.fokl_j```         | pyo.Set        | index of FoKL input variables                                                                                                                                                                                                               |
-| ```m.fokl_x```         | pyo.Var        | FoKL model input variables index over ```m.fokl_j```                                                                                                                                                                                        |
-| ```m.fokl_basis```     | pyo.Expression | basis functions used in FoKL model                                                                                                                                                                                                          |
-| ```m.fokl_k```         | pyo.Set        | index for FoKL term (where $k=0$ refers to $\beta_0$)                                                                                                                                                                                       |
-| ```m.fokl_b```         | pyo.Var        | FoKL coefficients (i.e., ```model.betas```)                                                                                                                                                                                                 |
-| ```m.fokl_expr```      | pyo.Expression | FoKL model function (i.e., $\overline{\beta}$ draws of $\beta_0 +\sum_{j=1}^{m} \sum_{i=1}^{n} (\beta_{ij} \cdot B_i (x_j ))+\sum_{j=1}^{m-1} \sum_{k=j+1}^{m} \sum_{i=1}^{n} (\beta_{ijk} \cdot B_i (x_j , x_k ))+\dotsm$, where $B_i=$ basis function) |
-| ```m.fokl_constr```    | pyo.Constraint | FoKL model equation (i.e., ```m.fokl_y[i] == m.fokl_expr[i] for i in m.fokl_scenarios```                                                                                                                                                    |
-         
-Defining the Pyomo model's objective and any other constraints must be done outside of the ```to_pyomo``` method.
-
-The user must then define an appropriate solver for the Pyomo model. The following is known to work for global optimization problems, which will likely be required for a problem using a GP model.
-```python
-solver = pyo.SolverFactory('multistart')
-solver.solve(m, solver='ipopt')
-```  
+Pass arguments to [fokl_to_pyomo](#fokl_to_pyomo). If embedding a single GP in Pyomo rather than multiple, it is recommended to use this method to avoid importing an additional module in the run script.
 
 ##### save
 
@@ -505,7 +426,7 @@ solver.solve(m, solver='ipopt')
 filepath = model.save(filename=None, directory=None)
 ```
 
-Save a FoKL class as a file with extension '*.fokl*'.
+Save a FoKL class as a file with extension '*.fokl*'. If not saving where expected relative to the run script, ensure the terminal directory is set to that of the run script.
 
 Both inputs are optional. By default, ```filename``` is of the form '*model_yyyymmddhhmmss.fokl*' and is saved to the
 current directory. To change the directory, embed within ```filename``` or assign to ```directory``` if using the default ```filename``` format.
@@ -523,6 +444,35 @@ FoKLRoutines.load(filepath)
 | Output         | Type   | Description                               |
 |----------------|--------|-------------------------------------------|
 | ```filepath``` | string | absolute path to where the file was saved |
+
+### fokl_to_pyomo
+
+```python
+from FoKL.fokl_to_pyomo import fokl_to_pyomo
+m = fokl_to_pyomo(models, xvars, yvars, m=None, xfix=None, yfix=None, truescale=True, std=True, draws=None)
+```
+
+Embed GP's in Pyomo by automatically converting ```draws``` from FoKL models trained with or defined by the ```'Bernoulli Polynomials'``` kernel to symbolic expressions in a Pyomo model.
+
+Defining the Pyomo model's objective and any other constraints must be done outside of ```fokl_to_pyomo```. The user must then define an appropriate solver for the Pyomo model. The following is known to work for global optimization problems, which will likely be required for a problem using a GP model.
+```python
+solver = pyo.SolverFactory('multistart')
+solver.solve(m, solver='ipopt')
+```
+
+For documentation on the components of the Pyomo model automatically generated, see [*nomenclature_of_fokl_to_pyomo.ipynb*](docs/_dev/in_dev__nomenclature_of_fokl_to_pyomo.ipynb). The function arguments are as follows.
+
+| Input | Type | Description | Default |
+|---|---|---|---|
+| ```models``` | list of FoKL class objects | multiple FoKL models to be embedded in single Pyomo model | - |
+| ```xvars``` | list of lists of strings | strings are input variable names, and lists correspond to models | - |
+| ```yvars``` | list of strings | strings are output variable names corresponding to models | - |
+| ```m``` | Pyomo model | pre-existing Pyomo model if existing | ```pyo.ConcreteModel()``` |
+| ```xfix``` | list of lists of floats | floats are input variable values if known and to be fixed), and lists correspond to models | - |
+| ```yfix``` | list of floats | floats are output variable values (if known and to be fixed) corresponding to models | - |
+| ```truescale``` | list of lists of booleans | corresponding to the variables created by ```xvars```, set ```True``` to use true scale (i.e., un-normalized) values and set ```False``` to use normalized values; unless ```xvars``` is to correspond to the normalized input variables, leave blank | ```[[True, ..., True], ..., [True, ..., True]]``` |
+| ```std``` | list of booleans | set ```False``` if standard deviation of FoKL model (corresponding to position in list) is not needed so Pyomo model only defines mean | ```[[True, ..., True], ..., [True, ..., True]]``` |
+| ```draws``` | int | number of most recent draws to embed in Pyomo | ```model.draws``` |
 
 ### getKernels
 
@@ -542,7 +492,21 @@ from FoKL.GP_Integrate import GP_Integrate
 T, Y = GP_Integrate(betas, matrix, b, norms, phis, start, stop, y0, h, used_inputs)
 ```
 
-Integrate FoKL models of derivatives.
+Integrate FoKL models that were fitted to derivatives. Multiple models are able to be integrated simulatneously. Currently, only models trained on the "Cubic Splines" basis functions are supported.
+
+For example, training ```model1``` on $x = f(\dot{x}, b_1)$ and ```model2``` on $y = f(\dot{y}, b_2)$ is as usual. Then, to integrate the models with constants $(b_1, b_2)$ set to ```b``` and initial conditions $(x_0, y_0)$ set to ```y0```,
+
+```python
+betas1, mtx1, _ = model1.fit([xdot, b1], x)
+betas2, mtx2, _ = model2.fit([ydot, b2], y)
+
+T, Y = GP_integrate([np.mean(betas1, axis=0), np.mean(betas2, axis=0)], 
+                    [mtx1, mtx2], 
+                    [b1, b2], 
+                    ..., 
+                    [x0, y0], 
+                    ...)
+```
 
 | Input             | Description                                                                                                                                                                                                                                                                                                                                                                                                 |
 |-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -562,21 +526,21 @@ Integrate FoKL models of derivatives.
 | ```T``` | ```T``` is an array of the time steps the models are integrated at.                                  |
 | ```Y``` | ```Y``` is an array of the models that have been integrated, at the time steps contained in ```T```. |
 
-For example, if two models were being integrated, with 3 other inputs total
-and the 1st model used both models outputs as inputs and the 1st and 3rd additional
-inputs, while the 2nd model used its own output as an input and the 2nd
-and 3rd additional inputs,
+To demonstrate ```used_inputs```, suppose two models were being integrated with 3 other inputs total.
+The 1st model uses the output of both models as inputs; and, the 1st and 3rd additional
+inputs. The 2nd model uses its own output as an input; and, the 2nd
+and 3rd additional inputs. This yields
 ```python
 used_inputs = [[1, 1, 1, 0, 1], [0, 1, 0, 1, 0]]
 ```
 If the models created do not follow this ordering scheme for their inputs,
 the inputs can be rearranged based upon an alternate
 numbering scheme provided to ```used_inputs```. E.g., if the inputs need to be reordered then the 1st input should have a '1' in its place in the
-```used_inputs``` vector, the 2nd input should have a '2' and so on. Using the
-same example as before, if the 1st models inputs needed rearranged so that
-the 3rd additional input came first, followed by the two model outputs in
+```used_inputs``` vector, the 2nd input should have a '2', and so on. Using the
+same example as before, if the 1st model's inputs need to be rearranged so that
+the 3rd additional input comes first, followed by the two model outputs in
 the same order as they are in ```y0```, and ends with the 1st additional input,
-then the 1st cell in ```used_inputs``` would have the form ```[2, 3, 4, 0, 1]```.
+then the 1st list in ```used_inputs``` would be ```[2, 3, 4, 0, 1]```.
 
 ## Benchmarks and Papers
 
