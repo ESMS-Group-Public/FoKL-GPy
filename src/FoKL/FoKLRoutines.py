@@ -1,5 +1,5 @@
-from src.FoKL import getKernels
-
+from FoKL import getKernels
+from FoKL.fokl_to_pyomo import fokl_to_pyomo
 import os
 import sys
 # # -----------------------------------------------------------------------
