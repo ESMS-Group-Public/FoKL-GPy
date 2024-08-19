@@ -3,7 +3,7 @@
 # For Data Processing
 import numpy as np
 import pandas as pd
-from src.FoKL import FoKLRoutines
+from FoKL import FoKLRoutines
 
 # Create FoKL Object
 model = FoKLRoutines.FoKL()
