@@ -542,6 +542,17 @@ the 3rd additional input comes first, followed by the two model outputs in
 the same order as they are in ```y0```, and ends with the 1st additional input,
 then the 1st list in ```used_inputs``` would be ```[2, 3, 4, 0, 1]```.
 
+# Updating Models
+BSS ANOVA models can be updated as new data comes available. To perform this capability a few different hyperparameters can be defined for model updating methods
+| Hyper Paramter | Description | Necessary to define? |
+|----------|------------------------------------------------------------------------------------|--------------|
+| update | Removes variable selection functionality to allow for future updates of models | Yes |
+| sigsqd0 | ---- | Yes |
+| burn | How many draws to remove from prior betas model before new fitting | No, sets to 500 |
+| built | Boolean for if model has been previously built | Yes |
+
+Once the proper parameters are in place, models can be updated with each successive calling of ```model.fit``` and redefining of the inputs and data.
+
 ## Benchmarks and Papers
 
 As mentioned in [About FoKL](#about-fokl), the primary advantage offered by FoKL in comparison to other machine learning packages 
