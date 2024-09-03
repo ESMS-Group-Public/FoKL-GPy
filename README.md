@@ -1,4 +1,4 @@
-![FoKL-GPy Logo](docs/_static/fokl-gpy_banner.png)
+x![FoKL-GPy Logo](docs/_static/fokl-gpy_banner.png)
 
 --------------------------------------------------------------------------------
 
@@ -547,11 +547,11 @@ BSS ANOVA models can be updated as new data comes available. To perform this cap
 | Hyper Paramter | Description | Necessary to define? |
 |----------|------------------------------------------------------------------------------------|--------------|
 | update | Removes variable selection functionality to allow for future updates of models | Yes |
-| sigsqd0 | ---- | Yes |
+| sigsqd0 | initial sigma squared guess | Yes |
 | burn | How many draws to remove from prior betas model before new fitting | No, sets to 500 |
 | built | Boolean for if model has been previously built | Yes |
 
-Once the proper parameters are in place, models can be updated with each successive calling of ```model.fit``` and redefining of the inputs and data.
+Once the proper parameters are in place, models can be updated with each successive calling of ```model.fit``` and redefining of the inputs and data. See [a link](https://github.com/ESMS-Group-Public/FoKL-GPy/blob/Update/examples/sigmoid/updateSig.py) for an example
 
 ## Benchmarks and Papers
 
