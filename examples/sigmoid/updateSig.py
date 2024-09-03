@@ -77,7 +77,7 @@ model.fit()
 
 print('First Fit Completed')
 
-mean, bounds, rmse  = model.evaluate(inputs = x)
+mean = model.evaluate(inputs = x)
 
 # # Need to add test-betas[-1] because this is the constant value that doesn't get added in bss_eval
 df['prediction'] = (np.array(mean))
@@ -118,27 +118,20 @@ model.inputs = model.clean(x[5000:-1])
 model.fit()
 
 # Evaluation of new model
-mean= model.evaluate(inputs=x)
+mean = model.evaluate(inputs=x)
 
-# # Need to add test-betas[-1] because this is the constant value that doesn't get added in bss_eval
 df['prediction'] = (np.array(mean))
 
 fig = px.scatter_3d()
 
 fig.add_trace(go.Scatter3d(
-    x=df['x'][0:4999],
-    y=df['y'][0:4999],
-    z=df['data'][0:4999],
+    x=df['x'],
+    y=df['y'],
+    z=df['data'],
     mode='markers',
     name='Given'
 ))
-fig.add_trace(go.Scatter3d(
-    x=df['x'][5000:-1],
-    y=df['y'][5000:-1],
-    z=df['data'][5000:-1],
-    mode='markers',
-    name='Withheld'
-))
+
 fig.add_trace(go.Scatter3d(
     x=df['x'],
     y=df['y'],
