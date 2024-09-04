@@ -330,6 +330,7 @@ To govern what is passed to [evaluate](#evaluate):
 | ```inputs``` | -    | see ```model.inputs``` of [clean](#clean) | ```model.inputs``` |
 | ```data```   | -    | see ```model.data``` of [clean](#clean)   | ```model.data```   |
 | ```draws```  | -    | see ```draws``` of [FoKL](#fokl)          | ```model.draws```  |
+|``` nrmse```  | -    | normalized root mean square error         | False              |
 
 To govern basic plot controls:
 
