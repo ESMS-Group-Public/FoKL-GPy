@@ -585,7 +585,7 @@ Please reach out via the information in the [Contact Us](#contact-us) section wi
 
 | Topic                                            | Point of Contact | Email                                                         |
 |--------------------------------------------------|------------------|---------------------------------------------------------------|
-| Installation<br/>Troubleshooting<br/>Development | Jacob Krell      | [jpk0024@mix.wvu.edu](mailto:jpk0024@mix.wvu.edu)             |
+| Installation<br/>Troubleshooting<br/>Development | Nam Khuu      | [ntk00002@mix.wvu.edu](mailto:ntk00002@mix.wvu.edu)             |
 | Research<br/>Theory<br/>Other                    | David Mebane     | [david.mebane@mail.wvu.edu](mailto:david.mebane@mail.wvu.edu) |
 
 ## License
@@ -597,7 +597,7 @@ FoKL-GPy has an MIT license. Please see the [LICENSE](LICENSE) file.
 Please cite: K. Hayes, M.W. Fouts, A. Baheri and
 D.S. Mebane, "Forward variable selection enables fast and accurate
 dynamic system identification with Karhunen-Loève decomposed Gaussian
-processes", arXiv:2205.13676
+processes", PLoS ONE 19(9): e0309661.
 
 Credits: David Mebane (ideas and original code), Kyle Hayes
 (integrator), Derek Slack (Python porting), Jacob Krell (Python v3 dev.)
