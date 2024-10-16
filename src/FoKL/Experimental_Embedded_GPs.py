@@ -34,6 +34,12 @@ def inverse_gamma_pdf(y, alpha, beta):
     return pdf
                     
 class GP:
+    """
+    This class is for a GP object which represents a generalized mathematical function to be used inside of 
+    a given physics model.  This class does not store any information explicitly, but is rather used 
+    to provide a more friendly user API when writing to likelihood equation and interface with the
+    main Embedded_GP_Model object. 
+    """
     def __init__(self):
         """
         Initializes an instance of the GP (Gaussian Process) class. This constructor sets up
@@ -98,7 +104,7 @@ class GP:
         Args:
             inputs (jax.numpy.ndarray): The input data matrix where each row represents a different input instance.
                                         Assumed normalized from 0-1.
-            discmtx (jax.numpy.ndarray): Discriminative matrix that indicates which basis functions are active
+            discmtx (jax.numpy.ndarray): Interaction matrix that indicates which basis functions are active
                                         for each feature. Can be a scalar if the model has only one input.
             phis (jax.numpy.ndarray): Array containing spline coefficients. Each set of coefficients corresponds
                                     to a different basis function.
@@ -110,7 +116,7 @@ class GP:
                             shaped according to the input matrix.
 
         Notes:
-            This function constructs a feature matrix from the `inputs` by normalizing them and mapping them
+            This function constructs a feature matrix from the `inputs` by mapping them
             to their corresponding spline coefficients in `phis`. It then computes a transformation for each
             input feature, accumulating contributions from each basis function specified in `discmtx`. The
             result is a linear combination of these features weighted by the `betas`.
@@ -191,8 +197,8 @@ class GP:
        
 class Embedded_GP_Model:
     """
-    Manages multiple Gaussian Process (GP) models, allowing for physcial models
-    that involve multiple GP models simultaneously.
+    Manages multiple Gaussian Process (GP) models, allowing for physical models
+    that involve multiple GP models to be evaluate simultaneously.
 
     Attributes:
         GP (tuple of GaussianProcess): Stores the tuple of Gaussian Processes.
@@ -223,24 +229,6 @@ class Embedded_GP_Model:
         self.betas = jnp.ones(len(GP)*(len(self.discmtx)+1) + 1) # Add one for sigma sampling
         # self.sigma_alpha = 2
         # self.sigma_beta = 0.01
-
-    def splineconvert500(self,A):
-        """
-        Same as splineconvert, but for a larger basis of 500
-        """
-
-        coef = np.loadtxt(A)
-
-        phi = []
-        for i in range(500):
-            a = coef[i * 499:(i + 1) * 499, 0]
-            b = coef[i * 499:(i + 1) * 499, 1]
-            c = coef[i * 499:(i + 1) * 499, 2]
-            d = coef[i * 499:(i + 1) * 499, 3]
-
-            phi.append([a, b, c, d])
-
-        return phi        
 
     def GP_Processing(self):
         """
@@ -342,14 +330,11 @@ class Embedded_GP_Model:
         # Calculate neg log likelihood
         error = self.data - results
         ln_variance = betas[-1]
-        log_likelihood = 0.5 * jnp.log(2 * jnp.pi * jnp.exp(ln_variance)) + (error ** 2 / (2 * jnp.exp(ln_variance)))
-        log_prior = -jnp.log(jax.scipy.stats.multivariate_normal.pdf(betas[:-1], jnp.zeros((len(self.betas) - 1)), 1000*jnp.eye((len(self.betas) - 1))))#/(len(self.betas) - 1)
-        # log_sigma_prior = -jnp.log(inverse_gamma_pdf(jnp.exp(betas[-1]), 4.0, 0.05))
-        # jax.debug.print("log_sigma_prior: {}", log_sigma_prior)
-        # log_posterior = log_likelihood + log_prior + log_sigma_prior
-        # Calculate varaince prior (Will be used in future Calculations)
+        neg_log_likelihood = 0.5 * jnp.log(2 * jnp.pi * jnp.exp(ln_variance)) + (error ** 2 / (2 * jnp.exp(ln_variance)))
+        neg_log_prior = -jnp.log(jax.scipy.stats.multivariate_normal.pdf(betas[:-1], jnp.zeros((len(self.betas) - 1)), 1000*jnp.eye((len(self.betas) - 1))))
+        # Calculate variance prior (Will be used in future Calculations)
         # neg_log_ln_p_variance = -jnp.log(inverse_gamma_pdf(jnp.exp(ln_variance), alpha = self.sigma_alpha, beta = self.sigma_beta))
-        return jnp.sum(log_likelihood) + log_prior # + log_sigma_prior
+        return jnp.sum(neg_log_likelihood) + neg_log_prior # + neg_log_ln_p_variance
     
     def d_neg_log_likelihood_create(self):
         """
@@ -479,7 +464,9 @@ class Embedded_GP_Model:
         self.jit_HMC = jit(self.HMC)
     
     def leapfrog(self, theta, r, grad, epsilon, f, Cov_Matrix):
-        """ Perfom a leapfrog jump in the Hamiltonian space
+        """ 
+        This function is a part of this GitHub Repo: https://github.com/mfouesneau/NUTS/tree/master
+        Perfom a leapfrog jump in the Hamiltonian space
         INPUTS
         ------
         theta: ndarray[float, ndim=1]
@@ -512,10 +499,8 @@ class Embedded_GP_Model:
         # make half step in r
         rprime = r + 0.5 * epsilon * grad
         # make new step in theta
-        # Something is wrong here I think?? Theta prime is very large. Should M_inv be just M?
         thetaprime = theta + epsilon * (Cov_Matrix @ rprime.reshape(-1, 1)).flatten()
         #compute new gradient
-        # Limitation on variance
         logpprime, gradprime = f(thetaprime)
         # make half step in r again
         rprime = rprime + 0.5 * epsilon * gradprime
@@ -523,6 +508,7 @@ class Embedded_GP_Model:
 
     def find_reasonable_epsilon(self, theta0, key):
         """ 
+        This function is a part of this GitHub Repo: https://github.com/mfouesneau/NUTS/tree/master
         Heuristic for choosing an initial value of epsilon.
         Algorithm 4 from original paper 
         """
@@ -531,16 +517,13 @@ class Embedded_GP_Model:
         
         logp0, grad0 = f(theta0)
         epsilon = 1.
-        # Initial Momentum
         mean = jnp.zeros(len(self.M))
         key, subkey = random.split(key)
         r0 = random.multivariate_normal(key, mean, self.M)
 
         # Figure out what direction we should be moving epsilon.
         _, rprime, gradprime, logpprime = self.leapfrog(theta0, r0, grad0, epsilon, f, self.Cov_Matrix)
-        # brutal! This trick make sure the step is not huge leading to infinite
-        # values of the likelihood. This could also help to make sure theta stays
-        # within the prior domain (if any)
+
         def cond_fun(k):
             _, _, gradprime, logpprime = self.leapfrog(theta0, r0, grad0, epsilon * k, f, self.Cov_Matrix)
             is_inf = jnp.isinf(logpprime) | jnp.isinf(gradprime).any()
@@ -566,7 +549,6 @@ class Embedded_GP_Model:
 
         def cond_fun(carry):
             epsilon, logacceptprob = carry
-            # jax.debug.print("Log Acceptance Probability: {}", logacceptprob )
             return a * logacceptprob > -a * jnp.log(2.)
 
         def body_fun(carry):
@@ -716,7 +698,6 @@ class Embedded_GP_Model:
         
         def perms(x):
             """Python equivalent of MATLAB perms."""
-            # from https://stackoverflow.com/questions/38130008/python-equivalent-for-matlabs-perms
             a = jnp.array(jnp.vstack(list(itertools.permutations(x)))[::-1])
             return a
 
