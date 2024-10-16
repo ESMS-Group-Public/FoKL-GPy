@@ -343,11 +343,13 @@ class Embedded_GP_Model:
         error = self.data - results
         ln_variance = betas[-1]
         log_likelihood = 0.5 * jnp.log(2 * jnp.pi * jnp.exp(ln_variance)) + (error ** 2 / (2 * jnp.exp(ln_variance)))
-        log_prior = jnp.log(jax.scipy.stats.multivariate_normal.pdf(betas[:-1], jnp.zeros((len(self.betas) - 1)), 1000*jnp.eye((len(self.betas) - 1))))/(len(self.betas) - 1)
-        log_posterior = log_likelihood + log_prior
+        log_prior = -jnp.log(jax.scipy.stats.multivariate_normal.pdf(betas[:-1], jnp.zeros((len(self.betas) - 1)), 1000*jnp.eye((len(self.betas) - 1))))#/(len(self.betas) - 1)
+        # log_sigma_prior = -jnp.log(inverse_gamma_pdf(jnp.exp(betas[-1]), 4.0, 0.05))
+        # jax.debug.print("log_sigma_prior: {}", log_sigma_prior)
+        # log_posterior = log_likelihood + log_prior + log_sigma_prior
         # Calculate varaince prior (Will be used in future Calculations)
         # neg_log_ln_p_variance = -jnp.log(inverse_gamma_pdf(jnp.exp(ln_variance), alpha = self.sigma_alpha, beta = self.sigma_beta))
-        return jnp.sum(log_posterior)
+        return jnp.sum(log_likelihood) + log_prior # + log_sigma_prior
     
     def d_neg_log_likelihood_create(self):
         """
@@ -676,16 +678,16 @@ class Embedded_GP_Model:
 
             # To make epsilon adaptive, modify based on acceptance rate (ideal 65% per paper)
             if (i+1) % 50 == 0:
-                if sum(acceptance_array[i-50:i]) < 20:
+                if sum(acceptance_array[i-50:i]) < 15:
                     self.epsilon = self.epsilon*0.5
                     print('Massive Decrease to Epsilon')
-                if sum(acceptance_array[i-50:i]) < 40 and sum(acceptance_array[i-50:i]) >= 20:
+                if sum(acceptance_array[i-50:i]) < 30 and sum(acceptance_array[i-50:i]) >= 15:
                     self.epsilon = self.epsilon*0.8
                     print('Decreased Epsilon')
-                if sum(acceptance_array[i-50:i]) > 40 and sum(acceptance_array[i-50:i]) <= 48:
+                if sum(acceptance_array[i-50:i]) > 30 and sum(acceptance_array[i-50:i]) <= 45:
                     self.epsilon = self.epsilon*1.2
                     print('Increased Epsilon')
-                if sum(acceptance_array[i-50:i]) > 48:
+                if sum(acceptance_array[i-50:i]) > 45:
                     self.epsilon = self.epsilon*1.5
                     print('Massive Increase to Epsilon')
 
