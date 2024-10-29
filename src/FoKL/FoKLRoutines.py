@@ -1,3 +1,5 @@
+from multiprocessing.managers import Value
+
 from FoKL import getKernels
 from FoKL.fokl_to_pyomo import fokl_to_pyomo
 import os
@@ -243,6 +245,8 @@ class FoKL:
         # Store values as class attributes:
         for key, value in current.items():
             setattr(self, key, value)
+
+        self.setnos = None # draw random selection
 
     def _format(self, inputs, data=None, AutoTranspose=True, SingleInstance=False, bit=64):
         """
@@ -581,7 +585,8 @@ class FoKL:
 
         phind = phind - 1
         xsm = np.array(l_phis * inputs - phind, dtype=inputs.dtype)
-
+        if np.max(phind) > 499 or np.min(phind) < 0:
+            raise ValueError('Inputs are not normalized correctly, try calling clean=True within evaluate to evaluate with normalization of model training')
         return X, phind, xsm
 
     def bss_derivatives(self, **kwargs):
@@ -841,7 +846,7 @@ class FoKL:
 
         return basis
 
-    def evaluate(self, inputs=None, betas=None, mtx=None, **kwargs):
+    def evaluate(self, inputs=None, betas=None, mtx=None, avgbetas=False, **kwargs):
         """
         Evaluate the FoKL model for provided inputs and (optionally) calculate bounds. Note 'evaluate_fokl' may be a
         more accurate name so as not to confuse this function with 'evaluate_basis', but it is unexpected for a user to
@@ -866,7 +871,7 @@ class FoKL:
                              # For '_format':
                              'AutoTranspose': True, 'SingleInstance': False, 'bit': 64,
                              # For '_normalize':
-                             'normalize': True, 'minmax': None, 'pillow': None, 'pillow_type': 'percent'}
+                             'normalize': True, 'minmax': self.minmax, 'pillow': None, 'pillow_type': 'percent'}
         current = _process_kwargs(_merge_dicts(default, default_for_clean), kwargs)
         for boolean in ['clean', 'ReturnBounds']:
             current[boolean] = _str_to_bool(current[boolean])
@@ -879,12 +884,15 @@ class FoKL:
             warnings.warn("'draws' must be greater than or equal to 40 if calculating bounds. Setting 'draws=40'.")
         draws = current['draws']  # define local variable
         if betas is None:  # default
-            if draws > self.betas.shape[0]:
-                draws = self.betas.shape[0]  # more draws than models results in inf time, so threshold
-                self.draws = draws
-                warnings.warn("Updated attribute 'self.draws' to equal number of draws in 'self.betas'.",
-                              category=UserWarning)
-            betas = self.betas[-draws::, :]  # use samples from last models
+            if avgbetas:
+                betas = self.avg_betas
+            else:
+                if draws > self.betas.shape[0]:
+                    draws = self.betas.shape[0]  # more draws than models results in inf time, so threshold
+                    self.draws = draws
+                    warnings.warn("Updated attribute 'self.draws' to equal number of draws in 'self.betas'.",
+                                  category=UserWarning)
+                betas = self.betas[-draws::, :]  # use samples from last models
         else:  # user-defined betas may need to be formatted
             betas = np.array(betas)
             if betas.ndim == 1:
@@ -915,8 +923,8 @@ class FoKL:
         else:  # user-defined 'inputs'
             if not current['clean']:  # assume provided inputs are already formatted and normalized
                 normputs = inputs
-                if current['_suppress_normalization_warning'] is False:  # to suppress warning when evaluate called from coverage3
-                    warnings.warn("User-provided 'inputs' but 'clean=False'. Subsequent errors may be solved by enabling automatic formatting and normalization of 'inputs' via 'clean=True'.", category=UserWarning)
+                # if current['_suppress_normalization_warning'] is False:  # to suppress warning when evaluate called from coverage3
+                #     warnings.warn("User-provided 'inputs' but 'clean=False'. Subsequent errors may be solved by enabling automatic formatting and normalization of 'inputs' via 'clean=True'.", category=UserWarning)
         if current['clean']:
             normputs = self.clean(inputs, kwargs_from_other=kwargs_to_clean)
         elif inputs is None:
@@ -925,17 +933,14 @@ class FoKL:
             normputs = np.array(inputs)
 
         m, mbets = np.shape(betas)  # Size of betas
-        n, mputs = np.shape(normputs)  # Size of normalized inputs
+        n = np.shape(normputs)[0] # Size of normalized inputs
+        mputs = int(np.size(normputs)/n)
 
-        setnos_p = np.random.randint(m, size=(1, draws))  # Random draws  from integer distribution
-        i = 1
-        while i == 1:
-            setnos = np.unique(setnos_p)
-
-            if np.size(setnos) == np.size(setnos_p):
-                i = 0
-            else:
-                setnos_p = np.append(setnos, np.random.randint(m, size=(1, draws - np.shape(setnos)[0])))
+        if self.setnos is None:
+            setnos = np.random.choice(m,draws,replace=False) # random draw selection
+            self.setnos = setnos
+        else:
+            setnos = self.setnos
 
         X = np.zeros((n, mbets))
         normputs = np.asarray(normputs)
@@ -1716,6 +1721,7 @@ class FoKL:
             mtx = damtx
 
         self.betas = betas[-self.draws::, :]  # discard 'burnin' draws by only keeping last 'draws' draws
+        self.avg_betas = np.mean(self.betas, axis=0)
         self.mtx = mtx
         self.evs = evs
 
