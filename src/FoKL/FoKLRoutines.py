@@ -1,7 +1,4 @@
-from multiprocessing.managers import Value
-
 from FoKL import getKernels
-from FoKL.fokl_to_pyomo import fokl_to_pyomo
 import os
 import sys
 # # -----------------------------------------------------------------------
@@ -1763,6 +1760,13 @@ class FoKL:
 
     def to_pyomo(self, xvars, yvars, m=None, xfix=None, yfix=None, truescale=True, std=True, draws=None):
         """Passes arguments to external function. See 'fokl_to_pyomo' for more documentation."""
+        try:
+            import pyomo.environ as pyo
+        except ImportError:
+            raise ImportError(
+                "Pyomo must be installed to use this method. try pip install FoKL[pyomo] or pip install pyomo directly"
+            )
+        from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
         return fokl_to_pyomo(self, xvars, yvars, m, xfix, yfix, truescale, std, draws)
 
     def save(self, filename=None, directory=None):
