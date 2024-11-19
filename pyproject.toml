@@ -17,9 +17,12 @@ classifiers = [
 dependencies = [
     "requests",
     'importlib-metadata; python_version<"3.8"',
-    "Pyomo >= 6.7.0",
     "NumPy < 2.0.0",  # Pyomo uses 'float_' which was removed in NumPy 2.0
     "pandas",
     "matplotlib"
 ]
+
 dynamic = ["version"]
+
+[project.optional-dependencies]
+pyomo = ["Pyomo >= 6.7.0"]
