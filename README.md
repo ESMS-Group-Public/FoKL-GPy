@@ -414,6 +414,10 @@ model.clear(all=True)
 ```
 
 ##### to_pyomo
+FoKL models can be converted to pyomo. If you want to use pyomo, you can either install the package directly or
+```python
+pip install FoKL[pyomo]
+```
 
 ```python
 m = model.to_pyomo(xvars, yvars, m=None, xfix=None, yfix=None, truescale=True, std=True, draws=None)
