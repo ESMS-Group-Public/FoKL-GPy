@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import time
 import pickle
 import copy
+import jax
 
 
 def load(filename, directory=None):
@@ -964,6 +965,7 @@ class FoKL:
                 X[i, j] = phi
 
         X[:, 0] = np.ones((n,))
+        self.X = X
         modells = np.zeros((n, draws))  # note n == np.shape(data)[0] if data != 'ignore'
         for i in range(draws):
             modells[:, i] = np.transpose(np.matmul(X, np.transpose(np.array(betas[setnos[i], :]))))
@@ -1407,8 +1409,8 @@ class FoKL:
                 X = Xin
             else:
                 X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
-
-            for i in range(minp):  # for datapoint in training datapoints
+            #
+            # for i in range(minp):  # for datapoint in training datapoints
 
                 # ------------------------------
                 # [IN DEVELOPMENT] PRINT PERCENT COMPLETION TO CONSOLE (reported to cause significant delay):
@@ -1423,32 +1425,65 @@ class FoKL:
                 # [END]
                 # ----------------------------
                 
-                for j in range(nxin, mmtx + 1):
-                    null, nxin2 = np.shape(X)
-                    if j == nxin2:
-                        X = np.append(X, np.zeros((minp, 1)), axis=1)
+                # for j in range(nxin, mmtx + 1):
+                #     null, nxin2 = np.shape(X)
+                #     if j == nxin2:
+                #         X = np.append(X, np.zeros((minp, 1)), axis=1)
+                #
+                #     phi = 1
+                #
+                #     for k in range(ninp):  # for input var in input vars
+                #
+                #         if np.shape(discmtx) == ():
+                #             num = discmtx
+                #         else:
+                #             num = discmtx[j - 1][k]
+                #
+                #         if num != 0:  # enter if loop if num is nonzero
+                #             nid = int(num - 1)
+                #
+                #             # Evaluate basis function:
+                #             if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
+                #                 coeffs = [phis[nid][order][phind[i, k]] for order in range(4)]  # coefficients for cubic
+                #             elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
+                #                 coeffs = phis[nid]  # coefficients for bernoulli
+                #             phi = phi * self.evaluate_basis(coeffs, xsm[i, k])  # multiplies phi(x0)*phi(x1)*etc.
+                #
+                #     X[i][j] = phi
 
-                    phi = 1
+            phind = jax.numpy.ceil(inputs * 499)
+            sett = (phind == 0)
+            phind = phind + sett
+            xsm = 499 * inputs - phind + 1
+            phind = phind.astype(int) - 1
+            def logD_func(phis, phind, X, num):
+                def true_branch(_):
+                    nid = num - 1
+                    return phis[nid][0][phind] + phis[nid][1][phind] * X + phis[nid][2][phind] * X ** 2 + phis[nid][3][
+                        phind] * X ** 3
 
-                    for k in range(ninp):  # for input var in input vars
+                def false_branch(_):
+                    return 1.0
 
-                        if np.shape(discmtx) == ():
-                            num = discmtx
-                        else:
-                            num = discmtx[j - 1][k]
+                return jax.lax.cond(num > 0, true_branch, false_branch, operand=None)
 
-                        if num != 0:  # enter if loop if num is nonzero
-                            nid = int(num - 1)
-
-                            # Evaluate basis function:
-                            if self.kernel == self.kernels[0]:  # == 'Cubic Splines':
-                                coeffs = [phis[nid][order][phind[i, k]] for order in range(4)]  # coefficients for cubic
-                            elif self.kernel == self.kernels[1]:  # == 'Bernoulli Polynomials':
-                                coeffs = phis[nid]  # coefficients for bernoulli
-                            phi = phi * self.evaluate_basis(coeffs, xsm[i, k])  # multiplies phi(x0)*phi(x1)*etc.
-
-                    X[i][j] = phi
-
+                #
+                # def logD_func(phis, phind, X, num, bet):
+                #     nid = num
+                #     return phis[nid][0][phind] + phis[nid][1][phind] * X + phis[nid][2][phind] * X ** 2 + phis[nid][3][
+                #             phind] * X ** 3
+            phis = jax.numpy.array(phis)
+            aaa = jax.vmap(logD_func, in_axes=(None, 0, 0, 0))
+            bbb = jax.vmap(
+                aaa,
+                in_axes=(None, None, None, 0)  # This maps over rows of phind and X
+            )
+            ccc = jax.vmap(
+                bbb,
+                in_axes=(None, 0, 0, None)  # This maps over columns of phind and X
+            )
+            X_vec = jax.numpy.prod(ccc(phis, phind, xsm, discmtx.astype(int)), axis=2)
+            X = np.hstack([np.ones((minp, 1)), X_vec])
             # # initialize tausqd at the mode of its prior: the inverse of the mode of sigma squared, such that the
             # # initial variance for the betas is 1
             # sigsqd = b / (1 + a)
@@ -1474,43 +1509,34 @@ class FoKL:
 
             atau_star = atau + mmtx / 2
 
+
             # Gibbs iterations
 
-            betas = np.zeros((draws, mmtx + 1))
+            o_betas = np.zeros((draws, mmtx + 1))
             sigs = np.zeros((draws, 1))
             taus = np.zeros((draws, 1))
             lik = np.zeros((draws, 1))
 
-            for k in range(draws):
+            Lamb_tausqd = np.diag(Lamb) + (1 / tausqd) * np.identity(mmtx + 1)
+            Lamb_tausqd_inv = np.diag(1 / np.diag(Lamb_tausqd))
 
-                Lamb_tausqd = np.diag(Lamb) + (1 / tausqd) * np.identity(mmtx + 1)
-                Lamb_tausqd_inv = np.diag(1 / np.diag(Lamb_tausqd))
+            mun = Q.dot(Lamb_tausqd_inv).dot(np.transpose(Q)).dot(Xty)
+            S = Q.dot(np.diag(np.diag(Lamb_tausqd_inv) ** (1 / 2)))
 
-                mun = Q.dot(Lamb_tausqd_inv).dot(np.transpose(Q)).dot(Xty)
-                S = Q.dot(np.diag(np.diag(Lamb_tausqd_inv) ** (1 / 2)))
+            vec = np.random.normal(loc=0, scale=1, size=(mmtx + 1, draws))
 
-                vec = np.random.normal(loc=0, scale=1, size=(mmtx + 1, 1))  # drawing from normal distribution
-                betas[k][:] = np.transpose(mun + sigsqd ** (1 / 2) * (S).dot(vec))
+            def beta_func(sigsqd, S, mun, vec, mmtx):
+                return jax.numpy.transpose(mun + sigsqd ** (1 / 2) * jax.numpy.dot(S, jax.numpy.reshape(vec, [mmtx + 1, 1])))
 
-                vecc = mun - np.reshape(betas[k][:], (len(betas[k][:]), 1))
+            def stack(betas):
+                return
 
-                bstar = b + 0.5 * (betas[k][:].dot(XtX.dot(np.transpose([betas[k][:]]))) - 2 * betas[k][:].dot(Xty) +
-                                   dtd + betas[k][:].dot(np.transpose([betas[k][:]])) / tausqd)
-                # bstar = b + comp1.dot(comp2) + 0.5 * dtd - comp3;
+            beta_map = jax.vmap(beta_func,in_axes=(None, None, None, 1, None),out_axes=0)
 
-                # Returning a 'not a number' constant if bstar is negative, which would
-                # cause np.random.gamma to return a ValueError
-                if bstar < 0:
-                    sigsqd = math.nan
-                else:
-                    sigsqd = 1 / np.random.gamma(astar, 1 / bstar)
+            betas = jax.numpy.reshape(beta_map(sigsqd, S, mun, vec, mmtx),[draws,mmtx+1])
 
-                sigs[k] = sigsqd
-
-                btau_star = (1/(2*sigsqd)) * (betas[k][:].dot(np.reshape(betas[k][:], (len(betas[k][:]), 1)))) + btau
-
-                tausqd = 1 / np.random.gamma(atau_star, 1 / btau_star)
-                taus[k] = tausqd
+            for k in range(draws):  # drawing from normal distribution
+                o_betas[k][:] = np.transpose(mun + sigsqd ** (1 / 2) * (S).dot(np.reshape(vec[:, k], [mmtx + 1, 1])))
 
             # Calculate the evidence
             siglik = np.var(data - np.matmul(X, betahat))
