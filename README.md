@@ -37,6 +37,11 @@ Some other advantages of FoKL include:
 
 To read more about FoKL, please see the [Benchmarks and Papers](#benchmarks-and-papers) section.
 
+Versions:
+- FoKL
+- FoKL['pyomo']
+- FoKL['JAX']
+
 ## Installation and Setup
 
 From your command-line terminal, FoKL is available through PyPI:
@@ -306,6 +311,16 @@ Evaluate the FoKL model for provided inputs and (optionally) calculate bounds.
 | ```ReturnBounds``` | boolean | return 95% confidence bounds as second output if true                                                                          | ```False```       |
 
 If ```clean=True```, then any keywords documented for [clean](#clean) may be used here.
+
+Evaluation can now be completed with JAX, utilizing parrellziation to increase the evaluation time in models with either large mtx matrix or large amount of instances evaluated. To call this, ensure you have JAX installed, this can be done manually or by installing the JAX optional dependency version of FoKL. Then import the evaluate functions into your workspace with:
+
+
+```python
+from JAX_EVAL import *
+```
+
+next in place of the normal ```model.evaluate(**kwaargs)``` call use ```evaluate(model, ***kwaargs)```
+
 
 | Output                  | Type                 | Description                                                                                                                                                                                                           |
 |-------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
