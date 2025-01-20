@@ -27,3 +27,4 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 pyomo = ["Pyomo >= 6.7.0"]
+JAX = ["JAX"]
