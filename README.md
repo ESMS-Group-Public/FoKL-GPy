@@ -312,6 +312,12 @@ Evaluate the FoKL model for provided inputs and (optionally) calculate bounds.
 
 If ```clean=True```, then any keywords documented for [clean](#clean) may be used here.
 
+
+| Output                  | Type                 | Description                                                                                                                                                                                                           |
+|-------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ```mean```              | $n \times 1$ ndarray | prediction of $\overline{y}$ in $\overline{y}=f(\overline{x}_1,...,\overline{x}_m)$ for provided ```inputs```; prediction of ```model.data``` defined in [clean](#clean) by default (i.e., ```inputs=model.inputs```) |
+| ```bounds``` (optional) | $n \times 2$ ndarray | upper and lower bounds for 95% confidence interval of predicting; returned if ```ReturnBounds=True```                                                                                                                 |
+
 Evaluation can now be completed with JAX, utilizing parrellziation to increase the evaluation time in models with either large mtx matrix or large amount of instances evaluated. To call this, ensure you have JAX installed, this can be done manually or by installing the JAX optional dependency version of FoKL. Then import the evaluate functions into your workspace with:
 
 
@@ -322,10 +328,6 @@ from JAX_EVAL import *
 next in place of the normal ```model.evaluate(**kwaargs)``` call use ```evaluate(model, ***kwaargs)```
 
 
-| Output                  | Type                 | Description                                                                                                                                                                                                           |
-|-------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ```mean```              | $n \times 1$ ndarray | prediction of $\overline{y}$ in $\overline{y}=f(\overline{x}_1,...,\overline{x}_m)$ for provided ```inputs```; prediction of ```model.data``` defined in [clean](#clean) by default (i.e., ```inputs=model.inputs```) |
-| ```bounds``` (optional) | $n \times 2$ ndarray | upper and lower bounds for 95% confidence interval of predicting; returned if ```ReturnBounds=True```                                                                                                                 |
 
 ##### coverage3
 
