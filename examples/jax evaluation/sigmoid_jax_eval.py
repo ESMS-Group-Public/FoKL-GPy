@@ -7,7 +7,7 @@ perform some very basic post-processing with a 'coverage3' plot and included RMS
 """
 import timeit
 
-from src.FoKL import FoKLRoutines
+from FoKL import FoKLRoutines
 import os
 dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
 # # -----------------------------------------------------------------------
@@ -17,7 +17,7 @@ dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
 # from src.FoKL import FoKLRoutines
 # # -----------------------------------------------------------------------
 import numpy as np
-from src.FoKL.JAX_Eval import *
+from FoKL.JAX_Eval import *
 import matplotlib.pyplot as plt
 
 
