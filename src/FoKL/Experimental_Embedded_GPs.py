@@ -3,16 +3,18 @@
 from FoKL import getKernels
 import itertools
 import numpy as np
+from numpy import random
+
 
 # Jax for data processing
 import jax
 import jax.numpy as jnp
 from jax import grad
-from jax import random
-from jax import jit
+# from jax import random
+# from jax import jit
 from jax.lax import fori_loop, cond, while_loop
 from jax import lax
-from jax.scipy.special import gamma
+# from jax.scipy.special import gamma
 
 def inverse_gamma_pdf(y, alpha, beta):
     """
@@ -27,10 +29,10 @@ def inverse_gamma_pdf(y, alpha, beta):
     float or array-like: The PDF value(s) at y.
     """
     # Ensure y is a JAX array for compatibility
-    y = jnp.array(y)
+    y = np.array(y)
     
     # Calculate the PDF of the inverse gamma distribution
-    pdf = (beta ** alpha / gamma(alpha)) * y ** (-alpha - 1) * jnp.exp(-beta / y)
+    pdf = (beta ** alpha / gamma(alpha)) * y ** (-alpha - 1) * np.exp(-beta / y)
     return pdf
                     
 class GP:
@@ -83,9 +85,9 @@ class GP:
         """
 
         L_phis = len(phis[0][0])  # length of coeff. in basis funtions
-        phind = jnp.array(jnp.ceil(inputs * L_phis), dtype=int)  # 0-1 normalization to 0-499 normalization
+        phind = np.array(np.ceil(inputs * L_phis), dtype=int)  # 0-1 normalization to 0-499 normalization
 
-        phind = jnp.expand_dims(phind, axis=-1) if phind.ndim == 1 else phind
+        phind = np.expand_dims(phind, axis=-1) if phind.ndim == 1 else phind
 
         set = (phind == 0)  # set = 1 if phind = 0, otherwise set = 0
         phind = phind + set
@@ -132,69 +134,74 @@ class GP:
         """
 
         # building the matrix by calculating the corresponding basis function outputs for each set of inputs
-        minp, ninp = jnp.shape(inputs)
+        minp, ninp = np.shape(inputs)
+        normputs = inputs
+        mtx = discmtx
 
-        if jnp.shape(discmtx) == ():  # part of fix for single input model
+        if np.shape(discmtx) == ():  # part of fix for single input model
             mmtx = 1
         else:
-            mmtx, null = jnp.shape(discmtx)
+            mmtx, null = np.shape(discmtx)
 
-        # if jnp.size(Xin) == 0:
-        Xin = jnp.ones((minp, 1))
-        mxin, nxin = jnp.shape(Xin)
+        # if np.size(Xin) == 0:
+        Xin = np.ones((minp, 1))
+        mxin, nxin = np.shape(Xin)
         
         if mmtx - nxin < 0:
             X = Xin
         else:
-            X = jnp.append(Xin, jnp.zeros((minp, mmtx - nxin)), axis=1)
+            X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
 
-        phind, xsm = self.inputs_to_phind(inputs=inputs, phis=phis)
+        n = jnp.shape(normputs)[0]  # Size of normalized inputs
 
-        null, nxin2 = jnp.shape(X)
-        additional_cols = max(0, mmtx + 1 - nxin2)
-        X = jnp.concatenate((X, jnp.zeros((minp, additional_cols))), axis=1)
+        normputs = jnp.asarray(normputs)
+        phis = jnp.array(phis)
+        mtx = jnp.array(mtx)
 
-        def body_fun_k(k, carry):
-            i, j, phi_j = carry
-            num = discmtx[j - 1, k] if discmtx.ndim > 1 else discmtx
-            # Define the operation to perform if num is not zero
-            def true_fun(_):
-                nid = num - 1
-                term = (phis[nid, 0, phind[i, k]] +
-                        phis[nid, 1, phind[i, k]] * xsm[i, k] +
-                        phis[nid, 2, phind[i, k]] * xsm[i, k] ** 2 +
-                        phis[nid, 3, phind[i, k]] * xsm[i, k] ** 3)
-                return phi_j * term
+        phind = jnp.ceil(normputs * 499)
+        sett = (phind == 0)
+        phind = phind + sett
+        X = 499 * normputs - phind + 1
+        phind = phind.astype(int) - 1
 
-            # Define the operation to perform if num is zero
-            def false_fun(_):
-                return phi_j
+        A = jnp.array([1, 2, 3])
 
-            # Using lax.cond to conditionally execute true_fun or false_fun
-            phi_j = lax.cond(num != 0, true_fun, false_fun, None)
-            
-            return (i, j, phi_j)
+        X_sc = np.stack([X ** a for a in A], axis=2)
 
-        def body_fun_j(j, carry):
-            i, X = carry
-            phi_j_initial = 1.0
-            # Carry includes `j` to be accessible inside body_fun_k
-            carry_initial = (i, j, phi_j_initial)
-            carry = lax.fori_loop(0, ninp, body_fun_k, carry_initial)
-            _, _, phi_j = carry  # Unpack the final carry to get phi_j
-            X = X.at[i, j].set(phi_j)
-            return (i, X)
-        
-        def body_fun_i(i, X):
-            carry_initial = (i, X)
-            _, X = lax.fori_loop(nxin, mmtx + 1, body_fun_j, carry_initial)
-        
-            return X
+        def cubic_func(phis, phind, X, num, bet):
 
-        X = lax.fori_loop(0, minp, body_fun_i, X)
-        prediction = jnp.matmul(X, betas)
+            return jax.numpy.where(
+                num > 0,
+                phis[num - 1][0][phind]
+                + phis[num - 1][1][phind] * X[0]
+                + phis[num - 1][2][phind] * X[1]
+                + phis[num - 1][3][phind] * X[2],
+                1.0
+            )
+
+        map_inputs = jax.vmap(cubic_func, in_axes=(None, 0, 0, 0, None))
+        map_dimensions = jax.vmap(
+            map_inputs,
+            in_axes=(None, None, None, 0, 1)  # This maps over rows of phind and X
+        )
+        map_instances = jax.vmap(
+            map_dimensions,
+            in_axes=(None, 0, 0, None, None)  # This maps over columns of phind and X
+        )
+        X_vec = jax.numpy.prod(map_instances(phis, phind, X_sc, mtx.astype(int), betas[:, 1:]), axis=2)
+
+        X = np.hstack([np.ones((n, 1)), X_vec])
+
+        def batched_matmul(X, betas):
+            return jax.numpy.transpose(jax.numpy.matmul(X, jax.numpy.transpose(betas)))
+
+        jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
+        modells = jfunc(X, betas)
+        prediction = jax.numpy.mean(modells, axis=1)
+
         return prediction   
-       
+
+
 class Embedded_GP_Model:
     """
     Manages multiple Gaussian Process (GP) models, allowing for physical models
@@ -222,11 +229,10 @@ class Embedded_GP_Model:
         """
         # Define critical parameters
         self.GP = GP
-        self.key = random.PRNGKey(0)
         # Define placeholder values needed for GP_Processing to run when the 
         # set_equation function is ran.
-        self.discmtx = jnp.array([[1]])
-        self.betas = jnp.ones(len(GP)*(len(self.discmtx)+1) + 1) # Add one for sigma sampling
+        self.discmtx = np.array([[1]])
+        self.betas = np.ones(len(GP)*(len(self.discmtx)+1) + 1).reshape(-1,1) # Add one for sigma sampling
         # self.sigma_alpha = 2
         # self.sigma_beta = 0.01
 
@@ -257,10 +263,10 @@ class Embedded_GP_Model:
         betas_list = self.betas[:-1].reshape(num_functions,num_betas)
 
         # Evaluate GPs and save results into matrix of size [# of GPs, # of inputs]
-        GP_results = jnp.empty((0,len(self.inputs)))
+        GP_results = np.empty((0,len(self.inputs)))
         for idx, _ in enumerate (self.GP):
-              result = self.GP[idx].GP_eval(self.inputs, self.discmtx, jnp.array(self.phis), betas_list[idx])
-              GP_results = jnp.append(GP_results, result.reshape(1, -1), axis=0)
+              result = self.GP[idx].GP_eval(self.inputs, self.discmtx, np.array(self.phis), betas_list[idx])
+              GP_results = np.append(GP_results, result.reshape(1, -1), axis=0)
 
         self.Processed_GPs = GP_results
     
@@ -285,7 +291,7 @@ class Embedded_GP_Model:
             # Define an equation function
             def my_equation():
                 # Example of CSTR Reaction Kinetics
-                r_co2 = -(jnp.exp(-(multi_gp_model.Processed_GPs[0]))*C_CO2*C_Sites - jnp.exp(-(multi_gp_model.Processed_GPs[1]))*C_CO2_ADS)
+                r_co2 = -(np.exp(-(multi_gp_model.Processed_GPs[0]))*C_CO2*C_Sites - np.exp(-(multi_gp_model.Processed_GPs[1]))*C_CO2_ADS)
                 return r_co2
 
             # Assuming `set_equation` is a method of the `Multiple_GP_Model` class and an instance `multi_gp_model` has been created:
@@ -330,11 +336,11 @@ class Embedded_GP_Model:
         # Calculate neg log likelihood
         error = self.data - results
         ln_variance = betas[-1]
-        neg_log_likelihood = 0.5 * jnp.log(2 * jnp.pi * jnp.exp(ln_variance)) + (error ** 2 / (2 * jnp.exp(ln_variance)))
-        neg_log_prior = -jnp.log(jax.scipy.stats.multivariate_normal.pdf(betas[:-1], jnp.zeros((len(self.betas) - 1)), 1000*jnp.eye((len(self.betas) - 1))))
+        neg_log_likelihood = 0.5 * np.log(2 * np.pi * np.exp(ln_variance)) + (error ** 2 / (2 * np.exp(ln_variance)))
+        neg_log_prior = -np.log(jax.scipy.stats.multivariate_normal.pdf(betas[:-1], np.zeros((len(self.betas) - 1)), 1000*np.eye((len(self.betas) - 1))))
         # Calculate variance prior (Will be used in future Calculations)
-        # neg_log_ln_p_variance = -jnp.log(inverse_gamma_pdf(jnp.exp(ln_variance), alpha = self.sigma_alpha, beta = self.sigma_beta))
-        return jnp.sum(neg_log_likelihood) + neg_log_prior # + neg_log_ln_p_variance
+        # neg_log_ln_p_variance = -np.log(inverse_gamma_pdf(np.exp(ln_variance), alpha = self.sigma_alpha, beta = self.sigma_beta))
+        return np.sum(neg_log_likelihood) + neg_log_prior # + neg_log_ln_p_variance
     
     def d_neg_log_likelihood_create(self):
         """
@@ -356,7 +362,7 @@ class Embedded_GP_Model:
         """
         self.d_neg_log_likelihood = grad(self.neg_log_likelihood)
             
-    def HMC(self, epsilon, L, current_q, M, Cov_Matrix, key):
+    def HMC(self, epsilon, L, current_q, M, Cov_Matrix):
         """
         Performs one iteration of the Hamiltonian Monte Carlo (HMC) algorithm to sample from
         a probability distribution proportional to the exponential of the negative log likelihood
@@ -392,24 +398,31 @@ class Embedded_GP_Model:
         grad_U = self.d_neg_log_likelihood
 
         # Random Momentum Sampling
-        key, subkey = random.split(key)
-        mean = jnp.zeros(len(M))
-        p = random.multivariate_normal(subkey, mean, self.M)
+
+        mean = np.zeros(len(M))
+        p = random.multivariate_normal(mean, self.M)
         current_p = p
 
         ### Begin Leapfrog Integration
         # Make half step for momentum at the beginning
         p = p - epsilon * grad_U(current_q) / 2
 
-        def loop_body(i, val):
-            q, p = val
+        # def loop_body(i, val):
+        #     q, p = val
+        #     q = q + epsilon * (Cov_Matrix @ p.reshape(-1, 1)).flatten()
+        #     p_update = epsilon * grad_U(q)
+        #     last_iter_factor = 1 - (i == L - 1)
+        #     p = p - last_iter_factor * p_update
+        #     return (q, p)
+        #
+        # q, p = fori_loop(0, L, loop_body, (current_q, p))
+        q = current_q
+        for i in range(L):
             q = q + epsilon * (Cov_Matrix @ p.reshape(-1, 1)).flatten()
             p_update = epsilon * grad_U(q)
             last_iter_factor = 1 - (i == L - 1)
             p = p - last_iter_factor * p_update
-            return (q, p)
 
-        q, p = fori_loop(0, L, loop_body, (current_q, p))
 
         # Make half step for momentum at the end
         p = p - epsilon * grad_U(q) / 2
@@ -424,44 +437,24 @@ class Embedded_GP_Model:
         proposed_U = U(q)
         proposed_K = sum(p @ Cov_Matrix @ p.reshape(-1, 1)) / 2
 
-        accept_prob = jnp.exp(current_U - proposed_U + current_K - proposed_K)
+        accept_prob = np.exp(current_U - proposed_U + current_K - proposed_K)
 
-        # If statement of Metropolis Hastings Criteria in JAX for optimized performance
-        def true_branch(_):
-            return q, True
+        # # If statement of Metropolis Hastings Criteria in JAX for optimized performance
+        # def true_branch(_):
+        #     return q, True
+        #
+        # def false_branch(_):
+        #     return current_q, False
+        if random.uniform() < accept_prob:
+            final = q
+            accept = True
+        else:
+            final = current_q
+            accept = False
+        # final, accept = random.uniform(subkey) < accept_prob, true_branch, false_branch, None
 
-        def false_branch(_):
-            return current_q, False
+        return final, accept, U(final)
 
-        final, accept = cond(random.uniform(subkey) < accept_prob, true_branch, false_branch, None)
-
-        return final, accept, U(final), key
-    
-    def create_jit_HMC(self):
-        """
-        Compiles the Hamiltonian Monte Carlo (HMC) method using JAX's Just-In-Time (JIT) compilation.
-        This process optimizes the HMC method for faster execution by compiling it to machine code
-        tailored to the specific hardware it will run on. The compiled function is stored in the
-        `jit_HMC` attribute of the class.  The reason it is done in this fashion is for a) code
-        brevity later on and b) the fact that JIT needs to occur post the user giving their model
-        so this automates this process.
-
-        Side Effects:
-            - Sets the `jit_HMC` attribute to a JIT-compiled version of the `HMC` method. This allows
-            the HMC method to execute more efficiently by reducing Python's overhead and optimizing
-            execution at the hardware level.
-
-        Usage:
-            After invoking this method, `jit_HMC` can be used in place of `HMC` to perform Hamiltonian
-            Monte Carlo sampling with significantly improved performance, especially beneficial
-            in scenarios involving large datasets/complex models and where `HMC` is called a significant
-            number of times (which is most models).
-
-         Note:
-            - The `create_jit_HMC` method should be called before using `jit_HMC` for the first time to ensure
-            that the JIT compilation is completed.
-        """
-        self.jit_HMC = jit(self.HMC)
     
     def leapfrog(self, theta, r, grad, epsilon, f, Cov_Matrix):
         """ 
@@ -506,7 +499,7 @@ class Embedded_GP_Model:
         rprime = rprime + 0.5 * epsilon * gradprime
         return thetaprime, rprime, gradprime, logpprime
 
-    def find_reasonable_epsilon(self, theta0, key):
+    def find_reasonable_epsilon(self, theta0):
         """ 
         This function is a part of this GitHub Repo: https://github.com/mfouesneau/NUTS/tree/master
         Heuristic for choosing an initial value of epsilon.
@@ -517,26 +510,29 @@ class Embedded_GP_Model:
         
         logp0, grad0 = f(theta0)
         epsilon = 1.
-        mean = jnp.zeros(len(self.M))
-        key, subkey = random.split(key)
-        r0 = random.multivariate_normal(key, mean, self.M)
+        mean = np.zeros(len(self.M))
+
+        r0 = random.multivariate_normal(mean, self.M)
 
         # Figure out what direction we should be moving epsilon.
         _, rprime, gradprime, logpprime = self.leapfrog(theta0, r0, grad0, epsilon, f, self.Cov_Matrix)
 
         def cond_fun(k):
             _, _, gradprime, logpprime = self.leapfrog(theta0, r0, grad0, epsilon * k, f, self.Cov_Matrix)
-            is_inf = jnp.isinf(logpprime) | jnp.isinf(gradprime).any()
+            is_inf = np.isinf(logpprime) | np.isinf(gradprime).any()
             return is_inf
 
         def body_fun(k):
             k *= 0.5
             _, _, gradprime, logpprime = self.leapfrog(theta0, r0, grad0, epsilon * k, f, self.Cov_Matrix)
-            is_inf = jnp.isinf(logpprime) | jnp.isinf(gradprime).any()
+            is_inf = np.isinf(logpprime) | np.isinf(gradprime).any()
             return k # lax.select(is_inf, k * 0.5, k) # cond(is_inf, lambda _: k * 0.5, lambda _: k, None)
 
+        cf_res = True
         k = 1.
-        k = while_loop(cond_fun, body_fun, k)
+        while cf_res:
+            k = body_fun(k)
+            cf_res = cond_fun(k)
 
         epsilon = 0.5 * k * epsilon
 
@@ -544,12 +540,16 @@ class Embedded_GP_Model:
         # epsilon in a direction until it crosses the 50% acceptance threshold
         # via doubling of epsilon
         logacceptprob = logpprime-logp0-0.5*((rprime @ rprime)-(r0 @ r0))
-        a = lax.select(logacceptprob > jnp.log(0.5), 1., -1.)
+
+        if logacceptprob > np.log(0.5):
+            a = 1.
+        else:
+            a = -1.
         # Keep moving epsilon in that direction until acceptprob crosses 0.5.
 
         def cond_fun(carry):
             epsilon, logacceptprob = carry
-            return a * logacceptprob > -a * jnp.log(2.)
+            return a * logacceptprob > -a * np.log(2.)
 
         def body_fun(carry):
             epsilon, logacceptprob = carry
@@ -559,7 +559,13 @@ class Embedded_GP_Model:
             return epsilon, logacceptprob
 
         # epsilon = 1.
-        epsilon, logacceptprob = lax.while_loop(cond_fun, body_fun, (epsilon, logacceptprob))
+        eps_fun = True
+        carry = epsilon, logacceptprob
+        while eps_fun:
+            carry = body_fun(carry)
+            eps_fun = cond_fun(carry)
+
+        epsilon, logacceptprob = carry
 
         return epsilon
     
@@ -585,7 +591,7 @@ class Embedded_GP_Model:
             - JIT compilation happens the first time the JIT-compiled function is called, not when
             `create_jit_find_reasonable_epsilon` is executed.
         """
-        self.jit_find_reasonable_epsilon = jit(self.find_reasonable_epsilon)
+        self.jit_find_reasonable_epsilon = self.find_reasonable_epsilon
     
     def full_sample(self, draws):
         """
@@ -627,31 +633,31 @@ class Embedded_GP_Model:
             print("Negative Log Likelihoods:", nlls)
         """
         # Initialize parameters for new interaction matrix
-        self.Cov_Matrix = jnp.eye(len(self.GP)*(len(self.discmtx)+1) +1)
-        self.M = jnp.linalg.inv(self.Cov_Matrix)
-        neg_log_likelihood_array = jnp.zeros(draws+1, dtype=float)
-        acceptance_array = jnp.zeros(draws+1, dtype=bool)
-        samples = jnp.ones((draws+1, len(self.GP)*(len(self.discmtx)+1)+1)) # Starting point always all betas = 1
+        self.Cov_Matrix = np.eye(len(self.GP)*(len(self.discmtx)+1) +1)
+        self.M = np.linalg.inv(self.Cov_Matrix)
+        neg_log_likelihood_array = np.zeros(draws+1, dtype=float)
+        acceptance_array = np.zeros(draws+1, dtype=bool)
+        samples = np.ones((draws+1, len(self.GP)*(len(self.discmtx)+1)+1)) # Starting point always all betas = 1
 
         # Create relevant functions
         self.d_neg_log_likelihood_create()
         self.create_jit_find_reasonable_epsilon()
-        self.create_jit_HMC()
+
 
         # Create Initial Epsilon Estimate
-        self.epsilon = self.jit_find_reasonable_epsilon(samples[0], self.key)
+        self.epsilon = self.jit_find_reasonable_epsilon(samples[0])
 
         # Loop for HMC Sampling        
         for i in range(draws):
             # Print iteration in loop
             print(i)
             # Actual HMC Sampling
-            sample, accept, neg_log_likelihood_sample, self.key = self.jit_HMC(epsilon = self.epsilon,
+            sample, accept, neg_log_likelihood_sample= self.HMC(epsilon = self.epsilon,
                                                                                L = 20, 
                                                                                current_q = samples[i],
                                                                                M = self.M,
                                                                                Cov_Matrix = self.Cov_Matrix, 
-                                                                               key = self.key)
+                                                                               )
             
             # Save HMC sampling results
             samples = samples.at[i+1].set(sample)
@@ -674,18 +680,18 @@ class Embedded_GP_Model:
                     print('Massive Increase to Epsilon')
 
             # Update Mass Matrix after warmup (NOTE: breaks detail balance)
-            if (i+1) in [500] and len(jnp.unique(samples[i-100:i],axis=0)) >= 5:
+            if (i+1) in [500] and len(np.unique(samples[i-100:i],axis=0)) >= 5:
                 print('M Update')
                 # Take the last 100 values of the vector and create Covariance and Mass Matrixes
-                last_100_values = jnp.unique(samples[i-100:i],axis=0)
-                cov_matrix = jnp.cov(last_100_values, rowvar=False)
-                self.Cov_Matrix = cov_matrix.diagonal()*jnp.identity(len(cov_matrix))
-                self.M = jnp.linalg.inv(cov_matrix)*jnp.identity(len(cov_matrix))
+                last_100_values = np.unique(samples[i-100:i],axis=0)
+                cov_matrix = np.cov(last_100_values, rowvar=False)
+                self.Cov_Matrix = cov_matrix.diagonal()*np.identity(len(cov_matrix))
+                self.M = np.linalg.inv(cov_matrix)*np.identity(len(cov_matrix))
                 print(self.M)
 
                 # Update epsilon
                 theta = samples[i]
-                self.epsilon = self.jit_find_reasonable_epsilon(theta, self.key)
+                self.epsilon = self.jit_find_reasonable_epsilon(theta)
         
         return samples, acceptance_array, neg_log_likelihood_array
     
@@ -694,32 +700,32 @@ class Embedded_GP_Model:
         Creates the interaction matrixes and compares the models against eachother.  Taken from methodology
         with a singular GP.
         """
-        # relats_in = jnp.array([])
+        # relats_in = np.array([])
         
         def perms(x):
             """Python equivalent of MATLAB perms."""
-            a = jnp.array(jnp.vstack(list(itertools.permutations(x)))[::-1])
+            a = np.array(np.vstack(list(itertools.permutations(x)))[::-1])
             return a
 
         # 'n' is the number of datapoints whereas 'm' is the number of inputs
-        n, m = jnp.shape(self.inputs)
+        n, m = np.shape(self.inputs)
         mrel = n
-        damtx = jnp.array([])
-        evs = jnp.array([])
+        damtx = np.array([])
+        evs = np.array([])
 
         # Conversion of Lines 79-100 of emulator_Xin.m
-        # if jnp.logical_not(all([isinstance(index, int) for index in relats_in])):  # checks if relats is an array
-        #     if jnp.any(relats_in):
-        #         relats = jnp.zeros((sum(jnp.logical_not(relats_in)), m))
+        # if np.logical_not(all([isinstance(index, int) for index in relats_in])):  # checks if relats is an array
+        #     if np.any(relats_in):
+        #         relats = np.zeros((sum(np.logical_not(relats_in)), m))
         #         ind = 1
         #         for i in range(0, m):
-        #             if jnp.logical_not(relats_in[i]):
+        #             if np.logical_not(relats_in[i]):
         #                 relats[ind][i] = 1
         #                 ind = ind + 1
         #         ind_in = m + 1
         #         for i in range(0, m - 1):
         #             for j in range(i + 1, m):
-        #                 if jnp.logical_not(relats_in[ind_in]):
+        #                 if np.logical_not(relats_in[ind_in]):
         #                     relats[ind][i] = 1
         #                     relats[ind][j] = 1
         #                     ind = ind + 1
@@ -758,22 +764,22 @@ class Embedded_GP_Model:
                         break
 
             while 1:
-                vecs = jnp.unique(perms(indvec),axis=0)
+                vecs = np.unique(perms(indvec),axis=0)
                 if ind > 1:
                     mvec, nvec = np.shape(vecs)
                 else:
-                    mvec = jnp.shape(vecs)[0]
+                    mvec = np.shape(vecs)[0]
                     nvec = 1
                 killvecs = []
                 if mrel != 0:
                     for j in range(1, mvec):
-                        testvec = jnp.divide(vecs[j, :], vecs[j, :])
+                        testvec = np.divide(vecs[j, :], vecs[j, :])
                         testvec[jitnp.isnan(testvec)] = 0
                         for k in range(1, mrel):
                             if sum(testvec == relats[k, :]) == m:
                                 killvecs.append(j)
                                 break
-                    nuvecs = jnp.zeros(mvec - jnp.size(killvecs), m)
+                    nuvecs = np.zeros(mvec - np.size(killvecs), m)
                     vecind = 1
                     for j in range(1, mvec):
                         if not (j == killvecs):
@@ -782,21 +788,21 @@ class Embedded_GP_Model:
 
                     vecs = nuvecs
                 if ind > 1:
-                    vm, vn = jnp.shape(vecs)
+                    vm, vn = np.shape(vecs)
                 else:
-                    vm = jnp.shape(vecs)[0]
+                    vm = np.shape(vecs)[0]
                     vn = 1
-                if jnp.size(damtx) == 0:
+                if np.size(damtx) == 0:
                     damtx = vecs
                 else:
-                    damtx = jnp.append(damtx, vecs, axis=0)
-                [dam,null] = jnp.shape(damtx)
+                    damtx = np.append(damtx, vecs, axis=0)
+                [dam,null] = np.shape(damtx)
                 self.discmtx = damtx.astype(int)
                 print(damtx)
 
                 beters, null, neg_log_likelihood = self.full_sample(draws)
 
-                ev = (2*len(self.discmtx) + 1) * jnp.log(n) - 2 * jnp.max(neg_log_likelihood*-1)
+                ev = (2*len(self.discmtx) + 1) * np.log(n) - 2 * np.max(neg_log_likelihood*-1)
 
                 # if aic:
                 #     ev = ev + (2 - np.log(n)) * (dam + 1)
@@ -846,33 +852,33 @@ class Embedded_GP_Model:
                 # for k in range(0, np.size(killset)):
                 #     damtx = np.delete(damtx, int(np.array(killset[k]) - 1), 0)
 
-                ev = jnp.min(evmin)
+                ev = np.min(evmin)
                 # X = xers
 
                 # print(ev)
                 # print(evmin)
                 print([ind, ev])
-                if jnp.size(evs) > 0:
-                    if ev < jnp.min(evs):
+                if np.size(evs) > 0:
+                    if ev < np.min(evs):
 
                         betas = beters
                         mtx = damtx
                         greater = 1
-                        evs = jnp.append(evs, ev)
+                        evs = np.append(evs, ev)
 
                     elif greater < tolerance:
                         greater = greater + 1
-                        evs = jnp.append(evs, ev)
+                        evs = np.append(evs, ev)
                     else:
                         finished = 1
-                        evs = jnp.append(evs, ev)
+                        evs = np.append(evs, ev)
 
                         break
                 else:
                     greater = greater + 1
                     betas = beters
                     mtx = damtx
-                    evs = jnp.append(evs, ev)
+                    evs = np.append(evs, ev)
                 if m == 1:
                     break
                 elif way3:
