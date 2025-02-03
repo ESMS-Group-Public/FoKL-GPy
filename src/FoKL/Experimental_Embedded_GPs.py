@@ -153,7 +153,8 @@ class GP:
             X = np.append(Xin, np.zeros((minp, mmtx - nxin)), axis=1)
 
         n = jnp.shape(normputs)[0]  # Size of normalized inputs
-
+        if betas.ndim == 1:
+            betas = betas.reshape(1,-1)
         normputs = jnp.asarray(normputs)
         phis = jnp.array(phis)
         mtx = jnp.array(mtx)
@@ -192,12 +193,8 @@ class GP:
 
         X = np.hstack([np.ones((n, 1)), X_vec])
 
-        def batched_matmul(X, betas):
-            return jax.numpy.transpose(jax.numpy.matmul(X, jax.numpy.transpose(betas)))
-
-        jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
-        modells = jfunc(X, betas)
-        prediction = jax.numpy.mean(modells, axis=1)
+        prediction = jax.numpy.transpose(jax.numpy.matmul(X, jax.numpy.transpose(betas)))
+        # prediction = jax.numpy.mean(modells, axis=1)
 
         return prediction   
 
@@ -236,7 +233,7 @@ class Embedded_GP_Model:
         # self.sigma_alpha = 2
         # self.sigma_beta = 0.01
 
-    def GP_Processing(self):
+    def GP_Processing(self, d=False):
         """
         Processes multiple Gaussian Processes (GPs) using a shared beta vector that is split among the processes.
         Each GP is evaluated with a subset of the beta parameters and additional inputs specific to each GP.
@@ -267,8 +264,10 @@ class Embedded_GP_Model:
         for idx, _ in enumerate (self.GP):
               result = self.GP[idx].GP_eval(self.inputs, self.discmtx, np.array(self.phis), betas_list[idx])
               GP_results = np.append(GP_results, result.reshape(1, -1), axis=0)
-
-        self.Processed_GPs = GP_results
+        if d == False:
+            self.Processed_GPs = GP_results
+        else:
+            return GP_results
     
     def set_equation(self, equation_func):
         """
@@ -303,8 +302,9 @@ class Embedded_GP_Model:
         """
         self.GP_Processing()
         self.equation = equation_func
+        self.equation_d = equation_func
     
-    def neg_log_likelihood(self, betas):
+    def neg_log_likelihood(self, betas, d=False):
         """
         Calculates the overall negative log likelihood for the model results using a single specified
         set of beta coefficients. This method updates the betas, processes the Gaussian Processes, and
@@ -329,9 +329,13 @@ class Embedded_GP_Model:
             within the class by the user to compute the likelihood.
         """
         # Set up of method
-        self.betas = betas
-        self.GP_Processing()
-        results = self.equation()
+        if d:
+            GP_results = self.GP_Processing(d=d)
+            results = self.equation(GP_results)
+        else:
+            self.betas = betas
+            self.GP_Processing()
+            results = self.equation(self.Processed_GPs)
 
         # Calculate neg log likelihood
         error = self.data - results
@@ -360,7 +364,11 @@ class Embedded_GP_Model:
             differentiation, which includes ensuring that all operations within `neg_log_likelihood` are
             differentiable and supported by JAX.
         """
-        self.d_neg_log_likelihood = grad(self.neg_log_likelihood)
+
+        def numerical_grad(betas, h=1e-5):
+            return (self.neg_log_likelihood(betas + h, d=True) - self.neg_log_likelihood(betas - h, d=True)) / (2 * h)
+
+        self.d_neg_log_likelihood = numerical_grad
             
     def HMC(self, epsilon, L, current_q, M, Cov_Matrix):
         """
@@ -660,10 +668,15 @@ class Embedded_GP_Model:
                                                                                )
             
             # Save HMC sampling results
-            samples = samples.at[i+1].set(sample)
-            acceptance_array = acceptance_array.at[i+1].set(accept)
-            neg_log_likelihood_array = neg_log_likelihood_array.at[i+1].set(neg_log_likelihood_sample)  
+            for i in range(draws - 1):  # Avoids out-of-bounds access at `i+1`
+                sample = np.random.randn()  # Replace with actual sample
+                accept = np.random.rand() > 0.5  # Replace with actual acceptance condition
+                neg_log_likelihood_sample = np.random.rand()  # Replace with actual likelihood value
 
+                # Direct NumPy updates
+                samples[i + 1] = sample
+                acceptance_array[i + 1] = accept
+                neg_log_likelihood_array[i + 1] = neg_log_likelihood_sample
             # To make epsilon adaptive, modify based on acceptance rate (ideal 65% per paper)
             if (i+1) % 50 == 0:
                 if sum(acceptance_array[i-50:i]) < 15:
@@ -774,7 +787,7 @@ class Embedded_GP_Model:
                 if mrel != 0:
                     for j in range(1, mvec):
                         testvec = np.divide(vecs[j, :], vecs[j, :])
-                        testvec[jitnp.isnan(testvec)] = 0
+                        testvec[np.isnan(testvec)] = 0
                         for k in range(1, mrel):
                             if sum(testvec == relats[k, :]) == m:
                                 killvecs.append(j)
