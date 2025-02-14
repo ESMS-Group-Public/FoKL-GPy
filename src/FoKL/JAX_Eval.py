@@ -178,7 +178,7 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, **kwa
 
     jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
     modells = jfunc(X,betas,setnos.astype(int))
-    mean = jax.numpy.mean(modells, axis=1)
+    mean = jax.numpy.mean(modells, axis=0)
 
     if current['ReturnBounds']:
         bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
