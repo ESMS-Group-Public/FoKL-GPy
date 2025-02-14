@@ -3,7 +3,7 @@ import jax
 import numpy as np
 import jax.numpy as jnp
 import warnings
-from src.FoKL.FoKLRoutines import _process_kwargs, _merge_dicts, _str_to_bool
+from FoKL.FoKLRoutines import _process_kwargs, _merge_dicts, _str_to_bool
 
 __all__ = ["evaluate_preprocess", "evaluate_jax", "evaluate_basis_jax"]
 def evaluate_preprocess(model, inputs=None, betas=None, mtx=None, avgbetas=False, **kwargs):
