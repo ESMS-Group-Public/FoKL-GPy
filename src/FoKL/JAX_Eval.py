@@ -129,6 +129,7 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, **kwa
     phind = jnp.ceil(normputs * 499)
     sett = (phind == 0)
     phind = phind + sett
+    l_phis = 499
     r = 1 / l_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
     xmin = jnp.array((phind - 1) * r, dtype=inputs.dtype)
     X = (inputs - xmin) / r
