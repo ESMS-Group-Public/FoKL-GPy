@@ -129,7 +129,10 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, **kwa
     phind = jnp.ceil(normputs * 499)
     sett = (phind == 0)
     phind = phind + sett
-    X = 499 * normputs - phind + 1
+    l_phis = 499
+    r = 1 / l_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
+    xmin = jnp.array((phind - 1) * r)
+    X = (normputs - xmin) / r
     phind = phind.astype(int) - 1
 
     A = jnp.array([1, 2, 3])
@@ -175,7 +178,7 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, **kwa
 
     jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
     modells = jfunc(X,betas,setnos.astype(int))
-    mean = jax.numpy.mean(modells, axis=1)
+    mean = jax.numpy.mean(modells, axis=0)
 
     if current['ReturnBounds']:
         bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
