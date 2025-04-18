@@ -9,10 +9,10 @@ from FoKL import FoKLRoutines
 import os
 dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
 # # -----------------------------------------------------------------------
-# # UNCOMMENT IF USING LOCAL FOKL PACKAGE:
-# import sys
-# sys.path.append(os.path.join(dir, '..', '..'))  # package directory
-# from src.FoKL import FoKLRoutines
+# UNCOMMENT IF USING LOCAL FOKL PACKAGE:
+import sys
+sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+from src.FoKL import FoKLRoutines
 # # -----------------------------------------------------------------------
 import numpy as np
 
@@ -29,17 +29,36 @@ def main():
     y = np.reshape(y_grid, (m * n, 1), order='F')
     z = np.reshape(z_grid, (m * n, 1), order='F')
 
+    inputs = [x, y] # (2, 441, 1)
+    inputs = np.array(inputs)   # (2, 441, 1)
+    inputs = np.squeeze(inputs) # (2, 441)
+    inputs = np.transpose(inputs) # (441, 2)
+
+    data = z
+    data = np.array(data) 
+
+
     # Initializing FoKL model with some user-defined hyperparameters (leaving others blank for default values) and
     # turning off user-warnings (i.e., warnings from FoKL) since working example requires no troubleshooting:
-    model = FoKLRoutines.FoKL(a=9, b=0.01, atau=3, btau=4000, aic=True, UserWarnings=False)
+    model = FoKLRoutines.FoKL(a=9, b=0.01, atau=3, btau=4000, aic=True, UserWarnings=False)\
+    
+    model.minmax = ([0, 1], [0, 1]) # minmax of inputs and data (i.e., [x, y] and z) for training
 
     # Running emulator routine (i.e., 'fit') to train model:
     print("\nCurrently training model...\n")
-    a, b, ev = model.fit([x, y], z, clean=True)
+    a, b, ev = model.fit(inputs, data, clean=False)
 
     # Evaluating and visualizing predicted values of data as a function of all inputs (train set plus test set):
     print("\nDone! Please close the figure to continue.")
     _, _, rmse = model.coverage3(plot=True, title='Sigmoid Example')
+
+    betas_avg = np.mean(a, axis=0)
+
+    betas_axis = betas_avg[:, np.newaxis].transpose()  # (49,) -> (1, 49)
+
+    d = model.evaluate(betas = betas_axis, draws = betas_axis.shape[0])
+
+    e = model.coverage3(plot= True, betas = betas_axis, draws = betas_axis.shape[0])
 
     # Post-processing:
     print(f"\nThe 'coverage3' method returned:\n    RMSE = {rmse}")
