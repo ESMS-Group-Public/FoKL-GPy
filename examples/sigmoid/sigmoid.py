@@ -29,6 +29,7 @@ def main():
     y = np.reshape(y_grid, (m * n, 1), order='F')
     z = np.reshape(z_grid, (m * n, 1), order='F')
 
+    # Formatting of dataset (i.e., converting to numpy arrays and reshaping grid matrices into vectors via fortran index order):
     inputs = [x, y] # (2, 441, 1)
     inputs = np.array(inputs)   # (2, 441, 1)
     inputs = np.squeeze(inputs) # (2, 441)
@@ -40,8 +41,8 @@ def main():
 
     # Initializing FoKL model with some user-defined hyperparameters (leaving others blank for default values) and
     # turning off user-warnings (i.e., warnings from FoKL) since working example requires no troubleshooting:
-    model = FoKLRoutines.FoKL(a=9, b=0.01, atau=3, btau=4000, aic=True, UserWarnings=False)\
-    
+    model = FoKLRoutines.FoKL(a=9, b=0.01, atau=3, btau=4000, aic=True, UserWarnings=False)
+
     model.minmax = ([0, 1], [0, 1]) # minmax of inputs and data (i.e., [x, y] and z) for training
 
     # Running emulator routine (i.e., 'fit') to train model:
@@ -50,7 +51,7 @@ def main():
 
     # Evaluating and visualizing predicted values of data as a function of all inputs (train set plus test set):
     print("\nDone! Please close the figure to continue.")
-    _, _, rmse = model.coverage3(plot=True, title='Sigmoid Example')
+    _, _, rmse = model.coverage3(plot=True, title='Sigmoid Example', ReturnBounds=True)
 
     betas_avg = np.mean(a, axis=0)
 
@@ -58,7 +59,7 @@ def main():
 
     d = model.evaluate(betas = betas_axis, draws = betas_axis.shape[0])
 
-    e = model.coverage3(plot= True, betas = betas_axis, draws = betas_axis.shape[0])
+    e = model.coverage3(plot= True, betas = betas_axis, draws = betas_axis.shape[0], ReturnBounds = False)
 
     # Post-processing:
     print(f"\nThe 'coverage3' method returned:\n    RMSE = {rmse}")

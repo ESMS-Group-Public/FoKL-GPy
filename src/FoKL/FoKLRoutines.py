@@ -970,7 +970,7 @@ class FoKL:
             modells[:, i] = np.transpose(np.matmul(X, np.transpose(np.array(betas[setnos[i], :]))))
         mean = np.mean(modells, 1)
 
-        if current['ReturnBounds']:
+        if current['ReturnBounds'] == True:
             bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
             cut = int(np.floor(draws * 0.025) + 1)
             for i in range(n):  # note n == np.shape(data)[0] if data != 'ignore'
@@ -1028,7 +1028,7 @@ class FoKL:
             # For basic plot controls:
             'plot': False, 'bounds': True, 'xaxis': False, 'labels': True, 'xlabel': 'Index', 'ylabel': 'Data',
             'title': 'FoKL', 'legend': True, 'LegendLabelFoKL': 'FoKL', 'LegendLabelData': 'Data',
-            'LegendLabelBounds': 'Bounds',
+            'LegendLabelBounds': 'Bounds', 'ReturnBounds': False,
 
             # For detailed plot controls:
             'PlotTypeFoKL': 'b', 'PlotSizeFoKL': 2, 'PlotTypeBounds': 'k--', 'PlotSizeBounds': 2, 'PlotTypeData': 'ro',
@@ -1108,7 +1108,11 @@ class FoKL:
         data = current['data']
         draws = current['draws']
 
-        mean, bounds = self.evaluate(normputs, draws=draws, ReturnBounds=1, _suppress_normalization_warning=True)
+        if current['ReturnBounds'] == True:
+            mean, bounds = self.evaluate(normputs, draws=draws, ReturnBounds=1, _suppress_normalization_warning=True)
+        else: 
+            mean = self.evaluate(normputs, draws=draws, ReturnBounds=0, _suppress_normalization_warning=True)
+
         n, mputs = np.shape(normputs)  # Size of normalized inputs ... calculated in 'evaluate' but not returned
 
         if current['plot']:  # if user requested a plot
@@ -1134,38 +1138,64 @@ class FoKL:
                 plt_bounds = bounds[sort_id]
                 plt_data = data[sort_id]
             else:  # elif current['plot'] is True:
-                plt_mean = mean
-                plt_data = data
-                plt_bounds = bounds
+                if current['ReturnBounds'] == True:
+                    plt_mean = mean
+                    plt_data = data
+                    plt_bounds = bounds
+                else: 
+                    plt_mean = mean
+                    plt_data = data
 
-            plt.figure()
-            plt.plot(plt_x, plt_mean, current['PlotTypeFoKL'], linewidth=current['PlotSizeFoKL'],
-                     label=current['LegendLabelFoKL'])
-            if data is not False:
-                plt.plot(plt_x, plt_data, current['PlotTypeData'], markersize=current['PlotSizeData'],
-                         label=current['LegendLabelData'])
-            if current['bounds']:
-                plt.plot(plt_x, plt_bounds[:, 0], current['PlotTypeBounds'], linewidth=current['PlotSizeBounds'],
-                         label=current['LegendLabelBounds'])
-                plt.plot(plt_x, plt_bounds[:, 1], current['PlotTypeBounds'], linewidth=current['PlotSizeBounds'])
-            if current['labels']:
-                if current['xlabel']:
-                    plt.xlabel(current['xlabel'])
-                if current['ylabel']:
-                    plt.ylabel(current['ylabel'])
-                if current['title']:
-                    plt.title(current['title'])
-            if current['legend']:
-                plt.legend()
+            if current['ReturnBounds'] == True:
+                plt.figure()
+                plt.plot(plt_x, plt_mean, current['PlotTypeFoKL'], linewidth=current['PlotSizeFoKL'],
+                         label=current['LegendLabelFoKL'])
+                if data is not False:
+                    plt.plot(plt_x, plt_data, current['PlotTypeData'], markersize=current['PlotSizeData'],
+                             label=current['LegendLabelData'])
+                if current['bounds']:
+                    plt.plot(plt_x, plt_bounds[:, 0], current['PlotTypeBounds'], linewidth=current['PlotSizeBounds'],
+                             label=current['LegendLabelBounds'])
+                    plt.plot(plt_x, plt_bounds[:, 1], current['PlotTypeBounds'], linewidth=current['PlotSizeBounds'])
+                if current['labels']:
+                    if current['xlabel']:
+                        plt.xlabel(current['xlabel'])
+                    if current['ylabel']:
+                        plt.ylabel(current['ylabel'])
+                    if current['title']:
+                        plt.title(current['title'])
+                if current['legend']:
+                    plt.legend()
 
-            plt.show()
+                plt.show()
+            else: 
+                plt.figure()
+                plt.plot(plt_x, plt_mean, current['PlotTypeFoKL'], linewidth=current['PlotSizeFoKL'],
+                         label=current['LegendLabelFoKL'])
+                if data is not False:
+                    plt.plot(plt_x, plt_data, current['PlotTypeData'], markersize=current['PlotSizeData'],
+                             label=current['LegendLabelData'])
+                if current['labels']:
+                    if current['xlabel']:
+                        plt.xlabel(current['xlabel'])
+                    if current['ylabel']:
+                        plt.ylabel(current['ylabel'])
+                    if current['title']:
+                        plt.title(current['title'])
+                if current['legend']:
+                    plt.legend()
+
+                plt.show()
 
         if data is not False:
             rmse = np.sqrt(np.mean(mean - data) ** 2)
         else:
             rmse = []
 
-        return mean, bounds, rmse
+        if current['ReturnBounds'] == True:
+            return mean, bounds, rmse
+        else:
+            return mean, rmse
 
     def fit(self, inputs=None, data=None, **kwargs):
         """

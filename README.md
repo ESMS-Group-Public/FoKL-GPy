@@ -188,7 +188,7 @@ if available; otherwise, leave blank. Multiple options are available to govern t
 | ```AutoTranspose``` | boolean | assumes $n > m$ and transposes dataset accordingly  | ```True``` |
 | ```bit```           | integer | (16, 32, 64) floating point bits to save dataset as | ```64```   |
 | ```normalize```     | boolean | to pass formatted dataset to ```_normalize()```     | ```True``` |
-| ```minmax```        | list of [min, max] lists | upper/lower bounds of each input variable | model.minmax |
+| ```minmax```        | list of [min, max] lists | upper/lower bounds of each input variable | ```model.minmax = ([input_min, input_max],[data_min, data_max],...)```  |
 | ```pillow```        | list of [lower, upper] lists | fraction of span by which to expand [min, max]; or, values on 0-1 scale that [min, max] should map to | ```0``` |
 
 After calling [clean](#clean), the now normalized and formatted dataset gets saved as attributes of the FoKL class. Be sure to use these attributes in place of the originally entered ```inputs``` and ```data``` so that normalization and formatting errors are avoided. The attributes are as follows:
