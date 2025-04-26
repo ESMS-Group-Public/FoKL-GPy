@@ -576,6 +576,11 @@ class FoKL:
         set = (phind == 0)  # set = 1 if phind = 0, otherwise set = 0
         phind = phind + set  # makes sense assuming L_phis > M
 
+        try: 
+            inputs.dtype
+        except AttributeError: 
+            raise AttributeError("Inputs must be a numpy array, to process automatically try making clean = True")
+
         r = 1 / l_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
         xmin = np.array((phind - 1) * r, dtype=inputs.dtype)
         X = (inputs - xmin) / r  # twice normalized inputs (0-1 first then to size of phis second)
@@ -843,7 +848,7 @@ class FoKL:
 
         return basis
 
-    def evaluate(self, inputs=None, betas=None, mtx=None, avgbetas=False, **kwargs):
+    def evaluate(self, inputs=None, betas=None, mtx=None, draws=None, **kwargs):
         """
         Evaluate the FoKL model for provided inputs and (optionally) calculate bounds. Note 'evaluate_fokl' may be a
         more accurate name so as not to confuse this function with 'evaluate_basis', but it is unexpected for a user to
@@ -860,10 +865,13 @@ class FoKL:
             clean        == boolean to automatically normalize and format 'inputs' == False (default)
             ReturnBounds == boolean to return confidence bounds as second output   == False (default)
         """
-
+        # Check if self.minmax exists before including it in defaults
+        if not hasattr(self, 'minmax'):
+            raise ValueError("To set minmax manually call model.minmax = ([input_min, input_max],[data_min, data_max],...)"
+                " or set clean=True to automtically define min and max from model.inputs")
         # Process keywords:
         default = {'minmax': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False,  # for evaluate
-                   '_suppress_normalization_warning': False}                                    # if called from coverage3
+                   '_suppress_normalization_warning': False, 'betas': self.betas, 'mtx': self.mtx}                                    # if called from coverage3
         default_for_clean = {'train': 1, 
                              # For '_format':
                              'AutoTranspose': True, 'SingleInstance': False, 'bit': 64,
@@ -877,26 +885,18 @@ class FoKL:
             kwargs_to_clean.update({kwarg: current[kwarg]})  # store kwarg for clean here
             del current[kwarg]  # delete kwarg for clean from current
         if current['draws'] < 40 and current['ReturnBounds']:
-            current['draws'] = 40
             warnings.warn("'draws' must be greater than or equal to 40 if calculating bounds. Setting 'draws=40'.")
         draws = current['draws']  # define local variable
         if betas is None:  # default
-            if avgbetas:
-                betas = self.avg_betas
-            else:
-                if draws > self.betas.shape[0]:
-                    draws = self.betas.shape[0]  # more draws than models results in inf time, so threshold
-                    self.draws = draws
-                    warnings.warn("Updated attribute 'self.draws' to equal number of draws in 'self.betas'.",
-                                  category=UserWarning)
-                betas = self.betas[-draws::, :]  # use samples from last models
-        else:  # user-defined betas may need to be formatted
-            betas = np.array(betas)
-            if betas.ndim == 1:
-                betas = betas[np.newaxis, :]  # note transpose would be column of beta0 terms, so not expected
-            if draws > betas.shape[0]:
-                draws = betas.shape[0]  # more draws than models results in inf time, so threshold
-            betas = betas[-draws::, :]  # use samples from last models
+            betas = self.betas 
+        if draws is None:  # default 
+            if betas.shape[0] < draws: 
+                draws = len(betas.shape[0])  
+            elif  betas.shape[0] > draws: 
+                draws = current['draws']
+        else: 
+            if betas.shape[0] < draws:
+                raise ValueError("The number of draws requested exceeds the number of beta terms in the model.")
         if mtx is None:  # default
             mtx = self.mtx
         else:  # user-defined mtx may need to be formatted
@@ -938,6 +938,9 @@ class FoKL:
             self.setnos = setnos
         else:
             setnos = self.setnos
+
+        if draws == 1: 
+            setnos = [0]
 
         X = np.zeros((n, mbets))
         normputs = np.asarray(normputs)
@@ -1022,7 +1025,7 @@ class FoKL:
         # Process keywords:
         default = {
             # For numerical evaluation of model:
-            'inputs': None, 'data': None, 'draws': self.draws,
+            'inputs': None, 'data': None, 'draws': self.draws, 'betas': self.betas,
 
             # For basic plot controls:
             'plot': False, 'bounds': True, 'xaxis': False, 'labels': True, 'xlabel': 'Index', 'ylabel': 'Data',
@@ -1280,7 +1283,8 @@ class FoKL:
         threshstda = self.threshstda
         threshstdb = self.threshstdb
         aic = self.aic
-
+        self.inputs = inputs  # update class attribute to be the cleaned 'inputs' (if not already done)
+        self.data = data
 
 
         # Update 'b' and/or 'btau' if set to default:
