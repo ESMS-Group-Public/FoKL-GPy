@@ -1019,7 +1019,10 @@ class FoKL:
             bounds == confidence interval for each predicted output value
             rmse   == root mean squared deviation (RMSE) of prediction versus known data
         """
-
+        try:
+            draws = self.draws
+        except:
+            raise ValueError("self.draws is undefined, specify number of draws to evaluate as kwarg: draws = ")
         # Process keywords:
         default = {
             # For numerical evaluation of model:
@@ -1028,7 +1031,7 @@ class FoKL:
             # For basic plot controls:
             'plot': False, 'bounds': True, 'xaxis': False, 'labels': True, 'xlabel': 'Index', 'ylabel': 'Data',
             'title': 'FoKL', 'legend': True, 'LegendLabelFoKL': 'FoKL', 'LegendLabelData': 'Data',
-            'LegendLabelBounds': 'Bounds', 'ReturnBounds': False,
+            'LegendLabelBounds': 'Bounds', 'ReturnBounds': True,
 
             # For detailed plot controls:
             'PlotTypeFoKL': 'b', 'PlotSizeFoKL': 2, 'PlotTypeBounds': 'k--', 'PlotSizeBounds': 2, 'PlotTypeData': 'ro',
@@ -1107,11 +1110,12 @@ class FoKL:
         normputs = current['inputs']  # assumes inputs are normalized and formatted correctly
         data = current['data']
         draws = current['draws']
-
+        if draws > np.shape(current['betas'])[0]:
+            raise ValueError(f"Number of draws called ({draws}) exceeds number of rows of betas ({np.shape(current['betas'])[0]}) ")
         if current['ReturnBounds'] == True:
-            mean, bounds = self.evaluate(normputs, draws=draws, ReturnBounds=1, _suppress_normalization_warning=True)
+            mean, bounds = self.evaluate(normputs, betas=current['betas'], draws=draws, ReturnBounds=1, _suppress_normalization_warning=True)
         else: 
-            mean = self.evaluate(normputs, draws=draws, ReturnBounds=0, _suppress_normalization_warning=True)
+            mean = self.evaluate(normputs, betas=current['betas'], draws=draws, ReturnBounds=0, _suppress_normalization_warning=True)
 
         n, mputs = np.shape(normputs)  # Size of normalized inputs ... calculated in 'evaluate' but not returned
 
