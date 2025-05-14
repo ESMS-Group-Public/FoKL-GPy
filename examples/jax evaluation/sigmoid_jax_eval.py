@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 def main():
     # Load Previously built FoKL Model
 
-    model = FoKLRoutines_update.load("examples\jax evaluation\sigmoid_jax_eval.py")
+    model = FoKLRoutines_update.load("examples\jax evaluation\sigmoid_model.fokl")
 
     n = [3, 5, 9, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000] # Number of evaluation points
 
