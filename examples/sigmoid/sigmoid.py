@@ -41,6 +41,14 @@ def main():
     # Evaluating and visualizing predicted values of data as a function of all inputs (train set plus test set):
     print("\nDone! Please close the figure to continue.")
     _, _, rmse = model.coverage3(plot=True, title='Sigmoid Example')
+    
+    betas_avg = np.mean(a, axis=0)
+
+    betas_axis = betas_avg[:, np.newaxis].transpose()  # (49,) -> (1, 49)
+
+    d = model.evaluate(betas = betas_axis, draws = betas_axis.shape[0])
+
+    e = model.coverage3(plot= True, betas = betas_axis, draws = betas_axis.shape[0], ReturnBounds = False)
 
     # Post-processing:
     print(f"\nThe 'coverage3' method returned:\n    RMSE = {rmse}")

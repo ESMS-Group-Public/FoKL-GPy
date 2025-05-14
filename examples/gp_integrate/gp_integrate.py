@@ -9,10 +9,10 @@ import os
 dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
 # # -----------------------------------------------------------------------
 # # UNCOMMENT IF USING LOCAL FOKL PACKAGE:
-# import sys
-# sys.path.append(os.path.join(dir, '..', '..'))  # package directory
-# from src.FoKL import FoKLRoutines
-# from src.FoKL.GP_Integrate import GP_Integrate
+import sys
+sys.path.append(os.path.join(dir, '..', '..'))  # package directory
+from src.FoKL import FoKLRoutines_update
+from src.FoKL.GP_Integrate import GP_Integrate
 # # -----------------------------------------------------------------------
 import numpy as np
 import matplotlib.pyplot as plt
@@ -28,7 +28,7 @@ def main():
 
     # Initializing FoKL model with user-defined constant hyperparameters (to override default values) and turning off
     # user-warnings (i.e., warnings from FoKL) since working example requires no troubleshooting:
-    model = FoKLRoutines.FoKL(relats_in=[1, 1, 1, 1, 1, 1], a=1000, b=1, draws=2000, way3=True, threshav=0,
+    model = FoKLRoutines_update.FoKL(relats_in=[1, 1, 1, 1, 1, 1], a=1000, b=1, draws=2000, way3=True, threshav=0,
                               threshstda=0, threshstdb=100, UserWarnings=False)
 
     # Iterating through datasets:
@@ -43,7 +43,7 @@ def main():
         model.btau = btau[i]
 
         # Running emulator routine for current dataset:
-        betas_i, mtx_i, _ = model.fit(traininputs, traindata[i], clean=True)
+        betas_i, mtx_i, _, _ = model.fit(traininputs, traindata[i], clean=True)
         print("\nDone!")
 
         # Store coefficients and interaction matrix of model equation for post-processing (i.e., for 'GP_Integrate'):

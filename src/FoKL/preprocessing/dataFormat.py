@@ -3,81 +3,75 @@ import copy
 import numpy as np
 import pandas as pd
 from ..utils import _str_to_bool, _process_kwargs, _merge_dicts, _set_attributes
-
-class dataFormat():
+class dataFormat:
     def __init__(self, fokl, config):
         self.fokl = fokl
         self.config = config
 
+
     def _format(self, inputs, data=None, AutoTranspose=True, SingleInstance=False, bit=64):
-        """
-        Called by 'clean' to format dataset.
-            - formats inputs as 2D ndarray, where columns are input variables; n_rows > n_cols if AutoTranspose=True
-            - formats data as 2D ndarray, with single column
+       """
+       Called by 'clean' to format dataset.
+           - formats inputs as 2D ndarray, where columns are input variables; n_rows > n_cols if AutoTranspose=True
+           - formats data as 2D ndarray, with single column Note SingleInstance has priority over AutoTranspose. If SingleInstance=True, then AutoTranspose=False.
+       """
+       # Format and check inputs:
+       AutoTranspose = _str_to_bool(AutoTranspose)
+       SingleInstance = _str_to_bool(SingleInstance)
+       bits = {16: np.float16, 32: np.float32, 64: np.float64}  # allowable datatypes: https://numpy.org/doc/stable/reference/arrays.scalars.html#arrays-scalars-built-in
+       if SingleInstance is True:
+           AutoTranspose = False
+       if bit not in bits.keys():
+           warnings.warn(f"Keyword 'bit={bit}' limited to values of 16, 32, or 64. Assuming default value of 64.", category=UserWarning)
+           bit = 64
+       datatype = bits[bit]   
 
-        Note SingleInstance has priority over AutoTranspose. If SingleInstance=True, then AutoTranspose=False.
-        """
-        # Format and check inputs:
-        AutoTranspose = _str_to_bool(AutoTranspose)
-        SingleInstance = _str_to_bool(SingleInstance)
-        bits = {16: np.float16, 32: np.float32, 64: np.float64}  # allowable datatypes: https://numpy.org/doc/stable/reference/arrays.scalars.html#arrays-scalars-built-in
-        if SingleInstance is True:
-            AutoTranspose = False
-        if bit not in bits.keys():
-            warnings.warn(f"Keyword 'bit={bit}' limited to values of 16, 32, or 64. Assuming default value of 64.", category=UserWarning)
-            bit = 64
-        datatype = bits[bit]
+       # Convert 'inputs' and 'data' to numpy if pandas:
+       if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
+           inputs = inputs.to_numpy()
+           warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.",
+                         category=UserWarning)
+       if data is not None:
+           if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
+               data = data.to_numpy()
+               warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.",
+                             category=UserWarning)   # Format 'inputs' as [n x m] numpy array:
+       inputs = np.array(inputs)  # attempts to handle lists or any other format (i.e., not pandas)
+       if inputs.ndim > 2:  # remove axes with 1D for cases like (N x 1 x M) --> (N x M)
+           inputs = np.squeeze(inputs)
+       if inputs.dtype != datatype:
+           inputs = np.array(inputs, dtype=datatype)
+           warnings.warn(f"'inputs' was converted to float{bit}. May require user-confirmation that "
+                         f"values did not get corrupted.", category=UserWarning)
+       if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
+           if SingleInstance is True:
+               inputs = inputs[np.newaxis, :]  # make 1D into (1, M)
+           else:
+               inputs = inputs[:, np.newaxis]  # make 1D into (N, 1)
+       if AutoTranspose is True and SingleInstance is False:
+           if inputs.shape[1] > inputs.shape[0]:  # assume user is using transpose of proper format
+               inputs = inputs.transpose()
+               warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables, else set "
+                             "'AutoTranspose=False' to disable.", category=UserWarning)   # Format 'data' as [n x 1] numpy array:
+       if data is not None:
+           data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
+           data = np.squeeze(data)
+           if data.dtype != datatype:
+               data = np.array(data, dtype=datatype)
+               warnings.warn(f"'data' was converted to float{bit}. May require user-confirmation that "
+                             f"values did not get corrupted.", category=UserWarning)
+           if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
+               data = data[:, np.newaxis]
+           else:  # check user provided only one output column/row, then transpose if needed
+               n = data.shape[0]
+               m = data.shape[1]
+               if (m != 1 and n != 1) or (m == 1 and n == 1):
+                   raise ValueError("Error: 'data' must be a vector.")
+               elif m != 1 and n == 1:
+                   data = data.transpose()
+                   warnings.warn("'data' was transposed to match FoKL formatting.", category=UserWarning)
 
-        # Convert 'inputs' and 'data' to numpy if pandas:
-        if any(isinstance(inputs, type) for type in (pd.DataFrame, pd.Series)):
-            inputs = inputs.to_numpy()
-            warnings.warn("'inputs' was auto-converted to numpy. Convert manually for assured accuracy.",
-                          category=UserWarning)
-        if data is not None:
-            if any(isinstance(data, type) for type in (pd.DataFrame, pd.Series)):
-                data = data.to_numpy()
-                warnings.warn("'data' was auto-converted to numpy. Convert manually for assured accuracy.",
-                              category=UserWarning)
-
-        # Format 'inputs' as [n x m] numpy array:
-        inputs = np.array(inputs)  # attempts to handle lists or any other format (i.e., not pandas)
-        if inputs.ndim > 2:  # remove axes with 1D for cases like (N x 1 x M) --> (N x M)
-            inputs = np.squeeze(inputs)
-        if inputs.dtype != datatype:
-            inputs = np.array(inputs, dtype=datatype)
-            warnings.warn(f"'inputs' was converted to float{bit}. May require user-confirmation that "
-                          f"values did not get corrupted.", category=UserWarning)
-        if inputs.ndim == 1:  # if inputs.shape == (number,) != (number,1), then add new axis to match FoKL format
-            if SingleInstance is True:
-                inputs = inputs[np.newaxis, :]  # make 1D into (1, M)
-            else:
-                inputs = inputs[:, np.newaxis]  # make 1D into (N, 1)
-        if AutoTranspose is True and SingleInstance is False:
-            if inputs.shape[1] > inputs.shape[0]:  # assume user is using transpose of proper format
-                inputs = inputs.transpose()
-                warnings.warn("'inputs' was transposed. Ignore if more datapoints than input variables, else set "
-                              "'AutoTranspose=False' to disable.", category=UserWarning)
-
-        # Format 'data' as [n x 1] numpy array:
-        if data is not None:
-            data = np.array(data)  # attempts to handle lists or any other format (i.e., not pandas)
-            data = np.squeeze(data)
-            if data.dtype != datatype:
-                data = np.array(data, dtype=datatype)
-                warnings.warn(f"'data' was converted to float{bit}. May require user-confirmation that "
-                              f"values did not get corrupted.", category=UserWarning)
-            if data.ndim == 1:  # if data.shape == (number,) != (number,1), then add new axis to match FoKL format
-                data = data[:, np.newaxis]
-            else:  # check user provided only one output column/row, then transpose if needed
-                n = data.shape[0]
-                m = data.shape[1]
-                if (m != 1 and n != 1) or (m == 1 and n == 1):
-                    raise ValueError("Error: 'data' must be a vector.")
-                elif m != 1 and n == 1:
-                    data = data.transpose()
-                    warnings.warn("'data' was transposed to match FoKL formatting.", category=UserWarning)
-                
-        return inputs, data    
+       return inputs, data
 
     def _normalize(self, inputs, minmax=None, pillow=None, pillow_type='percent'):
         """
@@ -88,13 +82,13 @@ class dataFormat():
             minmax      == list of [min, max] lists; upper/lower bounds of each input variable                      == self.minmax (default)
             pillow      == list of [lower buffer, upper buffer] lists; fraction of span by which to expand 'minmax' == 0 (default)
             pillow_type == string, 'percent' (i.e., fraction of span to buffer truescale) or 'absolute' (i.e., [min, max] on 0-1 scale), defining units of 'pillow' == 'percent' (default)
-            
+
         Note 'pillow' is ignored if reading 'minmax' from previously defined 'self.minmax'; a warning is thrown if 'pillow' is defined in this case.
-        
+
         Updates 'self.minmax'.
         """
         mm = inputs.shape[1]  # number of input variables
-        
+
         # Process 'pillow_type':
         pillow_types = ['percent', 'absolute']
         if isinstance(pillow_type, str):
@@ -105,9 +99,7 @@ class dataFormat():
         for pt in range(len(pillow_type)):
             if pillow_type[pt] not in pillow_types:
                 raise ValueError(f"'pillow_type' is limited to {pillow_types}.")
-
         # Process 'pillow':
-
         _skip_pillow = False  # to skip pillow's adjustment of minmax, if pillow is default
         if pillow is None:  # default
             _skip_pillow = True
@@ -128,12 +120,11 @@ class dataFormat():
                 pillow = []
                 for i in range(0, lp, 2):
                     pillow.append([float(pillow_vals[i]), float(pillow_vals[i + 1])])  # list of [lb, ub] lists
-        
-        # Process 'minmax':
-        
-        def _minmax_error():
-            raise ValueError("Input 'minmax' must correspond to input variables (i.e., columns of 'inputs').")
 
+        # Process 'minmax':
+
+        def minmax_error():
+            raise ValueError("Input 'minmax' must correspond to input variables (i.e., columns of 'inputs').")
         if minmax is None:  # default, read 'model.normalize' or define if does not exist
             if hasattr(self, 'minmax'):
                 minmax = self.minmax
@@ -146,15 +137,14 @@ class dataFormat():
                     minmax = [minmax]  # add outer list
                     lm = 1  # = len(minmax)
                 if lm != int(mm * 2):
-                    _minmax_error()
+                    minmax_error()
                 else:  # assume [min1, max1, ..., minm, maxm] needs to be formatted to [[min1, max1], ..., [minm, maxm]]
                     minmax_vals = copy.deepcopy(minmax)
                     minmax = []
                     for i in range(0, lm, 2):
                         minmax.append([minmax_vals[i], minmax_vals[i + 1]])  # list of [min, max] lists
             elif len(minmax) != mm:
-                _minmax_error()
-
+                minmax_error()
         if pillow is not None and _skip_pillow is False:
             minmax_vals = copy.deepcopy(minmax)
             minmax = []
@@ -176,32 +166,33 @@ class dataFormat():
                     #       min = (n / q - m / p) / (1 / q - 1 / p) = (n * p - m * q) / (p - q)
                     #   And,
                     #       max = (n - min) / q + min
-                    
+
                     if pillow[m][0] == 0:  # then n = min
                         minmax_min = x_min
                     else:  # see above equation
                         minmax_min = (x_min * (1 - pillow[m][1]) - x_max * pillow[m][0]) / (1 - pillow[m][1] - pillow[m][0])
-                    
+
                     if pillow[m][1] == 0:  # then m = max
                         minmax_max = x_max
                     elif pillow[m][0] == 0:  # empirically need equation rearranged in this case to avoid nan
                         minmax_max = (x_max - pillow[m][1] * minmax_min) / (1 - pillow[m][1])
                     else:  # see above equation
                         minmax_max = (x_min - minmax_min) / pillow[m][0] + minmax_min
-                    
+
                     minmax.append([minmax_min, minmax_max])  # [min, max] such that 'pillow' values map to 0-1 scale
-            
+
         if hasattr(self, 'minmax'):  # check if 'self.minmax' is defined, in which case give warning to re-train model
             if any(minmax[m] == self.minmax[m] for m in range(mm)) is False:
                 warnings.warn("The model already contains normalization [min, max] bounds, so the currently trained model will not be valid for the new bounds requested. Train a new model with these new bounds.", category=UserWarning)
-        self.fokl.minmax = minmax  # always update
-
+        self.minmax = minmax  # always update
         # Normalize 'inputs' to 0-1 scale according to 'minmax':
         for m in range(mm):  # for input var in input vars
             inputs[:, m] = (inputs[:, m] - minmax[m][0]) / (minmax[m][1] - minmax[m][0])
-        
-        return inputs, minmax 
-    
+
+        inputs = np.array(inputs)
+
+        return inputs, minmax
+
     def clean(self, inputs, data=None, kwargs_from_other=None, _setattr=False, **kwargs):
         """
         For cleaning and formatting inputs prior to training a FoKL model. Note that data is not required but should be
@@ -269,7 +260,7 @@ class dataFormat():
             return inputs
         else:  # e.g., 'clean_inputs, clean_data = model.clean(inputs, data)'
             return inputs, data, minmax
-
+        
     def generate_trainlog(self, train, n=None):
         """Generate random logical vector of length 'n' with 'train' percent as True."""
         if train < 1:
@@ -297,7 +288,6 @@ class dataFormat():
         """
         After running 'clean', call 'trainset' to get train inputs and train data. The purpose of this method is to
         simplify syntax, such that the code here does not need to be re-written each time the train set is defined.
-
         traininputs, traindata = self.trainset()
         """
         if self.trainlog is None:  # then use all observations for training
@@ -322,8 +312,7 @@ class dataFormat():
         if kernel is None:
             kernel = self.config.DEFAULT['kernel']
         if phis is None:
-            phis = self.config.DEFAULT['kernel']
-
+            phis = self.config.DEFAULT['phis'] 
         if kernel == self.config.KERNELS[1]:  # == 'Bernoulli Polynomials':
             warnings.warn("Twice normalization of inputs is not required for the 'Bernoulli Polynomials' kernel",
                           category=UserWarning)
@@ -340,17 +329,12 @@ class dataFormat():
         set = (phind == 0)  # set = 1 if phind = 0, otherwise set = 0
         phind = phind + set  # makes sense assuming L_phis > M
 
-        try: 
-            inputs.dtype
-        except AttributeError: 
-            raise AttributeError("Inputs must be a numpy array, to process automatically try making clean = True")
-
         r = 1 / l_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
-        xmin = np.array((phind - 1) * r, dtype=inputs.dtype)
+        xmin = np.array((phind - 1) * r, dtype= inputs.dtype) # inputs.dtype
         X = (inputs - xmin) / r  # twice normalized inputs (0-1 first then to size of phis second)
 
         phind = phind - 1
-        xsm = np.array(l_phis * inputs - phind, dtype=inputs.dtype)
+        xsm = np.array(l_phis * inputs - phind, dtype= inputs.dtype) # inputs.dtype
         if np.max(phind) > 499 or np.min(phind) < 0:
             raise ValueError('Inputs are not normalized correctly, try calling clean=True within evaluate to evaluate with normalization of model training')
         return X, phind, xsm

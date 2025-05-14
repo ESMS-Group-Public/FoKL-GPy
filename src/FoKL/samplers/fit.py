@@ -123,8 +123,7 @@ class fitSampler:
         threshstda = self.config.DEFAULT['threshstda']
         threshstdb = self.config.DEFAULT['threshstdb']
         aic = self.config.DEFAULT['aic']
-        self.inputs = inputs  # update class attribute to be the cleaned 'inputs' (if not already done)
-        self.data = data
+
 
 
 
@@ -133,6 +132,7 @@ class fitSampler:
             # Calculate variance and mean, both as 64-bit, but for large datasets (i.e., less than 64-bit) be careful
             # to avoid converting the entire 'data' to 64-bit:
             if data.dtype != np.float64:  # and sigmasq == math.inf  # then recalculate but as 64-bit
+                sigmasq = 0
                 n = data.shape[0]
                 data_mean = 0
                 for i in range(n):  # element-wise to avoid memory errors when entire 'data' is 64-bit
@@ -275,7 +275,7 @@ class fitSampler:
                     damtx = np.append(damtx, vecs, axis=0)
 
                 [dam, null] = np.shape(damtx)
-                [beters, null, null, null, xers, ev] = self.sampler.run_sampler(sampler, inputs, data, phis, X, damtx, a, b, atau, btau, draws, phind, xsm, sigsqd0, tausqd0, dtd)
+                [beters, null, null, null, xers, ev] = self.sampler.run_sampler(sampler,inputs, data, phis, X, damtx, a, b, atau, btau, draws, phind, xsm, sigsqd0, tausqd0, dtd)
                 if aic:
                     ev = ev + (2 - np.log(n)) * (dam + 1)
                 betavs = np.abs(np.mean(beters[int(np.ceil((draws / 2)+1)):draws, (dam - vm + 1):dam+1], axis=0))
