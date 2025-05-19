@@ -98,9 +98,7 @@ class FoKL:
             mean   == predicted output values for each indexed input
             bounds == confidence interval for each predicted output value
             rmse   == root mean squared deviation (RMSE) of prediction versus known data
-        """
-        
-
+        """   
         return self.postprocessing.coverage3(**kwargs)
     
     def fit(self, inputs=None, data=None, **kwargs):
@@ -165,9 +163,20 @@ class FoKL:
         return
     
     def to_pyomo(self, xvars, yvars, m=None, xfix=None, yfix=None, truescale=True, std=True, draws=None):
+        """Passes arguments to external function. See 'fokl_to_pyomo' for more documentation."""
         return fokl_to_pyomo(self, xvars, yvars, m, xfix, yfix, truescale, std, draws)
     
     def save(self, filename=None, **kwargs):
+        """
+        Save a FoKL class as a file. By default, the 'filename' is 'model_yyyymmddhhmmss.fokl' and is saved to the
+        directory of the Python script calling this method. Use 'directory' to change the directory saved to, or simply
+        embed the directory manually within 'filename'.
+
+        Returned is the 'filepath'. Enter this as the argument of 'load' to later reload the model. Explicitly, that is
+        'FoKLRoutines.load(filepath)' or 'FoKLRoutines.load(filename, directory)'.
+
+        Note the directory must exist prior to calling this method.
+        """
         return self.functions.save(filename, **kwargs)
     
     def load(self, filename=None, **kwargs):
