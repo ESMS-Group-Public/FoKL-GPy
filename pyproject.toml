@@ -17,7 +17,7 @@ classifiers = [
 dependencies = [
     "requests",
     'importlib-metadata; python_version<"3.8"',
-    "NumPy >= 3.0.0",
+    "NumPy,
     "pandas",
     "matplotlib",
     
