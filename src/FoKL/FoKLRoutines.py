@@ -885,17 +885,15 @@ class FoKL:
             kwargs_to_clean.update({kwarg: current[kwarg]})  # store kwarg for clean here
             del current[kwarg]  # delete kwarg for clean from current
         if current['draws'] < 40 and current['ReturnBounds']:
-            warnings.warn("'draws' must be greater than or equal to 40 if calculating bounds. Setting 'draws=40'.")
+            warnings.warn("'draws' must be greater than or equal to 40 to calculate 95% confidence interval bounds.'.")
         if betas is None:  # default
             betas = self.betas 
-        if draws is None:  # default 
-            if betas.shape[0] < draws: 
-                draws = len(betas.shape[0])  
-            elif  betas.shape[0] > draws: 
-                draws = current['draws']
+        if draws is None: # default
+            draws = self.draws
         else: 
             if betas.shape[0] < draws:
-                raise ValueError("The number of draws requested exceeds the number of beta terms in the model.")
+                raise ValueError(f"The number of draws: {draws}  exceeds the number of draws in betas: {betas.shape[0]}"
+                                 f", \n       draws must be < betas.")
         if mtx is None:  # default
             mtx = self.mtx
         else:  # user-defined mtx may need to be formatted
@@ -1699,7 +1697,7 @@ class FoKL:
                 if self.ConsoleOutput:
                     if data.dtype != np.float64:  # if large dataset, then 'Gibbs: 100.00%' printed from inside gibbs
                         sys.stdout.write('\r')  # place cursor at start of line to erase 'Gibbs: 100.00%'
-                    print([ind, ev])
+                    print([ind, float(ev)])
                 if np.size(evs) > 0:
                     if ev < np.min(evs):
 
@@ -2145,7 +2143,7 @@ class FoKL:
                         taus[k] = tausqd
 
                     # Calculate the evidence (BIC)
-                    ev = (mmtx + 1) * np.log(n) - 2 * max(lik)
+                    ev = (mmtx + 1) * np.log(n) - 2 * np.max(lik)
 
                     X = X[:, 0:mmtx]
 
@@ -2544,7 +2542,7 @@ class FoKL:
 
                             ev = ev + (2 - np.log(n)) * dam
 
-                        print(ind, float(ev))
+                        print(ind,ev)
 
                         # Keep running list of the evidence values for the sampling
                         if np.size(evs) == 0:
