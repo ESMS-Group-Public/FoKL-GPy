@@ -39,8 +39,8 @@ To read more about FoKL, please see the [Benchmarks and Papers](#benchmarks-and-
 
 Versions:
 - FoKL
-- FoKL['pyomo']
-- FoKL['JAX']
+- 'FoKL[pyomo]'
+- 'FoKL[JAX]'
 
 ## Installation and Setup
 
