@@ -2546,13 +2546,13 @@ class FoKL:
 
                         # Keep running list of the evidence values for the sampling
                         if np.size(evs) == 0:
-                            evs = ev
+                            evs = [ev]
                         else:
-                            evs = np.concatenate((evs, ev))
+                            evs = np.concatenate((evs, [ev]))
 
                         # ev (evidence) is the BIC and the smaller the better
 
-                        if ev == min(evs):
+                        if ev == np.min(evs):
                             betas_best = betas
                             mtx = damtx
                             greater = 1
