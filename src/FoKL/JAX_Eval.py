@@ -1,6 +1,5 @@
 import jaxlib
 import jax
-# jax.config.update("jax_enable_x64", True)
 import numpy as np
 import jax.numpy as jnp
 import warnings
@@ -122,7 +121,7 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
 
     if model.kernel == model.kernels[0]:  # == 'Cubic Splines':
         phis = jnp.array(phis)
-        _, phind, xsm = model._inputs_to_phind(normputs)  # ..., phis=self.phis, kernel=self.kernel) already true
+        _, phind, xsm = model._inputs_to_phind(normputs)
     elif model.kernel == model.kernels[1]:
         phi_empty = []
         for arr in phis:
@@ -141,7 +140,7 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
     sett = (phind == 0)
     phind = phind + sett
     l_phis = 499
-    r = 1 / l_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
+    r = 1 / l_phis
     xmin = jnp.array((phind - 1) * r)
     X = (normputs - xmin) / r
     phind = phind.astype(int) - 1
@@ -166,11 +165,11 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
             map_inputs = jax.vmap(cubic_func, in_axes=(None, 0, 0, 0))
             map_dimensions = jax.vmap(
                 map_inputs,
-                in_axes=(None, None, None, 0)  # This maps over rows of phind and X
+                in_axes=(None, None, None, 0)  # maps over rows of phind and X
             )
             map_instances = jax.vmap(
                 map_dimensions,
-                in_axes=(None, 0, 0, None)  # This maps over columns of phind and X
+                in_axes=(None, 0, 0, None)  # maps over columns of phind and X
             )
             model.map = map_instances
         X_vec = jax.numpy.prod(model.map(phis, phind, X_sc, mtx.astype(int)), axis=2)
@@ -201,22 +200,22 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
 
     X = np.hstack([np.ones((n,1)),X_vec])
 
-    # def batched_matmul(X, betas, setnos):
-    #
-    #     betas_subset = jax.lax.dynamic_slice(
-    #         betas,
-    #         start_indices=(setnos, 0),
-    #         slice_sizes=(1, betas.shape[1])
-    #     )
-    #     betas_subset = jax.numpy.squeeze(betas_subset, axis=0)
-    #
-    #
-    #     return jax.numpy.transpose(jax.numpy.matmul(X, jax.numpy.transpose(betas_subset)))
-    #
+    def batched_matmul(X, betas, setnos):
 
-    # jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
-    # modells = jfunc(X,betas,setnos.astype(int))
-    modells = np.matmul(np.array(X), np.transpose(betas))
+        betas_subset = jax.lax.dynamic_slice(
+            betas,
+            start_indices=(setnos, 0),
+            slice_sizes=(1, betas.shape[1])
+        )
+        betas_subset = jax.numpy.squeeze(betas_subset, axis=0)
+
+
+        return jax.numpy.transpose(jax.numpy.matmul(X, jax.numpy.transpose(betas_subset)))
+
+
+    jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
+    modells = jfunc(X,betas,setnos.astype(int))
+    # modells = np.matmul(np.array(X), np.transpose(betas))
     mean = np.mean(modells, axis=1)
 
     if current['ReturnBounds']:
