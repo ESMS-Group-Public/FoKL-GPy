@@ -17,16 +17,17 @@ dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
 # from src.FoKL import FoKLRoutines
 # # -----------------------------------------------------------------------
 import numpy as np
-from FoKL.JAX_Eval import *
+from src.FoKL.JAX_Eval import *
 import matplotlib.pyplot as plt
 
 
 def main():
     # Load Previously built FoKL Model
 
-    model = FoKLRoutines.load("sigmoid_model.fokl")
+    model = FoKLRoutines.load("bernoulli.fokl")
+    model.map = None
 
-    n = [3, 5, 9, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000] # Number of evaluation points
+    n = [3, 5, 9, 50, 100, 500, 1000, 5000] # Number of evaluation points
 
     # initialize vectors
     to_vec = []
@@ -48,10 +49,21 @@ def main():
         to_vec.append(t2)
         tn_vec.append(t4)
 
+        plt.plot(inputs[:,0], mo, label = 'original 64 bit')
+        plt.plot(inputs[:,0], mn, label = 'mapped 32 bit')
+        plt.xlabel('x')
+        plt.ylabel('z')
+        plt.title('Sigmoid')
+        plt.legend( loc='upper left', numpoints = 1 )
+        plt.show()
         print(f'loop {i} (# of points = {points}) finished with \n time original = {to_vec[i]} \n time JAX = {tn_vec[i]} \n')
 
-    plt.plot(to_vec)
-    plt.plot(tn_vec)
+    plt.plot(n, to_vec, label = 'Time Original')
+    plt.plot(n, tn_vec, label = 'Time JAX')
+    plt.title('JAX evaluation vs Normal')
+    plt.xlabel('Number of Points')
+    plt.ylabel('Time [s]')
+    plt.legend()
     plt.show()
 
 
