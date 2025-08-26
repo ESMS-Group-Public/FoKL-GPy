@@ -1,5 +1,6 @@
 import jaxlib
 import jax
+# jax.config.update("jax_enable_x64", True)
 import numpy as np
 import jax.numpy as jnp
 import warnings
@@ -151,7 +152,7 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
 
     if kernel == 'Cubic Splines':
         if model.map is None:
-            def cubic_func(phis, phind, X, num, bet):
+            def cubic_func(phis, phind, X, num):
 
                 return jax.numpy.where(
                     num > 0,
@@ -162,45 +163,27 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
                     1.0
                 )
 
-            map_inputs = jax.vmap(cubic_func, in_axes=(None, 0, 0, 0, None))
+            map_inputs = jax.vmap(cubic_func, in_axes=(None, 0, 0, 0))
             map_dimensions = jax.vmap(
                 map_inputs,
-                in_axes=(None, None, None, 0, 1)  # This maps over rows of phind and X
+                in_axes=(None, None, None, 0)  # This maps over rows of phind and X
             )
             map_instances = jax.vmap(
                 map_dimensions,
-                in_axes=(None, 0, 0, None, None)  # This maps over columns of phind and X
+                in_axes=(None, 0, 0, None)  # This maps over columns of phind and X
             )
             model.map = map_instances
-        X_vec = jax.numpy.prod(model.map(phis, phind, X_sc, mtx.astype(int), betas[:, 1:]), axis=2)
+        X_vec = jax.numpy.prod(model.map(phis, phind, X_sc, mtx.astype(int)), axis=2)
 
     elif kernel == 'Bernoulli Polynomials':
 
         if model.map is None:
-            # print(mtx.astype(int).shape)
-            # def bernoulli_func(phis, num, x):
-            #     coeff = phis[num - 1]
-            #     k_vec = jnp.array(range(1, len(coeff)))
-            #     def coeff_eval(co, k, x_e):
-            #         return co * x_e**k
-            #     coeff_evals = jax.vmap(coeff_eval, in_axes=(0,0,None))
-            #
-            #     return jax.numpy.where(
-            #         num > 0,
-            #         coeff[0] + sum(coeff_evals(coeff[1:], k_vec, x)),
-            #         1.0
-            #     )
-            #     # c[0] + sum(c[k] * (x ** k) for k in range(1, len(c)))
 
             def bernoulli_func(phis, num, x):
-                coeff = phis[num - 1]
 
-                return jax.numpy.where(
-                    num > 0,
-                    coeff[0] + sum(coeff[k] * (x ** k) for k in range(1, len(coeff))),
-                    1.0
-                )
-                # c[0] + sum(c[k] * (x ** k) for k in range(1, len(c)))
+                coeff = phis[num-1]
+                result = jnp.where(x>0.5, ((-1)**(num))*jnp.polyval(coeff[::-1],(1-x)),jnp.polyval(coeff[::-1], x))
+                return jnp.where(num > 0, result, 1.0)
 
             map_inputs = jax.vmap(bernoulli_func, in_axes=(None, 0, 0))
 
@@ -218,22 +201,23 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
 
     X = np.hstack([np.ones((n,1)),X_vec])
 
-    def batched_matmul(X, betas, setnos):
-
-        betas_subset = jax.lax.dynamic_slice(
-            betas,
-            start_indices=(setnos, 0),
-            slice_sizes=(1, betas.shape[1])
-        )
-        betas_subset = jax.numpy.squeeze(betas_subset, axis=0)
-
-
-        return jax.numpy.transpose(jax.numpy.matmul(X, jax.numpy.transpose(betas_subset)))
+    # def batched_matmul(X, betas, setnos):
+    #
+    #     betas_subset = jax.lax.dynamic_slice(
+    #         betas,
+    #         start_indices=(setnos, 0),
+    #         slice_sizes=(1, betas.shape[1])
+    #     )
+    #     betas_subset = jax.numpy.squeeze(betas_subset, axis=0)
+    #
+    #
+    #     return jax.numpy.transpose(jax.numpy.matmul(X, jax.numpy.transpose(betas_subset)))
     #
 
-    jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
-    modells = jfunc(X,betas,setnos.astype(int))
-    mean = jax.numpy.mean(modells, axis=0)
+    # jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
+    # modells = jfunc(X,betas,setnos.astype(int))
+    modells = np.matmul(np.array(X), np.transpose(betas))
+    mean = np.mean(modells, axis=1)
 
     if current['ReturnBounds']:
         bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
