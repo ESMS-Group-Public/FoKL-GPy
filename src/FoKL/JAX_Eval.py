@@ -1,5 +1,6 @@
 import jaxlib
 import jax
+# jax.config.update("jax_enable_x64", True)
 import numpy as np
 import jax.numpy as jnp
 import warnings
@@ -165,11 +166,11 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
             map_inputs = jax.vmap(cubic_func, in_axes=(None, 0, 0, 0))
             map_dimensions = jax.vmap(
                 map_inputs,
-                in_axes=(None, None, None, 0)  # maps over rows of phind and X
+                in_axes=(None, None, None, 0)  # This maps over rows of phind and X
             )
             map_instances = jax.vmap(
                 map_dimensions,
-                in_axes=(None, 0, 0, None)  # maps over columns of phind and X
+                in_axes=(None, 0, 0, None)  # This maps over columns of phind and X
             )
             model.map = map_instances
         X_vec = jax.numpy.prod(model.map(phis, phind, X_sc, mtx.astype(int)), axis=2)
@@ -181,7 +182,9 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
             def bernoulli_func(phis, num, x):
 
                 coeff = phis[num-1]
+
                 result = jnp.where(x>0.5, ((-1)**(num))*jnp.polyval(coeff[::-1],(1-x)),jnp.polyval(coeff[::-1], x))
+
                 return jnp.where(num > 0, result, 1.0)
 
             map_inputs = jax.vmap(bernoulli_func, in_axes=(None, 0, 0))
@@ -200,22 +203,7 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kerne
 
     X = np.hstack([np.ones((n,1)),X_vec])
 
-    def batched_matmul(X, betas, setnos):
-
-        betas_subset = jax.lax.dynamic_slice(
-            betas,
-            start_indices=(setnos, 0),
-            slice_sizes=(1, betas.shape[1])
-        )
-        betas_subset = jax.numpy.squeeze(betas_subset, axis=0)
-
-
-        return jax.numpy.transpose(jax.numpy.matmul(X, jax.numpy.transpose(betas_subset)))
-
-
-    jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
-    modells = jfunc(X,betas,setnos.astype(int))
-    # modells = np.matmul(np.array(X), np.transpose(betas))
+    modells = np.matmul(np.array(X), np.transpose(betas[setnos]))
     mean = np.mean(modells, axis=1)
 
     if current['ReturnBounds']:
