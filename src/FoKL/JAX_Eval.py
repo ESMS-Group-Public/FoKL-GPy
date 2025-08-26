@@ -1,5 +1,6 @@
 import jaxlib
 import jax
+# jax.config.update("jax_enable_x64", True)
 import numpy as np
 import jax.numpy as jnp
 import warnings
@@ -90,7 +91,7 @@ def evaluate_preprocess(model, inputs=None, betas=None, mtx=None, avgbetas=False
 
     return normputs, setnos, phis, betas, mtx, minmax, draws, current
 
-def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, **kwargs):
+def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, kernel='cubic', **kwargs):
     """
     Evaluate the FoKL model for provided inputs and (optionally) calculate bounds. Note 'evaluate_fokl' may be a
     more accurate name so as not to confuse this function with 'evaluate_basis', but it is unexpected for a user to
@@ -108,7 +109,7 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, **kwa
         ReturnBounds == boolean to return confidence bounds as second output   == False (default)
     """
     normputs, setnos, phis, betas, mtx, minmax, draws, current = evaluate_preprocess(model, inputs, betas, mtx, avgbetas, **kwargs)
-
+    kernel = model.kernel
     m, mbets = jnp.shape(betas)  # Size of betas
     n = jnp.shape(normputs)[0]  # Size of normalized inputs
     mputs = int(np.size(normputs) / n)
@@ -116,21 +117,31 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, **kwa
     X = jnp.zeros((n, mbets))
     normputs = jnp.asarray(normputs)
 
-    phis = jnp.array(phis)
     setnos = jnp.array(setnos)
     mtx = jnp.array(mtx)
 
     if model.kernel == model.kernels[0]:  # == 'Cubic Splines':
-        _, phind, xsm = model._inputs_to_phind(normputs)  # ..., phis=self.phis, kernel=self.kernel) already true
+        phis = jnp.array(phis)
+        _, phind, xsm = model._inputs_to_phind(normputs)
+    elif model.kernel == model.kernels[1]:
+        phi_empty = []
+        for arr in phis:
+            arr_new = np.zeros(len(phis) + 1)
+            for n_arr in range(len(arr)):
+                arr_new[n_arr] = arr[n_arr]
+            phi_empty.append(arr_new)
+        phis = jnp.array(phi_empty)
+        phind = None
+        xsm = normputs
     else:
-        raise ValueError("Kernel must be either 'Cubic Splines'")
+        raise ValueError("Kernel must be either 'Cubic Splines' or 'Bernoulli Polynomials")
 
 
     phind = jnp.ceil(normputs * 499)
     sett = (phind == 0)
     phind = phind + sett
     l_phis = 499
-    r = 1 / l_phis  # interval of when basis function changes (i.e., when next cubic function defines spline)
+    r = 1 / l_phis
     xmin = jnp.array((phind - 1) * r)
     X = (normputs - xmin) / r
     phind = phind.astype(int) - 1
@@ -138,47 +149,62 @@ def evaluate_jax(model, inputs=None, betas=None, mtx=None, avgbetas=False, **kwa
     A = jnp.array([1, 2, 3])
 
     X_sc = np.stack([X**a for a in A], axis=2)
-    def cubic_func(phis, phind, X, num, bet):
 
-        return jax.numpy.where(
-            num > 0,
-            phis[num - 1][0][phind]
-            + phis[num - 1][1][phind] * X[0]
-            + phis[num - 1][2][phind] * X[1]
-            + phis[num - 1][3][phind] * X[2],
-            1.0
-        )
+    if kernel == 'Cubic Splines':
+        if model.map is None:
+            def cubic_func(phis, phind, X, num):
 
+                return jax.numpy.where(
+                    num > 0,
+                    phis[num - 1][0][phind]
+                    + phis[num - 1][1][phind] * X[0]
+                    + phis[num - 1][2][phind] * X[1]
+                    + phis[num - 1][3][phind] * X[2],
+                    1.0
+                )
 
-    map_inputs = jax.vmap(cubic_func, in_axes=(None,0,0,0,None))
-    map_dimensions = jax.vmap(
-            map_inputs,
-            in_axes=(None,None,None, 0 ,1)  # This maps over rows of phind and X
-        )
-    map_instances = jax.vmap(
-        map_dimensions,
-        in_axes=(None, 0, 0, None, None)  # This maps over columns of phind and X
-    )
-    X_vec = jax.numpy.prod(map_instances(phis, phind, X_sc, mtx.astype(int), betas[:,1:]), axis = 2)
+            map_inputs = jax.vmap(cubic_func, in_axes=(None, 0, 0, 0))
+            map_dimensions = jax.vmap(
+                map_inputs,
+                in_axes=(None, None, None, 0)  # This maps over rows of phind and X
+            )
+            map_instances = jax.vmap(
+                map_dimensions,
+                in_axes=(None, 0, 0, None)  # This maps over columns of phind and X
+            )
+            model.map = map_instances
+        X_vec = jax.numpy.prod(model.map(phis, phind, X_sc, mtx.astype(int)), axis=2)
+
+    elif kernel == 'Bernoulli Polynomials':
+
+        if model.map is None:
+
+            def bernoulli_func(phis, num, x):
+
+                coeff = phis[num-1]
+
+                result = jnp.where(x>0.5, ((-1)**(num))*jnp.polyval(coeff[::-1],(1-x)),jnp.polyval(coeff[::-1], x))
+
+                return jnp.where(num > 0, result, 1.0)
+
+            map_inputs = jax.vmap(bernoulli_func, in_axes=(None, 0, 0))
+
+            map_dimensions = jax.vmap(
+                map_inputs,
+                in_axes=(None, 0, None)  #
+            )
+            map_instances = jax.vmap(
+                map_dimensions,
+                in_axes=(None, None, 0)  #
+            )
+
+            model.map = map_instances
+        X_vec = jax.numpy.prod(model.map(phis, mtx.astype(int), normputs), axis=2)
 
     X = np.hstack([np.ones((n,1)),X_vec])
 
-    def batched_matmul(X, betas, setnos):
-        # Gather rows corresponding to `setnos`
-        betas_subset = jax.lax.dynamic_slice(
-            betas,
-            start_indices=(setnos, 0),  # Start slicing at setnos
-            slice_sizes=(1, betas.shape[1])  # Slice one row and all columns
-        )
-        betas_subset = jax.numpy.squeeze(betas_subset, axis=0)  # Remove singleton dimension
-
-        # Perform the matrix multiplication
-        return jax.numpy.transpose(jax.numpy.matmul(X, jax.numpy.transpose(betas_subset)))
-    #
-
-    jfunc = jax.vmap(batched_matmul, in_axes=(None, None, 0))
-    modells = jfunc(X,betas,setnos.astype(int))
-    mean = jax.numpy.mean(modells, axis=0)
+    modells = np.matmul(np.array(X), np.transpose(betas[setnos]))
+    mean = np.mean(modells, axis=1)
 
     if current['ReturnBounds']:
         bounds = np.zeros((n, 2))  # note n == np.shape(data)[0] if data != 'ignore'
@@ -215,6 +241,20 @@ def evaluate_basis_jax(c, x):
     return basis
 
 def eval_loop_cubic(mtx, mbets, xsm, phis, phind, n, mputs):
+    for i in range(n):
+        for j in range(1, mbets):
+            phi = 1
+            for k in range(mputs):
+                num = mtx[j - 1, k]
+                if num:
+                    nid = int(num - 1)
+                    coeffs = [phis[nid][order][phind[i, k]] for order in range(4)]  # coefficients for cubic
+                    phi *= evaluate_basis_jax(coeffs, xsm[i, k])  # multiplies phi(x0)*phi(x1)*etc.
+            return phi
+
+
+
+def eval_loop_bernoullli(mtx, mbets, xsm, phis, phind, n, mputs):
     for i in range(n):
         for j in range(1, mbets):
             phi = 1
