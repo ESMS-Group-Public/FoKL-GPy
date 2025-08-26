@@ -17,7 +17,7 @@ dir = os.path.abspath(os.path.dirname(__file__))  # directory of script
 # from src.FoKL import FoKLRoutines
 # # -----------------------------------------------------------------------
 import numpy as np
-from src.FoKL.JAX_Eval import *
+from FoKL.JAX_Eval import *
 import matplotlib.pyplot as plt
 
 
@@ -27,7 +27,7 @@ def main():
     model = FoKLRoutines.load("bernoulli.fokl")
     model.map = None
 
-    n = [3, 5, 9, 50, 100, 500, 1000, 5000] # Number of evaluation points
+    n = [3, 5, 9, 50, 100, 500, 1000, 5000, 10000, 50000] # Number of evaluation points
 
     # initialize vectors
     to_vec = []
