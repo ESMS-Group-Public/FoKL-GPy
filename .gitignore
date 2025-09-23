@@ -1,4 +1,4 @@
-src/FoKL/__pycache__/
+src/FoKL/__pycache__/*
 .idea
 .spyder*
 .ropeproject
