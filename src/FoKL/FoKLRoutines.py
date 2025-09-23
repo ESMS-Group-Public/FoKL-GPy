@@ -1801,7 +1801,12 @@ class FoKL:
             raise ImportError(
                 "Pyomo must be installed to use this method. try pip install FoKL[pyomo] or pip install pyomo directly"
             )
-        from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
+        try:
+            # Look for a local version of FoKL in a standard place
+            from src.FoKL.fokl_to_pyomo import fokl_to_pyomo
+        except ModuleNotFoundError:
+            # Try to import from the installed package
+            from FoKL.fokl_to_pyomo import fokl_to_pyomo
         return fokl_to_pyomo(self, xvars, yvars, m, xfix, yfix, truescale, std, draws)
 
     def save(self, filename=None, directory=None):

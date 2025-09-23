@@ -1,1 +1,12 @@
-src/FoKL/__pycache__/
+src/FoKL/__pycache__/*
+.idea
+.spyder*
+.ropeproject
+.vscode
+*.pyx
+*.pyc
+*.pyo
+*.egg-info
+*.out
+.ipynb_checkpoints
+*.DS_Store*
