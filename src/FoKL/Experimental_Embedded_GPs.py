@@ -768,11 +768,11 @@ class Embedded_GP_Model:
                 if mrel != 0:
                     for j in range(1, mvec):
                         testvec = jnp.divide(vecs[j, :], vecs[j, :])
-                        testvec[jitnp.isnan(testvec)] = 0
-                        for k in range(1, mrel):
-                            if sum(testvec == relats[k, :]) == m:
-                                killvecs.append(j)
-                                break
+                        testvec[jnp.isnan(testvec)] = 0
+                        # for k in range(1, mrel):
+                        #     if sum(testvec == relats[k, :]) == m:
+                        #         killvecs.append(j)
+                        #         break
                     nuvecs = jnp.zeros(mvec - jnp.size(killvecs), m)
                     vecind = 1
                     for j in range(1, mvec):
