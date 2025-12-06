@@ -93,6 +93,7 @@ Then, see [User Documentation](#user-documentation) as needed.
       - [clear](#clear)
       - [to_pyomo](#to_pyomo)
       - [save](#save)
+      - [get_Jacobian](#get_jacobian)
   - [fokl_to_pyomo](#fokl_to_pyomo)
   - [getKernels](#getkernels)
   - [GP_integrate](#gp_integrate)
@@ -309,6 +310,7 @@ Evaluate the FoKL model for provided inputs and (optionally) calculate bounds.
 | ```draws```        | -       | see ```draws``` of [FoKL](#fokl)                                                                                               | ```model.draws``` |
 | ```clean```        | boolean | pass ```inputs``` to [clean](#clean) if true; note this will override ```minmax``` and result in ```inputs``` scaled to 0-1 | ```False```       |
 | ```ReturnBounds``` | boolean | return 95% confidence bounds as second output if true                                                                          | ```False```       |
+| ```ReturnJacobian```  | boolean | return Jacobian of FoKL model with respect to beta coefficients; see [get_Jacobian](#get_jacobian) | ```False``` |
 
 If ```clean=True```, then any keywords documented for [clean](#clean) may be used here.
 
@@ -466,6 +468,44 @@ FoKLRoutines.load(filepath)
 | Output         | Type   | Description                               |
 |----------------|--------|-------------------------------------------|
 | ```filepath``` | string | absolute path to where the file was saved |
+
+##### get_Jacobian
+
+```python
+J = model.get_Jacobian()
+```
+
+Outputs the Jacobian matrix of the FoKL model with respect to the $\beta$ coefficients. That is,
+
+$$
+\mathbf{J} =
+\begin{bmatrix}
+\frac{d y_{0}}{d \beta_{0}} & \frac{d y_{0}}{d \beta_{1}} & \dots \\
+\frac{d y_{1}}{d \beta_{0}} & \frac{d y_{1}}{d \beta_{1}} & {} \\
+\vdots & {} & \ddots \\
+\end{bmatrix}
+$$
+
+This is effectively the interaction terms. For example, if the FoKL model is
+
+$$
+y = \beta_{0} + \beta_{1} \phi_{1}(x_{1}) + \beta_{2} \phi_{1}(x_{2}) + \beta_{3} \phi_{1}(x_{1}) \phi_{1}(x_{2}) + \dots
+$$
+
+then the resulting Jacobian matrix would be
+
+$$
+\mathbf{J} =
+\begin{bmatrix}
+1 & \phi_{1}(x_{1}^{(0)}) & \phi_{1}(x_{2}^{(0)}) & \phi_{1}(x_{1}^{(0)}) \phi_{1}(x_{2}^{(0)}) & \dots \\
+1 & \phi_{1}(x_{1}^{(1)}) & \phi_{1}(x_{2}^{(1)}) & \phi_{1}(x_{1}^{(1)}) \phi_{1}(x_{2}^{(1)}) & \dots \\
+\vdots & \vdots & \vdots & \vdots & \ddots \\
+\end{bmatrix}
+$$
+
+where $i$ in $x_{m}^{(i)}$ refers to the index of the input, e.g., the time index in a time-series.
+
+Because this is equivalent to the FoKL model prior to the terms being scaled by the $\beta$ coefficients and summed together, this calculation actually occurs as an intermediate step in [evaluate](#evaluate) and so this method is a wrapper calling that method.
 
 ### fokl_to_pyomo
 

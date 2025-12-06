@@ -858,19 +858,20 @@ class FoKL:
             inputs == input variable(s) at which to evaluate the FoKL model == self.inputs (default)
 
         Optional Inputs:
-            betas        == coefficients defining FoKL model                       == self.betas (default)
-            mtx          == interaction matrix defining FoKL model                 == self.mtx (default)
-            minmax       == [min, max] of inputs used for normalization            == None (default)
-            draws        == number of beta terms used                              == self.draws (default)
-            clean        == boolean to automatically normalize and format 'inputs' == False (default)
-            ReturnBounds == boolean to return confidence bounds as second output   == False (default)
+            betas          == coefficients defining FoKL model                                                          == self.betas (default)
+            mtx            == interaction matrix defining FoKL model                                                    == self.mtx (default)
+            minmax         == [min, max] of inputs used for normalization                                               == None (default)
+            draws          == number of beta terms used                                                                 == self.draws (default)
+            clean          == boolean to automatically normalize and format 'inputs'                                    == False (default)
+            ReturnBounds   == boolean to return confidence bounds as second output                                      == False (default)
+            ReturnJacobian == boolean to return Jacobian of FoKL model with respect to beta coefficients as only output == False (default)
         """
         # Check if self.minmax exists before including it in defaults
         if not hasattr(self, 'minmax'):
             raise ValueError("To set minmax manually call model.minmax = ([input_min, input_max],[data_min, data_max],...)"
                 " or set clean=True to automtically define min and max from model.inputs")
         # Process keywords:
-        default = {'minmax': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False,  # for evaluate
+        default = {'minmax': None, 'draws': self.draws, 'clean': False, 'ReturnBounds': False, 'ReturnJacobian': False,  # for evaluate
                    '_suppress_normalization_warning': False, 'betas': self.betas, 'mtx': self.mtx}  # if called from coverage3
         default_for_clean = {'train': 1, 
                              # For '_format':
@@ -904,7 +905,9 @@ class FoKL:
                 mtx = mtx[np.newaxis, :]
                 warnings.warn("Assuming 'mtx' represents a single model. If meant to represent several models, then "
                               "explicitly enter a 2D numpy array where rows correspond to models.")
-
+        if current['ReturnBounds'] and current['ReturnJacobian']:
+            warnings.warn("Jacobian was requested, so 'ReturnBounds' has no effect. The Jacobian does not have confidence bounds, because it is independent of beta draws. Ignoring 'ReturnBounds'.")
+        
         phis = self.phis
 
         # Automatically normalize and format inputs:
@@ -963,6 +966,13 @@ class FoKL:
                 X[i, j] = phi
 
         X[:, 0] = np.ones((n,))
+
+        # Currently, 'X' is just the interaction terms (i.e., phi interactions), with the first column ('beta0') as ones.
+        # This happens to be the same as the FoKL model's Jacobian with respect to the betas, so return output now if Jacobian was requested:
+        if current['ReturnJacobian'] == True:
+            return X  # return Jacobian, J = dy/dbeta
+
+        # Factor in beta coefficient sets (because each draw is a set of betas) to 'X', then average draws:
         modells = np.zeros((n, draws))  # note n == np.shape(data)[0] if data != 'ignore'
         for i in range(draws):
             modells[:, i] = np.transpose(np.matmul(X, np.transpose(np.array(betas[setnos[i], :]))))
@@ -1850,7 +1860,8 @@ class FoKL:
 
         return filepath
 
-# Beginning of UPDATE Code:
+    # =================================
+    # [START] Beginning of UPDATE Code:
 
     def fitupdate(self, inputs, data):
             """
@@ -2586,4 +2597,12 @@ class FoKL:
                 mtx = damtx
 
             return betas_best, mtx, evs
+
+    # [END] End of UPDATE Code.
+    # =================================
+
+    def get_Jacobian(self):
+        '''Wrapper calling 'evaluate', to obtain the Jacobian matrix of the FoKL model with respect to beta coefficients.'''
+        J = self.evaluate(ReturnJacobian=True, _suppress_normalization_warning=True)
+        return J
 
