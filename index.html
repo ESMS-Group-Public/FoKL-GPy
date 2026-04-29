@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FoKL-GPy - Fast Gaussian Process Machine Learning</title>
+    <meta name="description" content="FoKL-GPy: Forward variable selection using Karhunen-Loève decomposed Gaussian Processes in Python for fast, accurate machine learning inference.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Spectral:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0a4d68;
+            --secondary: #05668d;
+            --accent: #028090;
+            --highlight: #00a896;
+            --dark: #0d1b2a;
+            --light: #f8f9fa;
+            --muted: #6c757d;
+            --code-bg: #1e1e1e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Spectral', Georgia, serif;
+            background: var(--light);
+            color: var(--dark);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-pattern {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.03;
+            background-image: 
+                repeating-linear-gradient(45deg, var(--primary) 0px, var(--primary) 1px, transparent 1px, transparent 60px),
+                repeating-linear-gradient(-45deg, var(--secondary) 0px, var(--secondary) 1px, transparent 1px, transparent 60px);
+            animation: drift 60s linear infinite;
+        }
+
+        @keyframes drift {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(60px, 60px); }
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M20,50 Q30,30 40,50 T60,50 T80,50" stroke="rgba(255,255,255,0.1)" fill="none" stroke-width="0.5"/></svg>');
+            background-size: 200px 200px;
+            opacity: 0.3;
+            animation: wave 20s linear infinite;
+        }
+
+        @keyframes wave {
+            0% { background-position: 0 0; }
+            100% { background-position: 200px 200px; }
+        }
+
+        h1 {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 3.5rem;
+            font-weight: 600;
+            letter-spacing: -2px;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 1;
+            animation: slideDown 0.8s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            font-weight: 300;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+            animation: fadeIn 1s ease-out 0.3s both;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 0.95; }
+        }
+
+        /* Navigation */
+        nav {
+            background: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            sticky: top;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav ul {
+            list-style: none;
+            display: flex;
+            justify-content: center;
+            gap: 2.5rem;
+            flex-wrap: wrap;
+        }
+
+        nav a {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--dark);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            position: relative;
+            padding: 0.3rem 0;
+        }
+
+        nav a::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent);
+            transition: width 0.3s ease;
+        }
+
+        nav a:hover {
+            color: var(--accent);
+        }
+
+        nav a:hover::after {
+            width: 100%;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            margin-bottom: 5rem;
+            animation: fadeUp 0.8s ease-out 0.5s both;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .hero h2 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--muted);
+            max-width: 800px;
+            margin: 0 auto 2rem;
+        }
+
+        /* Install Box */
+        .install-box {
+            background: var(--code-bg);
+            color: #fff;
+            padding: 1.5rem 2rem;
+            border-radius: 12px;
+            max-width: 600px;
+            margin: 2rem auto;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.1rem;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            animation: slideIn 0.8s ease-out 0.7s both;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .install-box::before {
+            content: '$ ';
+            color: var(--highlight);
+            font-weight: 600;
+        }
+
+        .copy-btn {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: var(--highlight);
+            transform: translateY(-50%) scale(1.05);
+        }
+
+        /* Features Grid */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2.5rem;
+            margin: 4rem 0;
+        }
+
+        .feature {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.06);
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--highlight));
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.4s ease;
+        }
+
+        .feature:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.12);
+        }
+
+        .feature:hover::before {
+            transform: scaleX(1);
+        }
+
+        .feature h3 {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .feature h3::before {
+            content: '→';
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .feature p {
+            color: var(--muted);
+            line-height: 1.8;
+        }
+
+        /* CTA Buttons */
+        .cta-buttons {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 3rem 0;
+        }
+
+        .btn {
+            font-family: 'IBM Plex Mono', monospace;
+            padding: 1rem 2.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: inline-block;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--highlight));
+            color: white;
+            box-shadow: 0 5px 15px rgba(0,168,150,0.3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 8px 25px rgba(0,168,150,0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* Stats Section */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin: 4rem 0;
+            padding: 3rem 2rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            color: white;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 3rem;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--highlight);
+        }
+
+        .stat-label {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--dark);
+            color: rgba(255,255,255,0.8);
+            padding: 3rem 2rem;
+            margin-top: 5rem;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 3rem;
+        }
+
+        .footer-section h3 {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--highlight);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .footer-section a {
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            display: block;
+            margin-bottom: 0.5rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-section a:hover {
+            color: var(--highlight);
+        }
+
+        .footer-bottom {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.9rem;
+        }
+
+        /* Code Block */
+        .code-example {
+            background: var(--code-bg);
+            color: #fff;
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .code-example .comment {
+            color: #6a9955;
+        }
+
+        .code-example .keyword {
+            color: #569cd6;
+        }
+
+        .code-example .string {
+            color: #ce9178;
+        }
+
+        .code-example .function {
+            color: #dcdcaa;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero h2 {
+                font-size: 2rem;
+            }
+
+            nav ul {
+                gap: 1rem;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+
+            .install-box {
+                font-size: 0.9rem;
+                padding: 1rem 1.5rem;
+            }
+
+            .copy-btn {
+                position: static;
+                transform: none;
+                margin-top: 1rem;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+
+    <header>
+        <h1>FoKL-GPy</h1>
+        <p class="subtitle">Forward variable selection using Karhunen-Loève decomposed Gaussian Processes</p>
+    </header>
+
+    <nav>
+        <ul>
+            <li><a href="#about">About</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#install">Installation</a></li>
+            <li><a href="#docs">Documentation</a></li>
+            <li><a href="https://github.com/ESMS-Group-Public/FoKL-GPy">GitHub</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <section class="hero" id="about">
+            <h2>Fast, Accurate Machine Learning with Gaussian Processes</h2>
+            <p>
+                FoKL-GPy is a Python package designed for scalable Gaussian Process regression with forward variable selection. 
+                Built for speed and accuracy, it enables fast inference on both static and dynamic datasets while maintaining 
+                significant predictive power.
+            </p>
+
+            <div class="install-box" id="install">
+                pip install FoKL
+                <button class="copy-btn" onclick="copyInstall()">Copy</button>
+            </div>
+
+            <div class="cta-buttons">
+                <a href="https://github.com/ESMS-Group-Public/FoKL-GPy" class="btn btn-primary">View on GitHub</a>
+                <a href="#docs" class="btn btn-secondary">Read Documentation</a>
+            </div>
+        </section>
+
+        <section class="stats">
+            <div class="stat">
+                <span class="stat-number">10×</span>
+                <span class="stat-label">Faster Inference</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">100%</span>
+                <span class="stat-label">Open Source</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">∞</span>
+                <span class="stat-label">Scalability</span>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <div class="feature">
+                <h3>Fast Inference</h3>
+                <p>
+                    Leverage Karhunen-Loève decomposition for scalable GP regression. Get rapid predictions on 
+                    large datasets without sacrificing accuracy.
+                </p>
+            </div>
+
+            <div class="feature">
+                <h3>Symbolic Equations</h3>
+                <p>
+                    Export your trained models as symbolic equations. Seamlessly integrate GP models into 
+                    optimization frameworks like Pyomo.
+                </p>
+            </div>
+
+            <div class="feature">
+                <h3>Derivatives & Gradients</h3>
+                <p>
+                    Compute first and second derivatives of your model with respect to any input variable. 
+                    Perfect for sensitivity analysis and optimization.
+                </p>
+            </div>
+
+            <div class="feature">
+                <h3>User-Friendly API</h3>
+                <p>
+                    Automatic handling of various dataset formats, intelligent training set creation, and 
+                    intuitive hyperparameter tuning make FoKL easy to use.
+                </p>
+            </div>
+
+            <div class="feature">
+                <h3>Model Persistence</h3>
+                <p>
+                    Save, share, and load trained models effortlessly. Import and evaluate models without 
+                    requiring the original training data.
+                </p>
+            </div>
+
+            <div class="feature">
+                <h3>Multiple Backends</h3>
+                <p>
+                    Choose from standard FoKL, FoKL[pyomo] for optimization, or FoKL[JAX] for accelerated 
+                    computation on GPUs.
+                </p>
+            </div>
+        </section>
+
+        <section id="quickstart">
+            <h2 style="text-align: center; margin: 4rem 0 2rem; font-size: 2.5rem; color: var(--primary);">Quick Start</h2>
+            
+            <div class="code-example">
+<span class="comment"># Import FoKL</span>
+<span class="keyword">from</span> fokl <span class="keyword">import</span> FoKL
+
+<span class="comment"># Initialize and train</span>
+model = <span class="function">FoKL</span>()
+model.<span class="function">fit</span>(X_train, y_train)
+
+<span class="comment"># Make predictions</span>
+y_pred = model.<span class="function">predict</span>(X_test)
+
+<span class="comment"># Export as symbolic equation</span>
+equation = model.<span class="function">to_symbolic</span>()
+
+<span class="comment"># Compute gradients</span>
+gradient = model.<span class="function">gradient</span>(X_test, variable=<span class="string">'x1'</span>)
+            </div>
+        </section>
+
+        <section id="docs" style="margin-top: 5rem; text-align: center;">
+            <h2 style="margin-bottom: 2rem; font-size: 2.5rem; color: var(--primary);">Documentation & Resources</h2>
+            <div class="cta-buttons">
+                <a href="docs/tutorials/" class="btn btn-secondary">Tutorials</a>
+                <a href="https://github.com/ESMS-Group-Public/FoKL-GPy/tree/main/examples" class="btn btn-secondary">Examples</a>
+                <a href="https://github.com/ESMS-Group-Public/FoKL-GPy#benchmarks-and-papers" class="btn btn-secondary">Papers & Benchmarks</a>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>FoKL-GPy</h3>
+                <p>Fast Gaussian Process machine learning for Python</p>
+            </div>
+
+            <div class="footer-section">
+                <h3>Quick Links</h3>
+                <a href="https://github.com/ESMS-Group-Public/FoKL-GPy">GitHub Repository</a>
+                <a href="https://pypi.org/project/FoKL/">PyPI Package</a>
+                <a href="https://github.com/ESMS-Group-Public/FoKL-GPy/issues">Report Issues</a>
+            </div>
+
+            <div class="footer-section">
+                <h3>Resources</h3>
+                <a href="docs/tutorials/">Tutorials</a>
+                <a href="https://github.com/ESMS-Group-Public/FoKL-GPy/tree/main/examples">Examples</a>
+                <a href="https://github.com/ESMS-Group-Public/FoKL-GPy/blob/main/LICENSE">License</a>
+            </div>
+
+            <div class="footer-section">
+                <h3>Community</h3>
+                <a href="https://github.com/ESMS-Group-Public/FoKL-GPy/blob/main/CODE_OF_CONDUCT.md">Code of Conduct</a>
+                <a href="https://github.com/ESMS-Group-Public/FoKL-GPy/blob/main/README.md#contact-us">Contact Us</a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2024-2026 ESMS Group. Licensed under the MIT License.</p>
+        </div>
+    </footer>
+
+    <script>
+        function copyInstall() {
+            const text = 'pip install FoKL';
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            });
+        }
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Stagger animation for features
+        const features = document.querySelectorAll('.feature');
+        features.forEach((feature, index) => {
+            feature.style.animation = `fadeUp 0.8s ease-out ${0.8 + index * 0.1}s both`;
+        });
+    </script>
+</body>
+</html>
